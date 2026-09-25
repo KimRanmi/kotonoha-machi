@@ -3,30 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./town.module.css";
+import { BUILDINGS } from "./buildings";
+import { BuildingMarker } from "./BuildingMarker";
 
 // 맵/캐릭터 기본 수치. 이번 범위는 "하나로 이어진 오픈맵 위에서 자유롭게 걸어다니기"까지이며
 // 실제 아트 에셋, 건물 기능, 대화 연동 등은 이후 단계에서 다룬다.
+// 건물 목록/타입은 ./buildings, 건물 한 채의 렌더링은 ./BuildingMarker 에 분리해뒀다 —
+// 건물별 기능을 추가할 때 이동/충돌을 다루는 이 파일을 건드릴 필요가 없도록 하기 위함이다.
 const MAP_WIDTH = 960;
 const MAP_HEIGHT = 640;
 const CHAR_SIZE = 32;
 const MOVE_SPEED = 220; // px / sec
-
-interface Building {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  label: string;
-  color: string;
-}
-
-// placeholder 건물 3개. 아직 아무 기능도 없다 — 충돌 처리를 위한 사각형 영역만 갖는다.
-const BUILDINGS: Building[] = [
-  { id: "house", x: 110, y: 110, width: 130, height: 100, label: "집", color: "#c97b4a" },
-  { id: "shop", x: 620, y: 150, width: 150, height: 110, label: "상점", color: "#5c7fae" },
-  { id: "hall", x: 360, y: 430, width: 170, height: 110, label: "마을회관", color: "#7a9d5c" },
-];
 
 const KEY_DIRECTIONS: Record<string, { dx: number; dy: number }> = {
   arrowup: { dx: 0, dy: -1 },
@@ -177,19 +164,7 @@ export default function TownPage() {
           />
 
           {BUILDINGS.map((b) => (
-            <div
-              key={b.id}
-              className={styles.building}
-              style={{
-                left: b.x,
-                top: b.y,
-                width: b.width,
-                height: b.height,
-                background: b.color,
-              }}
-            >
-              {b.label}
-            </div>
+            <BuildingMarker key={b.id} building={b} />
           ))}
 
           <div
