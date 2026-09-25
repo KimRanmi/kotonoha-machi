@@ -1,10 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
-import {
-  VILLAGER_MODEL,
-  VILLAGER_SYSTEM_PROMPT,
-  TRANSLATOR_SYSTEM_PROMPT,
-} from "@/lib/villager";
+import { VILLAGER_MODEL, TRANSLATOR_SYSTEM_PROMPT, getVillager } from "@/lib/villager";
 
 interface IncomingMessage {
   role: "user" | "assistant";
@@ -23,7 +19,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { messages?: IncomingMessage[] };
+  let body: { messages?: IncomingMessage[]; villagerId?: string };
   try {
     body = await req.json();
   } catch {
@@ -38,6 +34,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const villager = getVillager(body.villagerId);
   const ai = new GoogleGenAI({ apiKey });
 
   try {
@@ -49,7 +46,7 @@ export async function POST(req: NextRequest) {
     const response = await ai.models.generateContent({
       model: VILLAGER_MODEL,
       contents,
-      config: { systemInstruction: VILLAGER_SYSTEM_PROMPT },
+      config: { systemInstruction: villager.systemPrompt },
     });
 
     const reply = (response.text ?? "").trim();
