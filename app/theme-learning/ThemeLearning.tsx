@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import styles from "./theme-learning.module.css";
 import { travelTheme } from "./data";
+import { saveToStorage, PENDING_BUILDING_STORAGE_KEY } from "@/lib/storage";
+import type { PendingBuilding } from "@/lib/types";
 
 const MAX_WRONG_BEFORE_HINT = 3;
+// "테마 완료!" 화면을 잠깐 보여준 뒤 마을로 자동 전환하기까지의 대기 시간.
+// 실제 대기가 필요한 로직이 아니라 완료 피드백을 인지할 시간을 주기 위한 연출용 딜레이다.
+const AUTO_REDIRECT_DELAY_MS = 1500;
 
 type Stage = "rounds" | "review" | "complete";
 
@@ -14,6 +21,7 @@ function normalize(text: string): string {
 
 export default function ThemeLearning() {
   const theme = travelTheme;
+  const router = useRouter();
 
   const [stage, setStage] = useState<Stage>("rounds");
   const [roundIndex, setRoundIndex] = useState(0);
@@ -32,6 +40,21 @@ export default function ThemeLearning() {
 
   const round = theme.rounds[roundIndex];
   const item = round?.items[itemIndex];
+
+  // 테마 완료 화면에 들어서면, 새로 지어질 건물 정보를 저장해두고 짧은 딜레이 후
+  // 마을 맵으로 자동 전환한다(REQ-013). 실시간 건설 대기는 town 페이지에서 연출로만 처리한다.
+  useEffect(() => {
+    if (stage !== "complete") return;
+    const pending: PendingBuilding = {
+      themeTitle: theme.title,
+      completedAt: Date.now(),
+    };
+    saveToStorage(PENDING_BUILDING_STORAGE_KEY, pending);
+    const timeoutId = window.setTimeout(() => {
+      router.push("/town");
+    }, AUTO_REDIRECT_DELAY_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [stage, theme.title, router]);
 
   function resetItemState() {
     setSelected(null);
@@ -117,7 +140,12 @@ export default function ThemeLearning() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <div className={styles.themeTitle}>테마: {theme.title}</div>
+        <div className={styles.headerTop}>
+          <div className={styles.themeTitle}>테마: {theme.title}</div>
+          <Link href="/town" className={styles.navLink}>
+            마을로 가기
+          </Link>
+        </div>
         <div className={styles.subtitle}>{roundProgressLabel}</div>
       </div>
 
@@ -267,6 +295,14 @@ export default function ThemeLearning() {
         <div className={styles.completeScreen}>
           <div className={styles.completeTitle}>테마 완료!</div>
           <div>&quot;{theme.title}&quot; 테마 학습을 모두 마쳤어요.</div>
+          <div>마을에 새 건물이 지어져요!</div>
+          <button
+            type="button"
+            className={styles.nextButton}
+            onClick={() => router.push("/town")}
+          >
+            마을로 가기
+          </button>
         </div>
       )}
     </div>
