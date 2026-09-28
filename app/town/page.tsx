@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./town.module.css";
 import { BUILDINGS } from "./buildings";
 import { BuildingMarker } from "./BuildingMarker";
+import ChatPanel from "@/components/ChatPanel";
 
 // 맵/캐릭터 기본 수치. 이번 범위는 "하나로 이어진 오픈맵 위에서 자유롭게 걸어다니기"까지이며
 // 실제 아트 에셋, 건물 기능, 대화 연동 등은 이후 단계에서 다룬다.
@@ -14,6 +15,7 @@ const MAP_WIDTH = 960;
 const MAP_HEIGHT = 640;
 const CHAR_SIZE = 32;
 const MOVE_SPEED = 220; // px / sec
+const INTERACTION_MARGIN = 28; // 건물 테두리 밖으로 이 거리 안에 들어오면 "대화 가능"으로 본다
 
 const KEY_DIRECTIONS: Record<string, { dx: number; dy: number }> = {
   arrowup: { dx: 0, dy: -1 },
@@ -49,6 +51,27 @@ function collidesWithBuildings(x: number, y: number) {
   );
 }
 
+// 담당 주민이 있는 건물 중 캐릭터와 상호작용 가능한 거리(테두리 + margin)에 있는
+// 건물을 찾는다. 여러 건물 범위가 겹치는 배치는 없으므로 첫 매치를 그대로 쓴다.
+function findNearbyResidentBuilding(x: number, y: number) {
+  return (
+    BUILDINGS.find(
+      (b) =>
+        b.hasResident &&
+        rectsOverlap(
+          x,
+          y,
+          CHAR_SIZE,
+          CHAR_SIZE,
+          b.x - INTERACTION_MARGIN,
+          b.y - INTERACTION_MARGIN,
+          b.width + INTERACTION_MARGIN * 2,
+          b.height + INTERACTION_MARGIN * 2
+        )
+    ) ?? null
+  );
+}
+
 export default function TownPage() {
   const [position, setPosition] = useState({
     x: MAP_WIDTH / 2 - CHAR_SIZE / 2,
@@ -59,17 +82,48 @@ export default function TownPage() {
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
 
+  // 대화 가능한 건물에 가까이 있는지는 매 렌더마다 현재 위치에서 파생시킨다(별도 state 불필요).
+  // ref로도 함께 들고 있는 이유는 키 이벤트 핸들러(마운트 시 한 번만 등록)가
+  // 최신 값을 읽어야 하는데 클로저에 갇힌 state를 그대로 참조하면 값이 갱신되지 않기 때문이다.
+  const nearBuildingId = useMemo(
+    () => findNearbyResidentBuilding(position.x, position.y)?.id ?? null,
+    [position]
+  );
+  const nearBuildingIdRef = useRef<string | null>(null);
+  const [activeChatBuildingId, setActiveChatBuildingId] = useState<string | null>(null);
+  const isChatOpenRef = useRef(false);
+
   useEffect(() => {
     positionRef.current = position;
   }, [position]);
 
-  // 키보드 입력 처리: 방향키 / WASD를 누르고 있는 동안 계속 이동한다.
+  useEffect(() => {
+    nearBuildingIdRef.current = nearBuildingId;
+  }, [nearBuildingId]);
+
+  useEffect(() => {
+    isChatOpenRef.current = activeChatBuildingId !== null;
+    if (activeChatBuildingId !== null) {
+      // 대화가 열리는 동안 남아있는 이동 입력을 지워 캐릭터가 계속 움직이지 않게 한다.
+      pressedKeysRef.current.clear();
+    }
+  }, [activeChatBuildingId]);
+
+  // 키보드 입력 처리: 방향키 / WASD를 누르고 있는 동안 계속 이동하고,
+  // 대화 가능한 건물 근처에서 Enter/Space를 누르면 그 건물의 주민과 대화를 시작한다.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (isChatOpenRef.current) return; // 대화 오버레이가 열려있으면 이동/상호작용 입력을 무시한다.
+
       const key = e.key.toLowerCase();
       if (KEY_DIRECTIONS[key]) {
         pressedKeysRef.current.add(key);
         e.preventDefault();
+        return;
+      }
+      if ((key === "enter" || key === " ") && nearBuildingIdRef.current) {
+        e.preventDefault();
+        setActiveChatBuildingId(nearBuildingIdRef.current);
       }
     }
     function handleKeyUp(e: KeyboardEvent) {
@@ -164,7 +218,7 @@ export default function TownPage() {
           />
 
           {BUILDINGS.map((b) => (
-            <BuildingMarker key={b.id} building={b} />
+            <BuildingMarker key={b.id} building={b} isNear={nearBuildingId === b.id} />
           ))}
 
           <div
@@ -176,7 +230,20 @@ export default function TownPage() {
         </div>
       </main>
 
-      <p className={styles.hint}>방향키 또는 WASD로 캐릭터를 움직여보세요.</p>
+      {nearBuildingId ? (
+        <p className={styles.interactionBanner}>Enter 또는 Space로 대화하기</p>
+      ) : (
+        <p className={styles.hint}>방향키 또는 WASD로 캐릭터를 움직여보세요.</p>
+      )}
+
+      {activeChatBuildingId && (
+        <div className={styles.chatOverlay}>
+          <ChatPanel
+            villagerId={activeChatBuildingId}
+            onClose={() => setActiveChatBuildingId(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }
