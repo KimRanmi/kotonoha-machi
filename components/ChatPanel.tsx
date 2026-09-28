@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import * as wanakana from "wanakana";
 import { ChatMessage, LearnedWord } from "@/lib/types";
 import {
   WORDS_STORAGE_KEY,
@@ -38,7 +39,20 @@ export default function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [popup, setPopup] = useState<WordPopupState | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [kanaEnabled, setKanaEnabled] = useState(true);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el || !kanaEnabled) return;
+    // wanakana가 입력창 DOM을 직접 다루므로 이 입력창은 React가 value를 강제하지 않는
+    // 비제어(uncontrolled) 컴포넌트로 둔다 (커서 위치를 wanakana가 관리).
+    wanakana.bind(el);
+    return () => {
+      wanakana.unbind(el);
+    };
+  }, [kanaEnabled]);
 
   useEffect(() => {
     // localStorage는 서버에 없으므로 클라이언트 마운트 후 한 번만 읽어와 하이드레이션한다.
@@ -73,6 +87,7 @@ export default function ChatPanel({
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setInput("");
+    if (inputRef.current) inputRef.current.value = "";
     setError(null);
     setIsLoading(true);
 
@@ -179,6 +194,15 @@ export default function ChatPanel({
 
       {error && <p className="errorText">{error}</p>}
 
+      <label className="kanaToggle">
+        <input
+          type="checkbox"
+          checked={kanaEnabled}
+          onChange={(e) => setKanaEnabled(e.target.checked)}
+        />
+        로마자 자동 변환 (예: konnichiwa → こんにちは)
+      </label>
+
       <form
         className="inputBar"
         onSubmit={(e) => {
@@ -187,9 +211,10 @@ export default function ChatPanel({
         }}
       >
         <input
+          ref={inputRef}
           className="textInput"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          defaultValue=""
+          onInput={(e) => setInput((e.target as HTMLInputElement).value)}
           placeholder="일본어로 메시지를 입력하세요..."
           disabled={isLoading}
         />
