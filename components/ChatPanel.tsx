@@ -133,6 +133,11 @@ export default function ChatPanel({
           <Link href="/words" className="navLink">
             학습 목록 ({words.length})
           </Link>
+          {!onClose && (
+            <Link href="/town" className="navLink">
+              마을로 가기
+            </Link>
+          )}
           {onClose && (
             <button
               type="button"

@@ -13,6 +13,22 @@ export interface Building {
   hasResident?: boolean;
 }
 
+// 테마 학습 완료 후 사용자가 마을 맵에 직접 배치한 건물. 정적 BUILDINGS와 달리 x/y가
+// 고정돼있지 않고, 배치 시점에 사용자가 클릭한 자리로 정해진다.
+export interface PlacedBuilding extends Building {
+  themeTitle: string;
+  placedAt: number;
+}
+
+// 새로 배치되는 건물의 기본 크기와, 라벨 아래 깔아줄 색상 팔레트(정적 건물 색과 겹치지
+// 않게 순환시켜 구분되게 한다).
+export const NEW_BUILDING_SIZE = { width: 120, height: 100 };
+const NEW_BUILDING_COLORS = ["#a0522d", "#6a5acd", "#c9a227", "#3f8f8f", "#b5566b"];
+
+export function nextBuildingColor(existingPlacedCount: number): string {
+  return NEW_BUILDING_COLORS[existingPlacedCount % NEW_BUILDING_COLORS.length];
+}
+
 // 건물 3개 모두 lib/villager.ts에 정의된 담당 주민과 1:1로 연결되어 대화가 가능하다.
 // 건물 id는 담당 주민의 id(lib/villager.ts의 VILLAGERS 키)와 그대로 맞춰뒀다.
 export const BUILDINGS: Building[] = [
