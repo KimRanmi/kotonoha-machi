@@ -8,13 +8,19 @@ import styles from "./town.module.css";
 export function BuildingMarker({
   building,
   isNear,
+  isConstructing,
 }: {
   building: Building;
   isNear: boolean;
+  isConstructing?: boolean;
 }) {
   return (
     <div
-      className={styles.building}
+      className={
+        isConstructing
+          ? `${styles.building} ${styles.constructing}`
+          : styles.building
+      }
       style={{
         left: building.x,
         top: building.y,
@@ -26,6 +32,7 @@ export function BuildingMarker({
       {building.hasResident && isNear && (
         <div className={styles.interactionHint}>💬</div>
       )}
+      {isConstructing && <div className={styles.interactionHint}>🚧</div>}
       {building.label}
     </div>
   );
