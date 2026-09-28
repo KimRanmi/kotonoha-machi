@@ -14,6 +14,20 @@
   gap: 4px;
 }
 
+.headerTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.navLink {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .themeTitle {
   font-size: 22px;
   font-weight: 700;
