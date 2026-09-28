@@ -1,0 +1,202 @@
+.page {
+  min-height: 100dvh;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.themeTitle {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.progressBar {
+  display: flex;
+  gap: 8px;
+}
+
+.progressStep {
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: #fff;
+}
+
+.progressStepActive {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.progressStepDone {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.itemProgress {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 20px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  text-align: center;
+}
+
+.prompt {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.promptSentence {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.choiceButton {
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.choiceButton:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.choiceButton:disabled {
+  cursor: default;
+}
+
+.choiceCorrect {
+  border-color: #4a7c59;
+  background: #eef6ef;
+  color: #2d5a3a;
+  font-weight: 700;
+}
+
+.choiceWrong {
+  border-color: #c65b4f;
+  background: #fbeceb;
+  color: #8f362b;
+}
+
+.feedback {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.feedbackWrong {
+  color: #c65b4f;
+}
+
+.feedbackCorrect {
+  color: #4a7c59;
+}
+
+.hintBox {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px dashed var(--accent);
+  background: #fdf3ea;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: #8a5a2b;
+}
+
+.nextButton {
+  align-self: center;
+  padding: 10px 28px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nextButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.textAnswer {
+  width: 100%;
+  min-height: 90px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  font-size: 16px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.reviewLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.completeScreen {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 48px 20px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+}
+
+.completeTitle {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.wrongCounter {
+  font-size: 12px;
+  color: var(--text-muted);
+}
