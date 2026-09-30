@@ -157,3 +157,9 @@
   justify-content: center;
   z-index: 100;
 }
+
+.headerLinks {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}

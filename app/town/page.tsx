@@ -303,9 +303,14 @@ export default function TownPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.title}>ことばのまち — 마을 지도</div>
-        <Link href="/" className={styles.navLink}>
-          ← 대화로 돌아가기
-        </Link>
+        <div className={styles.headerLinks}>
+          <Link href="/villagers" className={styles.navLink}>
+            주민 목록
+          </Link>
+          <Link href="/" className={styles.navLink}>
+            ← 대화로 돌아가기
+          </Link>
+        </div>
       </header>
 
       <main
