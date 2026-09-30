@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { getIntimacyPrompt } from "@/lib/intimacy";
 import { VILLAGER_MODEL, TRANSLATOR_SYSTEM_PROMPT, getVillager } from "@/lib/villager";
 
 interface IncomingMessage {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { messages?: IncomingMessage[]; villagerId?: string };
+  let body: { messages?: IncomingMessage[]; villagerId?: string; exchanges?: number };
   try {
     body = await req.json();
   } catch {
@@ -35,6 +36,11 @@ export async function POST(req: NextRequest) {
   }
 
   const villager = getVillager(body.villagerId);
+  // 클라이언트가 보낸 누적 대화 횟수(친밀도). 신뢰할 수 없는 값이므로 음이 아닌 유한한 수로 정리한다.
+  const exchanges =
+    typeof body.exchanges === "number" && Number.isFinite(body.exchanges)
+      ? Math.max(0, Math.floor(body.exchanges))
+      : 0;
   const ai = new GoogleGenAI({ apiKey });
 
   try {
@@ -46,7 +52,7 @@ export async function POST(req: NextRequest) {
     const response = await ai.models.generateContent({
       model: VILLAGER_MODEL,
       contents,
-      config: { systemInstruction: villager.systemPrompt },
+      config: { systemInstruction: villager.systemPrompt + getIntimacyPrompt(exchanges) },
     });
 
     const reply = (response.text ?? "").trim();
