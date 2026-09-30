@@ -285,3 +285,35 @@ body {
 .wordRemoveButton:hover {
   color: #c0392b;
 }
+
+.intimacyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.intimacyItem {
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.intimacyItemLocked {
+  opacity: 0.55;
+}
+
+.intimacyTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.intimacyNote {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+}

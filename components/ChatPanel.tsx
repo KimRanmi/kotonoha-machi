@@ -11,6 +11,7 @@ import {
   saveToStorage,
 } from "@/lib/storage";
 import { DEFAULT_VILLAGER_ID, getVillager } from "@/lib/villager";
+import { recordExchange } from "@/lib/intimacy";
 import VillagerMessage from "@/components/VillagerMessage";
 import AddWordPopup, { WordPopupState } from "@/components/AddWordPopup";
 
@@ -115,6 +116,8 @@ export default function ChatPanel({
         createdAt: Date.now(),
       };
       setMessages((prev) => [...prev, villagerMessage]);
+      // 답변까지 정상적으로 받은 주고받기 1회를 친밀도에 조용히 반영한다(별도 알림 없음).
+      recordExchange(villager.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "요청에 실패했습니다.");
     } finally {
@@ -145,6 +148,9 @@ export default function ChatPanel({
           </div>
         </div>
         <div className="headerActions">
+          <Link href="/villagers" className="navLink">
+            주민 목록
+          </Link>
           <Link href="/words" className="navLink">
             학습 목록 ({words.length})
           </Link>
