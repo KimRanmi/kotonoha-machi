@@ -138,7 +138,7 @@ export default function ChatPanel({
   }
 
   return (
-    <div className="page">
+    <div className={onClose ? "page modalPage" : "page"}>
       <header className="header">
         <div className="villagerInfo">
           <div className="villagerAvatar">{villager.avatar}</div>
