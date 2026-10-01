@@ -26,11 +26,11 @@ export default function VillagersPage() {
           </div>
         </div>
         <div className="headerActions">
-          <Link href="/town" className="navLink">
-            마을로 가기
+          <Link href="/words" className="navLink">
+            학습 단어 목록
           </Link>
           <Link href="/" className="navLink">
-            ← 대화로 돌아가기
+            ← 마을로 돌아가기
           </Link>
         </div>
       </header>
