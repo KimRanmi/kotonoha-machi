@@ -11,6 +11,9 @@ export interface Building {
   // 이 건물에 담당 주민이 연결되어 대화가 가능한지 여부. true인 건물만 접근 시
   // 상호작용 힌트가 뜨고, 이 자리에서 기존 자유 대화(ChatPanel)를 시작할 수 있다.
   hasResident?: boolean;
+  // 담당 주민 id(lib/villager.ts의 VILLAGERS 키). 없으면 건물 id가 곧 주민 id다.
+  // 테마로 지은 건물은 id가 건물마다 유일하므로 이 값으로 테마 주민과 연결한다.
+  residentId?: string;
 }
 
 // 테마 학습 완료 후 사용자가 마을 맵에 직접 배치한 건물. 정적 BUILDINGS와 달리 x/y가

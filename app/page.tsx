@@ -11,6 +11,7 @@ import {
   type PlacedBuilding,
 } from "./buildings";
 import { BuildingMarker } from "./BuildingMarker";
+import { THEME_RESIDENTS } from "@/lib/villager";
 import ChatPanel from "@/components/ChatPanel";
 import {
   loadFromStorage,
@@ -86,6 +87,13 @@ function findNearbyResidentBuilding(x: number, y: number, buildings: Building[])
   );
 }
 
+// 테마 건물에 그 테마의 주민을 연결한다(해당 테마 주민이 없으면 그대로 둔다).
+function withThemeResident(b: PlacedBuilding): PlacedBuilding {
+  const residentId = THEME_RESIDENTS[b.themeTitle];
+  if (!residentId || b.residentId) return b;
+  return { ...b, hasResident: true, residentId };
+}
+
 export default function TownPage() {
   const [position, setPosition] = useState({
     x: MAP_WIDTH / 2 - CHAR_SIZE / 2,
@@ -104,8 +112,11 @@ export default function TownPage() {
   const [pendingBuilding, setPendingBuilding] = useState<PendingBuilding | null>(null);
 
   useEffect(() => {
+    // 주민 연결이 생기기 전에 저장된 건물에는 테마 주민을 소급해서 붙여준다.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPlacedBuildings(loadFromStorage<PlacedBuilding[]>(PLACED_BUILDINGS_STORAGE_KEY, []));
+    setPlacedBuildings(
+      loadFromStorage<PlacedBuilding[]>(PLACED_BUILDINGS_STORAGE_KEY, []).map(withThemeResident)
+    );
 
     // 배치 대기 건물은 마운트 시 한 번만 읽고 바로 지워서(소비) 새로고침해도
     // 배치 모드가 다시 트리거되지 않게 한다.
@@ -284,13 +295,14 @@ export default function TownPage() {
       themeTitle: pendingBuilding.themeTitle,
       placedAt: Date.now(),
     };
+    const withResident = withThemeResident(newBuilding);
 
-    const updated = [...placedBuildings, newBuilding];
+    const updated = [...placedBuildings, withResident];
     setPlacedBuildings(updated);
     saveToStorage(PLACED_BUILDINGS_STORAGE_KEY, updated);
     setPendingBuilding(null);
 
-    setJustPlacedId(newBuilding.id);
+    setJustPlacedId(withResident.id);
     if (justPlacedTimeoutRef.current !== null) {
       window.clearTimeout(justPlacedTimeoutRef.current);
     }
@@ -367,7 +379,10 @@ export default function TownPage() {
       {activeChatBuildingId && (
         <div className={styles.chatOverlay}>
           <ChatPanel
-            villagerId={activeChatBuildingId}
+            villagerId={
+              allBuildings.find((b) => b.id === activeChatBuildingId)?.residentId ??
+              activeChatBuildingId
+            }
             onClose={() => setActiveChatBuildingId(null)}
           />
         </div>
