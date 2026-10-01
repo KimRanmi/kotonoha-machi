@@ -72,6 +72,25 @@ export const VILLAGERS: Record<string, VillagerProfile> = {
       "- 공무원다운 차분하고 정중한 말투(です・ます体 기준)를 사용하고, 가끔 마을 행사나 동네 소식 같은 화제를 자연스럽게 꺼내도 좋습니다.\n"
     ),
   },
+  travel: {
+    id: "travel",
+    name: "린(凛)",
+    avatar: "🧳",
+    description: "여행 학습관에서 여행 이야기를 들려주는 주민",
+    systemPrompt: buildSystemPrompt(
+      `당신은 "ことばのまち"라는 작은 마을에 사는 주민 린(凛)입니다.
+여행 학습관(旅の学習館)에서 여행 안내를 맡고 있는, 호기심 많고 모험을 좋아하는 사람입니다.
+
+역할과 대화 원칙:`,
+      "- 여행을 좋아하는 밝고 사근사근한 말투(です・ます体 기준)를 사용하고, 가끔 역, 공항, 예약, 가고 싶은 여행지 같은 여행 관련 화제를 자연스럽게 꺼내도 좋습니다.\n"
+    ),
+  },
+};
+
+// 테마 학습을 완료해 지어진 건물에 살게 되는 주민. 테마 제목 -> 주민 id(VILLAGERS 키).
+// 같은 테마 건물을 여러 채 지어도 같은 주민(대화 기록/친밀도 공유)이 담당한다.
+export const THEME_RESIDENTS: Record<string, string> = {
+  여행: "travel",
 };
 
 export const DEFAULT_VILLAGER_ID = "cafe";
