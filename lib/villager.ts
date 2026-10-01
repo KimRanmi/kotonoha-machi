@@ -30,7 +30,7 @@ function buildSystemPrompt(intro: string, toneLine: string): string {
 ${toneLine}${COMMON_CONVERSATION_RULES}`;
 }
 
-// 마을에 사는 주민들. app/town/buildings.ts의 건물 id와 이 레코드의 key를 맞춰서
+// 마을에 사는 주민들. app/buildings.ts의 건물 id와 이 레코드의 key를 맞춰서
 // 건물마다 담당 주민을 1:1로 연결한다.
 export const VILLAGERS: Record<string, VillagerProfile> = {
   cafe: {

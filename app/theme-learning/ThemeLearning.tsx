@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import * as wanakana from "wanakana";
 import styles from "./theme-learning.module.css";
 import { travelTheme } from "./data";
 import { saveToStorage, PENDING_BUILDING_STORAGE_KEY } from "@/lib/storage";
@@ -37,9 +38,22 @@ export default function ThemeLearning() {
     "idle" | "correct" | "wrong"
   >("idle");
   const [reviewRevealed, setReviewRevealed] = useState(false);
+  const reviewInputRef = useRef<HTMLTextAreaElement>(null);
 
   const round = theme.rounds[roundIndex];
   const item = round?.items[itemIndex];
+
+  // 종합 복습 입력창도 대화창(ChatPanel)과 동일하게 로마자를 치면 바로 가나로
+  // 변환되게 한다. wanakana가 DOM을 직접 다루므로 이 textarea는 비제어 컴포넌트로
+  // 둔다 (value가 아니라 ref + onChange로 React 상태와 동기화).
+  useEffect(() => {
+    const el = reviewInputRef.current;
+    if (!el || stage !== "review") return;
+    wanakana.bind(el);
+    return () => {
+      wanakana.unbind(el);
+    };
+  }, [stage, reviewIndex]);
 
   // 테마 완료 화면에 들어서면, 새로 지어질 건물 정보를 저장해두고 짧은 딜레이 후
   // 마을 맵으로 자동 전환한다(REQ-013). 실시간 건설 대기는 town 페이지에서 연출로만 처리한다.
@@ -51,7 +65,7 @@ export default function ThemeLearning() {
     };
     saveToStorage(PENDING_BUILDING_STORAGE_KEY, pending);
     const timeoutId = window.setTimeout(() => {
-      router.push("/town");
+      router.push("/");
     }, AUTO_REDIRECT_DELAY_MS);
     return () => window.clearTimeout(timeoutId);
   }, [stage, theme.title, router]);
@@ -98,6 +112,7 @@ export default function ThemeLearning() {
     if (reviewIndex + 1 < theme.review.length) {
       setReviewIndex(reviewIndex + 1);
       setReviewAnswer("");
+      if (reviewInputRef.current) reviewInputRef.current.value = "";
       setReviewWrongCount(0);
       setReviewFeedback("idle");
       setReviewRevealed(false);
@@ -142,8 +157,8 @@ export default function ThemeLearning() {
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.themeTitle}>테마: {theme.title}</div>
-          <Link href="/town" className={styles.navLink}>
-            마을로 가기
+          <Link href="/" className={styles.navLink}>
+            ← 마을로 돌아가기
           </Link>
         </div>
         <div className={styles.subtitle}>{roundProgressLabel}</div>
@@ -249,11 +264,12 @@ export default function ThemeLearning() {
             {theme.review[reviewIndex].prompt}
           </div>
           <textarea
+            ref={reviewInputRef}
             className={styles.textAnswer}
-            value={reviewAnswer}
+            defaultValue=""
             disabled={reviewRevealed}
             onChange={(e) => setReviewAnswer(e.target.value)}
-            placeholder="일본어로 답해 보세요"
+            placeholder="일본어로 답해 보세요 (로마자를 치면 자동으로 변환돼요)"
           />
           {reviewFeedback === "wrong" && !reviewRevealed && (
             <div className={`${styles.feedback} ${styles.feedbackWrong}`}>
@@ -299,9 +315,9 @@ export default function ThemeLearning() {
           <button
             type="button"
             className={styles.nextButton}
-            onClick={() => router.push("/town")}
+            onClick={() => router.push("/")}
           >
-            마을로 가기
+            ← 마을로 돌아가기
           </button>
         </div>
       )}

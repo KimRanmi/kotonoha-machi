@@ -19,7 +19,7 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-// 주민과의 자유 대화 UI. `/` 페이지와 `/town`의 대화 오버레이가 이 컴포넌트를 그대로
+// 주민과의 자유 대화 UI. 마을(`/`)의 대화 오버레이가 이 컴포넌트를 그대로
 // 재사용한다 — 대화 로직(저장, API 호출)을 두 곳에 중복 구현하지 않기 위함이다.
 // villagerId로 어떤 주민과 대화할지 고르고(기본은 카페의 미유), onClose가 주어지면
 // (오버레이로 쓰일 때) 닫기 버튼을 보여준다.
@@ -155,11 +155,6 @@ export default function ChatPanel({
           <Link href="/words" className="navLink">
             학습 목록 ({words.length})
           </Link>
-          {!onClose && (
-            <Link href="/town" className="navLink">
-              마을로 가기
-            </Link>
-          )}
           {onClose && (
             <button
               type="button"
