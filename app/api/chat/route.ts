@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { getIntimacyPrompt } from "@/lib/intimacy";
 import { VILLAGER_MODEL, getVillager } from "@/lib/villager";
 
 interface IncomingMessage {
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { messages?: IncomingMessage[]; villagerId?: string };
+  let body: { messages?: IncomingMessage[]; villagerId?: string; exchanges?: number };
   try {
     body = await req.json();
   } catch {
@@ -63,13 +64,18 @@ export async function POST(req: NextRequest) {
   }
 
   const villager = getVillager(body.villagerId);
+  // 클라이언트가 보낸 누적 대화 횟수(친밀도). 신뢰할 수 없는 값이므로 음이 아닌 유한한 수로 정리한다.
+  const exchanges =
+    typeof body.exchanges === "number" && Number.isFinite(body.exchanges)
+      ? Math.max(0, Math.floor(body.exchanges))
+      : 0;
   const ai = new GoogleGenAI({ apiKey });
 
   // 응답 생성과 한국어 번역을 별도 호출 두 번으로 나누면, 동시에 여러 세션이 같은
   // API 키를 쓸 때 두 번째(번역) 호출만 유독 호출 빈도 제한에 걸려 번역이 자주
   // 누락되는 문제가 있었다. 한 번의 호출에서 JSON으로 함께 받아 호출 횟수를 절반으로
   // 줄인다.
-  const combinedSystemPrompt = `${villager.systemPrompt}
+  const combinedSystemPrompt = `${villager.systemPrompt}${getIntimacyPrompt(exchanges)}
 
 추가 출력 형식 지침:
 - 위 대화 원칙을 그대로 따라 생성한 일본어 응답을 "reply" 필드에 넣으세요.
