@@ -268,7 +268,7 @@ export default function ThemeLearning() {
             className={styles.textAnswer}
             defaultValue=""
             disabled={reviewRevealed}
-            onChange={(e) => setReviewAnswer(e.target.value)}
+            onInput={(e) => setReviewAnswer((e.target as HTMLTextAreaElement).value)}
             placeholder="일본어로 답해 보세요 (로마자를 치면 자동으로 변환돼요)"
           />
           {reviewFeedback === "wrong" && !reviewRevealed && (
