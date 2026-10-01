@@ -11,7 +11,7 @@ import {
   saveToStorage,
 } from "@/lib/storage";
 import { DEFAULT_VILLAGER_ID, getVillager } from "@/lib/villager";
-import { recordExchange } from "@/lib/intimacy";
+import { loadIntimacy, recordExchange } from "@/lib/intimacy";
 import VillagerMessage from "@/components/VillagerMessage";
 import AddWordPopup, { WordPopupState } from "@/components/AddWordPopup";
 
@@ -98,6 +98,7 @@ export default function ChatPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           villagerId: villager.id,
+          exchanges: loadIntimacy()[villager.id] ?? 0,
           messages: nextMessages.map((m) => ({
             role: m.role,
             content: m.content,
