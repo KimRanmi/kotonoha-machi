@@ -1,13 +1,17 @@
 package com.kotonoha.chat;
 
+import com.kotonoha.common.ApiException;
 import com.kotonoha.intimacy.IntimacyLevel;
+import com.kotonoha.intimacy.IntimacyRepository;
 import com.kotonoha.llm.GeminiClient;
 import com.kotonoha.villager.VillagerProfile;
 import com.kotonoha.villager.Villagers;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -27,16 +31,27 @@ public class ChatService {
 
     private final GeminiClient gemini;
     private final ObjectMapper objectMapper;
+    private final ChatRepository chats;
+    private final IntimacyRepository intimacy;
+    private final TransactionTemplate tx;
 
-    public ChatService(GeminiClient gemini, ObjectMapper objectMapper) {
+    public ChatService(GeminiClient gemini, ObjectMapper objectMapper, ChatRepository chats,
+            IntimacyRepository intimacy, TransactionTemplate tx) {
         this.gemini = gemini;
         this.objectMapper = objectMapper;
+        this.chats = chats;
+        this.intimacy = intimacy;
+        this.tx = tx;
     }
 
-    public ChatResponse chat(ChatRequest request) {
+    // Gemini 호출(느림)은 트랜잭션 밖에서 하고, 답변을 받은 뒤에만 대화 2건 저장 + 친밀도 +1을 한 트랜잭션으로 묶는다.
+    // 호출이 실패하면 아무것도 저장/증가하지 않는다.
+    public ChatResponse chat(long userId, ChatRequest request) {
+        if (!"user".equals(request.messages().getLast().role())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "마지막 메시지는 사용자 메시지여야 합니다.");
+        }
         VillagerProfile villager = Villagers.get(request.villagerId());
-        // 클라이언트가 보낸 값은 신뢰할 수 없으므로 음이 아닌 정수로 정리한다.
-        int exchanges = request.exchanges() == null ? 0 : Math.max(0, request.exchanges());
+        int exchanges = intimacy.exchanges(userId, villager.id());
 
         String systemPrompt = villager.systemPrompt()
                 + IntimacyLevel.promptFor(exchanges)
@@ -47,7 +62,17 @@ public class ChatService {
                 .toList();
 
         String raw = gemini.generateJson(systemPrompt, turns);
-        return parse(raw);
+        ChatResponse response = parse(raw);
+
+        // 이번 턴의 사용자 메시지는 요청의 마지막 user 메시지다.
+        String userText = request.messages().getLast().content();
+        tx.executeWithoutResult(status -> {
+            chats.insert(userId, villager.id(), "user", userText, null);
+            chats.insert(userId, villager.id(), "assistant", response.reply(),
+                    response.translation().isEmpty() ? null : response.translation());
+            intimacy.increment(userId, villager.id());
+        });
+        return response;
     }
 
     private ChatResponse parse(String raw) {

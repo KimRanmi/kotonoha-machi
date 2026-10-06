@@ -35,4 +35,5 @@ jobs:
           distribution: temurin
           java-version: 25
 
+      # 백엔드 테스트는 Testcontainers로 PostgreSQL 컨테이너를 띄운다 (ubuntu-latest에는 Docker가 있다).
       - run: ./gradlew build

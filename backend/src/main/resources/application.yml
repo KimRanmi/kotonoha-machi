@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: kotonoha-backend
+  datasource:
+    # 로컬 개발용 기본값(docker-compose.yml의 DB와 일치). 실제 환경에서는 환경변수로 덮어쓴다.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/kotonoha}
+    username: ${DB_USER:kotonoha}
+    password: ${DB_PASSWORD:kotonoha}
   threads:
     virtual:
       enabled: true
