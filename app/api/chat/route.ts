@@ -1,10 +1,28 @@
-import { GoogleGenAI } from "@google/genai";
+import { ApiError, GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { VILLAGER_MODEL, TRANSLATOR_SYSTEM_PROMPT, getVillager } from "@/lib/villager";
 
 interface IncomingMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+// Gemini가 "high demand"(503)로 일시적으로 거절할 때 재시도하기 위한 헬퍼.
+// 503이 아닌 오류(잘못된 키, 잘못된 요청 등)는 즉시 던져서 재시도로 숨기지 않는다.
+async function generateWithRetry<T>(
+  call: () => Promise<T>,
+  retries = 2,
+  delayMs = 1000
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await call();
+    } catch (err) {
+      const isRetryable = err instanceof ApiError && err.status === 503;
+      if (!isRetryable || attempt >= retries) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+    }
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -43,21 +61,25 @@ export async function POST(req: NextRequest) {
       parts: [{ text: m.content }],
     }));
 
-    const response = await ai.models.generateContent({
-      model: VILLAGER_MODEL,
-      contents,
-      config: { systemInstruction: villager.systemPrompt },
-    });
+    const response = await generateWithRetry(() =>
+      ai.models.generateContent({
+        model: VILLAGER_MODEL,
+        contents,
+        config: { systemInstruction: villager.systemPrompt },
+      })
+    );
 
     const reply = (response.text ?? "").trim();
 
     let translation = "";
     try {
-      const translationResponse = await ai.models.generateContent({
-        model: VILLAGER_MODEL,
-        contents: [{ role: "user", parts: [{ text: reply }] }],
-        config: { systemInstruction: TRANSLATOR_SYSTEM_PROMPT },
-      });
+      const translationResponse = await generateWithRetry(() =>
+        ai.models.generateContent({
+          model: VILLAGER_MODEL,
+          contents: [{ role: "user", parts: [{ text: reply }] }],
+          config: { systemInstruction: TRANSLATOR_SYSTEM_PROMPT },
+        })
+      );
       translation = (translationResponse.text ?? "").trim();
     } catch (err) {
       console.error("번역 생성 실패:", err);

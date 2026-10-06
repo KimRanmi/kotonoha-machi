@@ -225,6 +225,49 @@ body {
   cursor: default;
 }
 
+.voiceHint {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 0 20px;
+  margin: 0;
+}
+
+.micButton {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.micButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.micButtonActive {
+  background: #c0392b;
+  border-color: #c0392b;
+  color: #fff;
+  animation: micPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(192, 57, 43, 0);
+  }
+}
+
 .wordPopup {
   position: fixed;
   transform: translate(-50%, -110%);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as wanakana from "wanakana";
 import { ChatMessage, LearnedWord } from "@/lib/types";
@@ -16,6 +16,38 @@ import AddWordPopup, { WordPopupState } from "@/components/AddWordPopup";
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// Web Speech API는 표준 타입 정의가 없어 브라우저별 생성자를 직접 참조한다.
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+interface SpeechRecognitionLike extends EventTarget {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+interface SpeechRecognitionResultEvent extends Event {
+  results: { [index: number]: { [index: number]: { transcript: string } } };
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+}
+
+function isSpeechSynthesisSupported(): boolean {
+  return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
 // 주민과의 자유 대화 UI. `/` 페이지와 `/town`의 대화 오버레이가 이 컴포넌트를 그대로
@@ -40,8 +72,13 @@ export default function ChatPanel({
   const [popup, setPopup] = useState<WordPopupState | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [kanaEnabled, setKanaEnabled] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [micBlocked, setMicBlocked] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const sendMessageRef = useRef<(text: string) => void>(() => {});
 
   useEffect(() => {
     const el = inputRef.current;
@@ -74,8 +111,8 @@ export default function ChatPanel({
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  async function sendMessage() {
-    const text = input.trim();
+  const sendMessage = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if (!text || isLoading) return;
 
     const userMessage: ChatMessage = {
@@ -115,10 +152,73 @@ export default function ChatPanel({
         createdAt: Date.now(),
       };
       setMessages((prev) => [...prev, villagerMessage]);
+      if (isSpeechSynthesisSupported()) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(villagerMessage.content);
+        utterance.lang = "ja-JP";
+        window.speechSynthesis.speak(utterance);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "요청에 실패했습니다.");
     } finally {
       setIsLoading(false);
+    }
+  }, [input, isLoading, messages, villager.id]);
+
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
+
+  useEffect(() => {
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVoiceSupported(false);
+      return;
+    }
+    setVoiceSupported(true);
+
+    const recognition = new Ctor();
+    recognition.lang = "ja-JP";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) sendMessageRef.current(transcript);
+    };
+    recognition.onerror = (event) => {
+      setIsRecording(false);
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setMicBlocked(true);
+      }
+    };
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.stop();
+    };
+  }, []);
+
+  function toggleRecording() {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+    if (isRecording) {
+      recognition.stop();
+      setIsRecording(false);
+    } else {
+      setError(null);
+      try {
+        recognition.start();
+        setIsRecording(true);
+      } catch {
+        setIsRecording(false);
+      }
     }
   }
 
@@ -199,6 +299,14 @@ export default function ChatPanel({
 
       {error && <p className="errorText">{error}</p>}
 
+      {(!voiceSupported || micBlocked) && (
+        <p className="voiceHint">
+          {micBlocked
+            ? "마이크 권한이 거부되어 음성 입력을 사용할 수 없어요. 아래 텍스트로 계속 대화할 수 있어요."
+            : "이 브라우저는 음성 대화를 지원하지 않아요. 아래 텍스트로 계속 대화할 수 있어요."}
+        </p>
+      )}
+
       <label className="kanaToggle">
         <input
           type="checkbox"
@@ -215,13 +323,26 @@ export default function ChatPanel({
           sendMessage();
         }}
       >
+        <button
+          type="button"
+          className={isRecording ? "micButton micButtonActive" : "micButton"}
+          onClick={toggleRecording}
+          disabled={!voiceSupported || micBlocked || isLoading}
+          aria-pressed={isRecording}
+          aria-label={isRecording ? "녹음 종료" : "음성으로 말하기"}
+          title={isRecording ? "녹음 종료" : "음성으로 말하기"}
+        >
+          {isRecording ? "⏹" : "🎤"}
+        </button>
         <input
           ref={inputRef}
           className="textInput"
           defaultValue=""
           onInput={(e) => setInput((e.target as HTMLInputElement).value)}
-          placeholder="일본어로 메시지를 입력하세요..."
-          disabled={isLoading}
+          placeholder={
+            isRecording ? "듣고 있어요..." : "일본어로 메시지를 입력하세요..."
+          }
+          disabled={isLoading || isRecording}
         />
         <button type="submit" className="sendButton" disabled={isLoading || !input.trim()}>
           보내기
