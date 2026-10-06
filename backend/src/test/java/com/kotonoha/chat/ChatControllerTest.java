@@ -6,19 +6,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.kotonoha.TestcontainersConfig;
 import com.kotonoha.llm.GeminiClient;
 import com.kotonoha.llm.GeminiException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "gemini.api-key=test-key")
+@Import(TestcontainersConfig.class)
 @AutoConfigureMockMvc
 class ChatControllerTest {
+
+    static final String ANON = "11111111-1111-1111-1111-111111111111";
 
     @Autowired
     MockMvc mvc;
@@ -32,8 +37,8 @@ class ChatControllerTest {
         when(gemini.generateJson(any(), any()))
                 .thenReturn("{\"reply\":\"こんにちは\",\"translation\":\"안녕하세요\"}");
 
-        mvc.perform(post("/api/chat").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"villagerId\":\"cafe\",\"exchanges\":0,\"messages\":[{\"role\":\"user\",\"content\":\"こんにちは\"}]}"))
+        mvc.perform(post("/api/chat").header("X-Anonymous-Id", ANON).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"villagerId\":\"cafe\",\"messages\":[{\"role\":\"user\",\"content\":\"こんにちは\"}]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reply").value("こんにちは"))
                 .andExpect(jsonPath("$.translation").value("안녕하세요"));
@@ -44,7 +49,7 @@ class ChatControllerTest {
         when(gemini.isConfigured()).thenReturn(true);
         when(gemini.generateJson(any(), any())).thenReturn("こんにちは");
 
-        mvc.perform(post("/api/chat").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/chat").header("X-Anonymous-Id", ANON).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reply").value("こんにちは"))
@@ -55,7 +60,7 @@ class ChatControllerTest {
     void 메시지가_비면_400() throws Exception {
         when(gemini.isConfigured()).thenReturn(true);
 
-        mvc.perform(post("/api/chat").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/chat").header("X-Anonymous-Id", ANON).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"messages\":[]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("대화 메시지가 비어 있습니다."));
@@ -65,7 +70,7 @@ class ChatControllerTest {
     void 본문이_JSON이_아니면_400() throws Exception {
         when(gemini.isConfigured()).thenReturn(true);
 
-        mvc.perform(post("/api/chat").contentType(MediaType.APPLICATION_JSON).content("not json"))
+        mvc.perform(post("/api/chat").header("X-Anonymous-Id", ANON).contentType(MediaType.APPLICATION_JSON).content("not json"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("잘못된 요청입니다."));
     }
@@ -75,7 +80,7 @@ class ChatControllerTest {
         when(gemini.isConfigured()).thenReturn(true);
         when(gemini.generateJson(any(), any())).thenThrow(new GeminiException("fail", null));
 
-        mvc.perform(post("/api/chat").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/chat").header("X-Anonymous-Id", ANON).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}"))
                 .andExpect(status().isBadGateway());
     }
@@ -84,7 +89,7 @@ class ChatControllerTest {
     void API_키가_없으면_500() throws Exception {
         when(gemini.isConfigured()).thenReturn(false);
 
-        mvc.perform(post("/api/chat").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/chat").header("X-Anonymous-Id", ANON).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}"))
                 .andExpect(status().isInternalServerError());
     }
