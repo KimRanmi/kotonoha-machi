@@ -33,15 +33,20 @@ export default function WordsPage() {
             <div className="villagerDesc">대화 중 탭해서 담은 단어들</div>
           </div>
         </div>
-        <Link href="/" className="navLink">
-          ← 대화로 돌아가기
-        </Link>
+        <div className="headerActions">
+          <Link href="/villagers" className="navLink">
+            주민 목록
+          </Link>
+          <Link href="/" className="navLink">
+            ← 마을로 돌아가기
+          </Link>
+        </div>
       </header>
 
       <main className="wordListMain">
         {words.length === 0 ? (
           <p className="emptyHint">
-            아직 담은 단어가 없어요. 대화 화면에서 주민의 말 중 궁금한 단어를 탭해보세요.
+            아직 담은 단어가 없어요. 마을에서 주민과 대화하며 주민의 말 중 궁금한 단어를 탭해보세요.
           </p>
         ) : (
           <ul className="wordList">

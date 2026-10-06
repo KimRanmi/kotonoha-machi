@@ -42,13 +42,26 @@ API 키는 https://aistudio.google.com/apikey 에서 발급받을 수 있습니�
 GEMINI_MODEL=gemini-3.6-flash
 ```
 
-### 3. 개발 서버 실행
+### 3. 백엔드 실행 (Spring Boot, Java 25 필요)
+
+`/api/*` 요청은 `backend/`의 Spring Boot 서버(8080)가 처리합니다. `.env.local`의 키를 환경변수로 넘겨 실행하세요.
+
+```bash
+cd backend
+set -a && . ../.env.local && set +a
+./gradlew bootRun
+```
+
+### 4. 프론트엔드 실행
 
 ```bash
 npm run dev
 ```
 
-브라우저에서 http://localhost:3000 을 열면 카페 주인 미유와 대화할 수 있습니다.
+브라우저에서 http://localhost:3000 을 열면 됩니다. Next.js가 `/api/*`를 백엔드로 프록시합니다
+(백엔드 주소를 바꾸려면 `BACKEND_URL` 환경변수 사용, 기본값 `http://localhost:8080`).
+
+백엔드 테스트는 `cd backend && ./gradlew test` 로 실행합니다.
 
 ## 이 프로토타입에서 다루지 않는 것
 

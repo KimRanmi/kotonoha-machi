@@ -1,0 +1,14 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: kotonoha-backend
+  threads:
+    virtual:
+      enabled: true
+
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:}
+  base-url: https://generativelanguage.googleapis.com
