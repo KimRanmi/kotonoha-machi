@@ -26,7 +26,7 @@
 
 .navLink {
   font-size: 13px;
-  color: #4a7c59;
+  color: var(--accent);
   text-decoration: none;
   font-weight: 600;
   white-space: nowrap;
@@ -156,4 +156,10 @@
   align-items: center;
   justify-content: center;
   z-index: 100;
+}
+
+.headerLinks {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }

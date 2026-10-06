@@ -11,6 +11,7 @@ import {
   saveToStorage,
 } from "@/lib/storage";
 import { DEFAULT_VILLAGER_ID, getVillager } from "@/lib/villager";
+import { loadIntimacy, recordExchange } from "@/lib/intimacy";
 import VillagerMessage from "@/components/VillagerMessage";
 import AddWordPopup, { WordPopupState } from "@/components/AddWordPopup";
 
@@ -50,7 +51,7 @@ function isSpeechSynthesisSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
-// 주민과의 자유 대화 UI. `/` 페이지와 `/town`의 대화 오버레이가 이 컴포넌트를 그대로
+// 주민과의 자유 대화 UI. 마을(`/`)의 대화 오버레이가 이 컴포넌트를 그대로
 // 재사용한다 — 대화 로직(저장, API 호출)을 두 곳에 중복 구현하지 않기 위함이다.
 // villagerId로 어떤 주민과 대화할지 고르고(기본은 카페의 미유), onClose가 주어지면
 // (오버레이로 쓰일 때) 닫기 버튼을 보여준다.
@@ -134,6 +135,7 @@ export default function ChatPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           villagerId: villager.id,
+          exchanges: loadIntimacy()[villager.id] ?? 0,
           messages: nextMessages.map((m) => ({
             role: m.role,
             content: m.content,
@@ -158,6 +160,8 @@ export default function ChatPanel({
         utterance.lang = "ja-JP";
         window.speechSynthesis.speak(utterance);
       }
+      // 답변까지 정상적으로 받은 주고받기 1회를 친밀도에 조용히 반영한다(별도 알림 없음).
+      recordExchange(villager.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "요청에 실패했습니다.");
     } finally {
@@ -235,7 +239,7 @@ export default function ChatPanel({
   }
 
   return (
-    <div className="page">
+    <div className={onClose ? "page modalPage" : "page"}>
       <header className="header">
         <div className="villagerInfo">
           <div className="villagerAvatar">{villager.avatar}</div>
@@ -245,14 +249,12 @@ export default function ChatPanel({
           </div>
         </div>
         <div className="headerActions">
+          <Link href="/villagers" className="navLink">
+            주민 목록
+          </Link>
           <Link href="/words" className="navLink">
             학습 목록 ({words.length})
           </Link>
-          {!onClose && (
-            <Link href="/town" className="navLink">
-              마을로 가기
-            </Link>
-          )}
           {onClose && (
             <button
               type="button"
