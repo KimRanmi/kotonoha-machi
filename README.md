@@ -37,10 +37,10 @@ GEMINI_API_KEY=여기에-실제-키를-입력하세요
 
 API 키는 https://aistudio.google.com/apikey 에서 발급받을 수 있습니다.
 
-필요하면 주민 응답 생성에 쓸 모델도 바꿀 수 있습니다 (기본값: `gemini-3.6-flash`).
+필요하면 주민 응답 생성에 쓸 모델도 바꿀 수 있습니다 (기본값: `gemini-3.5-flash`).
 
 ```
-GEMINI_MODEL=gemini-3.6-flash
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
 ### 3. PostgreSQL 실행 (Docker 필요)
