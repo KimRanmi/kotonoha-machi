@@ -3,15 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { VILLAGERS } from "@/lib/villager";
-import { IntimacyRecord, getIntimacyDescription, loadIntimacy } from "@/lib/intimacy";
+import { VillagerIntimacy, fetchIntimacy } from "@/lib/storage";
 
 export default function VillagersPage() {
-  const [record, setRecord] = useState<IntimacyRecord>({});
+  const [record, setRecord] = useState<Record<string, VillagerIntimacy>>({});
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // localStorage는 서버에 없으므로 클라이언트 마운트 후 한 번만 읽어온다.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setRecord(loadIntimacy());
+    // 친밀도는 서버(DB)에 있으므로 마운트 후 한 번 불러온다.
+    fetchIntimacy()
+      .then((list) => setRecord(Object.fromEntries(list.map((i) => [i.villagerId, i]))))
+      .catch((err) => setError(err instanceof Error ? err.message : "친밀도를 불러오지 못했습니다."));
   }, []);
 
   const villagers = Object.values(VILLAGERS);
@@ -36,10 +38,10 @@ export default function VillagersPage() {
       </header>
 
       <main className="wordListMain">
+        {error && <p className="errorText">{error}</p>}
         <ul className="intimacyList">
           {villagers.map((v) => {
-            const exchanges = record[v.id] ?? 0;
-            const met = exchanges > 0;
+            const met = record[v.id]?.met ?? false;
             return (
               <li
                 key={v.id}
@@ -53,7 +55,7 @@ export default function VillagersPage() {
                   </div>
                 </div>
                 <div className="intimacyNote">
-                  {met ? getIntimacyDescription(exchanges) : "아직 만난 적 없어요"}
+                  {met ? record[v.id]?.description : "아직 만난 적 없어요"}
                 </div>
               </li>
             );

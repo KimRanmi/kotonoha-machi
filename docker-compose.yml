@@ -1,0 +1,20 @@
+# 로컬 개발용 PostgreSQL. 계정 정보는 .env (예시: .env.example)에서 받고, 없으면 아래 로컬 전용 기본값을 쓴다.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-kotonoha}
+      POSTGRES_USER: ${DB_USER:-kotonoha}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-kotonoha}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - kotonoha-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-kotonoha} -d ${DB_NAME:-kotonoha}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  kotonoha-db:
