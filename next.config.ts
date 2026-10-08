@@ -4,6 +4,8 @@ import type { NextConfig } from "next";
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8080";
 
 const nextConfig: NextConfig = {
+  // Docker 이미지용 최소 실행 번들(.next/standalone)을 만든다. 로컬 dev/build에는 영향 없다.
+  output: "standalone",
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*` }];
   },

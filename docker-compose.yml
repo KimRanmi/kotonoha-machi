@@ -1,0 +1,52 @@
+# 프로젝트명을 고정해 워크트리/폴더 이름과 상관없이 컨테이너 이름이 kotonoha-*로 일정하게 한다.
+name: kotonoha
+
+# 사용법
+#   개발:      docker compose up -d                       → DB만 뜬다 (백엔드/프론트는 로컬에서 bootRun / npm run dev)
+#   전체 실행: docker compose --profile full up -d --build → DB + 백엔드 + 프론트 (http://localhost:3000)
+# 전체 실행에는 .env.local의 GEMINI_API_KEY가 필요하다. 계정 정보는 .env(예시: .env.example)에서 받는다.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-kotonoha}
+      POSTGRES_USER: ${DB_USER:-kotonoha}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-kotonoha}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - kotonoha-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-kotonoha} -d ${DB_NAME:-kotonoha}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    profiles: ["full"]
+    build: ./backend
+    env_file: .env.local # GEMINI_API_KEY, (선택) GEMINI_MODEL
+    environment:
+      # 컨테이너 안에서는 localhost가 아니라 서비스 이름(db)으로 접속한다.
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-kotonoha}
+      DB_USER: ${DB_USER:-kotonoha}
+      DB_PASSWORD: ${DB_PASSWORD:-kotonoha}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    profiles: ["full"]
+    build:
+      context: .
+      args:
+        BACKEND_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  kotonoha-db:

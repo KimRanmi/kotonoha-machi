@@ -1,6 +1,7 @@
 package com.kotonoha.villager;
 
 import java.util.Map;
+import java.util.Set;
 
 // 마을에 사는 주민들. 프론트의 건물 id와 이 레코드의 key를 맞춰서 건물마다 담당 주민을 1:1로 연결한다.
 public final class Villagers {
@@ -62,5 +63,14 @@ public final class Villagers {
     public static VillagerProfile get(String id) {
         VillagerProfile profile = id == null ? null : VILLAGERS.get(id);
         return profile != null ? profile : VILLAGERS.get(DEFAULT_VILLAGER_ID);
+    }
+
+    // 정확히 일치하는 주민만 (없으면 null). 조회 API처럼 대체 주민을 쓰면 안 되는 곳에서 쓴다.
+    public static VillagerProfile find(String id) {
+        return id == null ? null : VILLAGERS.get(id);
+    }
+
+    public static Set<String> ids() {
+        return VILLAGERS.keySet();
     }
 }
