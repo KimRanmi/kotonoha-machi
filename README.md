@@ -77,6 +77,20 @@ npm run dev
 
 백엔드 테스트는 `cd backend && ./gradlew test` 로 실행합니다. Testcontainers로 실제 PostgreSQL 컨테이너를 띄우므로 **Docker가 실행 중**이어야 합니다.
 
+## Docker로 전체 실행
+
+앱 전체(DB + 백엔드 + 프론트)를 컨테이너로 한 번에 띄울 수 있습니다. 서비스에 붙은 `full` 프로필(이름표)을 지정할 때만 백엔드/프론트가 함께 뜹니다.
+
+```bash
+docker compose --profile full up -d --build   # DB + 백엔드 + 프론트 → http://localhost:3000
+docker compose --profile full down            # 중지 (DB 데이터는 볼륨에 유지, 지우려면 down -v)
+```
+
+- `GEMINI_API_KEY`는 이미지에 넣지 않고 `.env.local`에서 실행 시 환경변수로 받습니다.
+- 코드를 고치면 `--build`로 이미지를 다시 만들어야 반영됩니다. 그래서 평소 개발은 위의 3~5번(DB만 컨테이너, 백엔드/프론트는 로컬 실행)을 쓰세요.
+- 프론트의 `/api/*` 프록시 대상은 빌드 시점에 고정됩니다(`BACKEND_URL` 빌드 인자, compose에서는 `http://backend:8080`).
+- 컨테이너를 막 띄운 직후 몇 초간은 백엔드가 준비되지 않아 API가 에러를 낼 수 있습니다.
+
 ## 임시 사용자 식별 (로그인 전, 2단계)
 
 로그인이 없으므로 **익명 ID 헤더 방식**을 씁니다. 프론트가 처음 한 번 `crypto.randomUUID()`로 만든 ID를
