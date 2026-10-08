@@ -1,6 +1,6 @@
 // 주민(villager)용 응답 생성 모델. 비용 효율적인 모델을 기본값으로 쓰되,
 // 필요하면 .env.local의 GEMINI_MODEL로 교체할 수 있게 분리해둔다.
-export const VILLAGER_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+export const VILLAGER_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 
 export interface VillagerProfile {
   id: string;
