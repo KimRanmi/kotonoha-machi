@@ -6,12 +6,12 @@ import * as wanakana from "wanakana";
 import { ChatMessage, LearnedWord } from "@/lib/types";
 import {
   WORDS_STORAGE_KEY,
-  getChatStorageKey,
+  fetchChatHistory,
   loadFromStorage,
   saveToStorage,
+  sendChat,
 } from "@/lib/storage";
 import { DEFAULT_VILLAGER_ID, getVillager } from "@/lib/villager";
-import { loadIntimacy, recordExchange } from "@/lib/intimacy";
 import VillagerMessage from "@/components/VillagerMessage";
 import AddWordPopup, { WordPopupState } from "@/components/AddWordPopup";
 
@@ -63,7 +63,6 @@ export default function ChatPanel({
   onClose?: () => void;
 }) {
   const villager = getVillager(villagerId);
-  const chatStorageKey = getChatStorageKey(villager.id);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [words, setWords] = useState<LearnedWord[]>([]);
@@ -93,16 +92,25 @@ export default function ChatPanel({
   }, [kanaEnabled]);
 
   useEffect(() => {
-    // localStorage는 서버에 없으므로 클라이언트 마운트 후 한 번만 읽어와 하이드레이션한다.
+    // 대화 기록은 서버(DB)에서, 학습 단어는 localStorage에서(4단계 전까지) 마운트 후 한 번 불러온다.
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMessages(loadFromStorage<ChatMessage[]>(chatStorageKey, []));
+    setHydrated(false);
     setWords(loadFromStorage<LearnedWord[]>(WORDS_STORAGE_KEY, []));
-    setHydrated(true);
-  }, [chatStorageKey]);
-
-  useEffect(() => {
-    if (hydrated) saveToStorage(chatStorageKey, messages);
-  }, [messages, hydrated, chatStorageKey]);
+    fetchChatHistory(villager.id)
+      .then((history) => {
+        if (!cancelled) setMessages(history);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "대화 기록을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setHydrated(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [villager.id]);
 
   useEffect(() => {
     if (hydrated) saveToStorage(WORDS_STORAGE_KEY, words);
@@ -114,7 +122,7 @@ export default function ChatPanel({
 
   const sendMessage = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || !hydrated) return;
 
     const userMessage: ChatMessage = {
       id: makeId(),
@@ -130,22 +138,10 @@ export default function ChatPanel({
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          villagerId: villager.id,
-          exchanges: loadIntimacy()[villager.id] ?? 0,
-          messages: nextMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "알 수 없는 오류가 발생했습니다.");
-      }
+      const data = await sendChat(
+        villager.id,
+        nextMessages.map((m) => ({ role: m.role, content: m.content })),
+      );
       const villagerMessage: ChatMessage = {
         id: makeId(),
         role: "assistant",
@@ -160,14 +156,12 @@ export default function ChatPanel({
         utterance.lang = "ja-JP";
         window.speechSynthesis.speak(utterance);
       }
-      // 답변까지 정상적으로 받은 주고받기 1회를 친밀도에 조용히 반영한다(별도 알림 없음).
-      recordExchange(villager.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "요청에 실패했습니다.");
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, messages, villager.id]);
+  }, [input, isLoading, hydrated, messages, villager.id]);
 
   useEffect(() => {
     sendMessageRef.current = sendMessage;
@@ -269,7 +263,7 @@ export default function ChatPanel({
       </header>
 
       <main className="chatLog">
-        {messages.length === 0 && (
+        {hydrated && messages.length === 0 && (
           <p className="emptyHint">
             {villager.name}에게 일본어로 말을 걸어보세요. 예: 「こんにちは」
           </p>
@@ -346,7 +340,7 @@ export default function ChatPanel({
           }
           disabled={isLoading || isRecording}
         />
-        <button type="submit" className="sendButton" disabled={isLoading || !input.trim()}>
+        <button type="submit" className="sendButton" disabled={isLoading || !hydrated || !input.trim()}>
           보내기
         </button>
       </form>
