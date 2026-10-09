@@ -24,6 +24,20 @@ export function markThemeCompleted(themeTitle: string): void {
 const AUTH_TOKEN_STORAGE_KEY = "kotonoha:auth-token";
 const AUTH_EMAIL_STORAGE_KEY = "kotonoha:auth-email";
 
+// 건물 내부에서 나와 마을로 돌아갈 때, 방금 나온 건물 id를 한 번만 넘겨주는 키.
+// 마을이 읽으면 지운다(새로고침해도 캐릭터가 계속 그 자리로 되돌려지지 않게).
+const TOWN_RETURN_STORAGE_KEY = "kotonoha:town-return-building";
+
+export function setTownReturnBuilding(buildingId: string): void {
+  saveToStorage(TOWN_RETURN_STORAGE_KEY, buildingId);
+}
+
+export function takeTownReturnBuilding(): string | null {
+  const id = loadFromStorage<string | null>(TOWN_RETURN_STORAGE_KEY, null);
+  if (id) removeFromStorage(TOWN_RETURN_STORAGE_KEY);
+  return id;
+}
+
 export function loadFromStorage<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
