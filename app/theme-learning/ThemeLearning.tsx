@@ -6,7 +6,12 @@ import Link from "next/link";
 import * as wanakana from "wanakana";
 import styles from "./theme-learning.module.css";
 import { travelTheme } from "./data";
-import { saveToStorage, PENDING_BUILDING_STORAGE_KEY } from "@/lib/storage";
+import {
+  saveToStorage,
+  hasCompletedTheme,
+  markThemeCompleted,
+  PENDING_BUILDING_STORAGE_KEY,
+} from "@/lib/storage";
 import type { PendingBuilding } from "@/lib/types";
 
 const MAX_WRONG_BEFORE_HINT = 3;
@@ -25,6 +30,8 @@ export default function ThemeLearning() {
   const router = useRouter();
 
   const [stage, setStage] = useState<Stage>("rounds");
+  // 완료 시점에 한 번 정해진다: 이미 완료한 적 있는 테마를 다시 끝낸 것이면 복습(건물 없음).
+  const [isReview, setIsReview] = useState(false);
   const [roundIndex, setRoundIndex] = useState(0);
   const [itemIndex, setItemIndex] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
@@ -59,11 +66,17 @@ export default function ThemeLearning() {
   // 마을 맵으로 자동 전환한다(REQ-013). 실시간 건설 대기는 town 페이지에서 연출로만 처리한다.
   useEffect(() => {
     if (stage !== "complete") return;
-    const pending: PendingBuilding = {
-      themeTitle: theme.title,
-      completedAt: Date.now(),
-    };
-    saveToStorage(PENDING_BUILDING_STORAGE_KEY, pending);
+    const repeat = hasCompletedTheme(theme.title);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsReview(repeat);
+    if (!repeat) {
+      markThemeCompleted(theme.title);
+      const pending: PendingBuilding = {
+        themeTitle: theme.title,
+        completedAt: Date.now(),
+      };
+      saveToStorage(PENDING_BUILDING_STORAGE_KEY, pending);
+    }
     const timeoutId = window.setTimeout(() => {
       router.push("/");
     }, AUTO_REDIRECT_DELAY_MS);
@@ -309,9 +322,11 @@ export default function ThemeLearning() {
 
       {stage === "complete" && (
         <div className={styles.completeScreen}>
-          <div className={styles.completeTitle}>테마 완료!</div>
-          <div>&quot;{theme.title}&quot; 테마 학습을 모두 마쳤어요.</div>
-          <div>마을에 새 건물이 지어져요!</div>
+          <div className={styles.completeTitle}>{isReview ? "복습 완료!" : "테마 완료!"}</div>
+          <div>
+            &quot;{theme.title}&quot; 테마 {isReview ? "복습을 마쳤어요." : "학습을 모두 마쳤어요."}
+          </div>
+          <div>{isReview ? "건물은 처음 완료할 때만 지어져요." : "마을에 새 건물이 지어져요!"}</div>
           <button
             type="button"
             className={styles.nextButton}
