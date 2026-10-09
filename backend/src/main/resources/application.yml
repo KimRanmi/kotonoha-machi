@@ -17,3 +17,8 @@ gemini:
   api-key: ${GEMINI_API_KEY:}
   model: ${GEMINI_MODEL:}
   base-url: https://generativelanguage.googleapis.com
+
+jwt:
+  # HS256 서명 키(32바이트 이상). 비워두면 시작할 때마다 임의 키를 만들어 쓰므로 재시작하면 로그인이 풀린다(개발용).
+  secret: ${JWT_SECRET:}
+  expiration: 7d

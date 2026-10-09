@@ -1,11 +1,14 @@
 package com.kotonoha.user;
 
-import java.util.UUID;
+import java.util.Optional;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class UserRepository {
+
+    public record Account(long id, String email, String passwordHash) {}
 
     private final JdbcClient jdbc;
 
@@ -13,14 +16,26 @@ public class UserRepository {
         this.jdbc = jdbc;
     }
 
-    // 동시에 같은 익명 ID로 첫 요청이 와도 안전하도록 upsert 한 번으로 처리한다.
-    public long findOrCreateByAnonymousId(UUID anonymousId) {
-        return jdbc.sql("""
-                        INSERT INTO users (anonymous_id) VALUES (:anonymousId)
-                        ON CONFLICT (anonymous_id) DO UPDATE SET anonymous_id = EXCLUDED.anonymous_id
-                        RETURNING id""")
-                .param("anonymousId", anonymousId)
+    // 이메일이 이미 있으면 DuplicateKeyException (email UNIQUE).
+    public long create(String email, String passwordHash) throws DuplicateKeyException {
+        return jdbc.sql("INSERT INTO users (email, password_hash) VALUES (:email, :hash) RETURNING id")
+                .param("email", email)
+                .param("hash", passwordHash)
                 .query(Long.class)
                 .single();
+    }
+
+    public Optional<Account> findByEmail(String email) {
+        return jdbc.sql("SELECT id, email, password_hash FROM users WHERE email = :email")
+                .param("email", email)
+                .query((rs, i) -> new Account(rs.getLong("id"), rs.getString("email"), rs.getString("password_hash")))
+                .optional();
+    }
+
+    public Optional<String> findEmailById(long id) {
+        return jdbc.sql("SELECT email FROM users WHERE id = :id")
+                .param("id", id)
+                .query(String.class)
+                .optional();
     }
 }
