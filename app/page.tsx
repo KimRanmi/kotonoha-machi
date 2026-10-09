@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import Link from "next/link";
+import AuthStatus from "@/components/AuthStatus";
 import styles from "./town.module.css";
 import {
   BUILDINGS,
@@ -325,6 +326,7 @@ export default function TownPage() {
           <Link href="/villagers" className={styles.navLink}>
             주민 목록
           </Link>
+          <AuthStatus className={styles.navLink} />
         </div>
       </header>
 

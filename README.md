@@ -10,7 +10,7 @@
 - 주민(미유)과의 자유 텍스트 대화 (대화 맥락 유지)
 - 주민 응답에서 단어를 클릭하면 "학습 목록에 추가" 버튼만 뜨는 최소 개입형 팝업
 - 별도의 학습 목록 화면에서 담아둔 단어 확인/삭제
-- 대화 기록과 주민별 친밀도는 서버(PostgreSQL)에 저장되어 새로고침/다른 브라우저에서도 유지됨 (같은 익명 ID 기준)
+- 대화 기록과 주민별 친밀도는 서버(PostgreSQL)에 저장되어 새로고침/다른 브라우저에서도 유지됨 (같은 계정 기준)
 - 학습 목록·건물 등은 아직 localStorage에 저장됨 (4단계에서 서버로 이전 예정)
 
 ## 실행 방법
@@ -91,34 +91,29 @@ docker compose --profile full down            # 중지 (DB 데이터는 볼륨�
 - 프론트의 `/api/*` 프록시 대상은 빌드 시점에 고정됩니다(`BACKEND_URL` 빌드 인자, compose에서는 `http://backend:8080`).
 - 컨테이너를 막 띄운 직후 몇 초간은 백엔드가 준비되지 않아 API가 에러를 낼 수 있습니다.
 
-## 임시 사용자 식별 (로그인 전, 2단계)
+## 로그인 (JWT, 3단계)
 
-로그인이 없으므로 **익명 ID 헤더 방식**을 씁니다. 프론트가 처음 한 번 `crypto.randomUUID()`로 만든 ID를
-localStorage(`kotonoha:anonymous-id`)에 저장하고, 모든 API 요청에 `X-Anonymous-Id` 헤더로 보냅니다.
-백엔드는 이 값으로 `users` 행을 찾거나 만들고(`anonymous_id` UNIQUE, upsert), 대화 기록·친밀도를 그 `users.id`에 연결합니다.
+이메일 + 비밀번호로 가입/로그인하고, 서버가 발급한 JWT로 사용자를 식별합니다.
 
-**왜 이 방식인가**
-- 가장 단순합니다. 세션/쿠키/CORS 설정이 필요 없고, Next 프록시 뒤에서도 헤더가 그대로 전달됩니다.
-- 데이터가 처음부터 `users.id`(FK)에 매달려 있어서, 3단계에서 로그인이 생겨도 테이블 구조를 바꿀 필요가 거의 없습니다.
-- 컨트롤러는 `CurrentUser` 타입만 받고, 헤더를 해석하는 코드는 `CurrentUserArgumentResolver` 한 곳에 모여 있습니다.
+- **가입/로그인**: `POST /api/auth/signup`, `POST /api/auth/login` → `{token, email}`. 비밀번호는 8~72자이며 BCrypt 해시로만 저장합니다. 이메일은 소문자로 정규화합니다. 틀린 비밀번호와 없는 계정은 같은 오류 메시지를 줍니다.
+- **토큰**: HS256, 유효기간 7일(`jwt.expiration`), subject = `users.id`. 서명 키는 환경변수 `JWT_SECRET`(32바이트 이상)로만 받습니다. 비워 두면 서버 시작 때마다 임의 키를 만들어 쓰므로 **재시작하면 로그인이 풀립니다**(개발용). 계속 유지하려면 `.env.local`에 `JWT_SECRET`을 넣으세요(`openssl rand -base64 48`로 생성, 커밋 금지).
+- **요청 방식**: 모든 `/api/chat`, `/api/villagers/**`, `/api/intimacy`, `/api/auth/me` 요청에 `Authorization: Bearer <JWT>`가 필요하며, 없거나 무효/만료면 401을 돌려줍니다. 프론트는 401을 받으면 `/login`으로 보냅니다.
+- **구현 위치**: 2단계의 익명 ID 헤더 방식을 `CurrentUserArgumentResolver` 한 곳만 바꿔 교체했습니다(컨트롤러/서비스는 그대로). Spring Security 필터 체인은 쓰지 않고, 비밀번호 해시(`spring-security-crypto`)와 JWT(`nimbus-jose-jwt`)만 사용합니다.
+- **프론트**: 토큰은 localStorage(`kotonoha:auth-token`)에 둡니다. 구현이 단순하지만 XSS로 탈취될 수 있어, 운영 환경에서는 httpOnly 쿠키 방식으로 바꾸는 것을 권장합니다.
+- **2단계의 익명 데이터**: 로그인 도입으로 익명 ID로 쌓였던 대화 기록/친밀도는 더 이상 접근할 수 없습니다(이전 코드는 만들지 않았습니다. 개발용 데이터이므로 버려도 된다는 결정에 따름).
+- **아직 없는 것**: 로그인 시도 제한(5단계 rate limit), 토큰 갱신(refresh), 비밀번호 재설정, 이메일 인증.
 
-**한계**: 익명 ID는 비밀이 아니므로 ID를 아는 사람은 그 기록을 볼 수 있습니다(UUID라 추측은 어렵지만 인증은 아님). localStorage를 지우면 같은 사용자로 돌아올 수 없습니다. 그래서 로그인 전 임시 방편입니다.
-
-**3단계(JWT)에서 교체하는 방법**
-1. `users`에 `email`/`password_hash`를 추가하고 `anonymous_id`를 nullable로 바꿉니다 (Flyway `V2__...`).
-2. `CurrentUserArgumentResolver.resolveArgument`만 `Authorization: Bearer <JWT>` 검증 결과(subject = `users.id`)를 돌려주도록 바꿉니다. 컨트롤러/서비스/저장소는 수정할 필요가 없습니다.
-3. 프론트는 `lib/storage.ts`의 `apiFetch`에서 `X-Anonymous-Id` 대신 `Authorization` 헤더를 붙입니다.
-4. 기존 익명 사용자의 데이터를 로그인 계정으로 옮길지는 그때 결정합니다 (`anonymous_id`가 있는 users 행에 이메일을 붙이는 방식이 가능).
-
-## API (2단계)
+## API
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
+| POST | `/api/auth/signup`, `/api/auth/login` | `{email, password}` → `{token, email}` (공개) |
+| GET | `/api/auth/me` | 현재 로그인한 사용자 `{email}` |
 | POST | `/api/chat` | `{villagerId, messages}` → `{reply, translation}`. 성공 시 대화 2건 저장 + 친밀도 +1. 친밀도는 서버가 DB에서 읽으며 클라이언트가 보낸 `exchanges`는 무시합니다 |
 | GET | `/api/villagers/{id}/messages` | 주민별 대화 기록 (오래된 순, 최근 500건) |
 | GET | `/api/intimacy` | 주민별 `{villagerId, met, description}` (수치는 노출하지 않고 서술형 문구만) |
 
-모든 요청에 `X-Anonymous-Id`(UUID) 헤더가 필요합니다.
+`signup`/`login`을 뺀 모든 API에 `Authorization: Bearer <JWT>` 헤더가 필요합니다.
 
 ## 이 프로토타입에서 다루지 않는 것
 
