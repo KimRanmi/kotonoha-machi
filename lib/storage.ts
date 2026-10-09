@@ -7,9 +7,10 @@ export const PENDING_BUILDING_STORAGE_KEY = "kotonoha:pending-building";
 // 사용자가 마을 맵에 실제로 배치한 건물 목록(새로고침 후에도 유지).
 export const PLACED_BUILDINGS_STORAGE_KEY = "kotonoha:placed-buildings";
 
-// 로그인 도입(3단계) 전까지 사용자를 식별하는 익명 ID. 처음 한 번 만들어 localStorage에 두고
-// 모든 API 요청에 X-Anonymous-Id 헤더로 보낸다 (서버가 이 값으로 users 행을 연결한다).
-const ANONYMOUS_ID_STORAGE_KEY = "kotonoha:anonymous-id";
+// 로그인 후 서버가 준 JWT와 이메일. 모든 API 요청에 Authorization: Bearer 헤더로 보낸다.
+// (localStorage에 두는 방식이라 XSS에 취약하다는 점은 README에 적어 두었다.)
+const AUTH_TOKEN_STORAGE_KEY = "kotonoha:auth-token";
+const AUTH_EMAIL_STORAGE_KEY = "kotonoha:auth-email";
 
 export function loadFromStorage<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -40,28 +41,69 @@ export function removeFromStorage(key: string): void {
   }
 }
 
-function getAnonymousId(): string {
-  const existing = loadFromStorage<string>(ANONYMOUS_ID_STORAGE_KEY, "");
-  if (existing) return existing;
-  const id = crypto.randomUUID();
-  saveToStorage(ANONYMOUS_ID_STORAGE_KEY, id);
-  return id;
+// ---- 로그인 ----
+
+export class UnauthorizedError extends Error {
+  constructor() {
+    super("로그인이 필요합니다.");
+  }
+}
+
+export function getAuthEmail(): string | null {
+  if (!loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY, "")) return null;
+  return loadFromStorage<string>(AUTH_EMAIL_STORAGE_KEY, "") || null;
+}
+
+export function logout(): void {
+  removeFromStorage(AUTH_TOKEN_STORAGE_KEY);
+  removeFromStorage(AUTH_EMAIL_STORAGE_KEY);
+}
+
+async function authenticate(mode: "login" | "signup", email: string, password: string): Promise<void> {
+  const res = await fetch(`/api/auth/${mode}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await readJson<{ token: string; email: string }>(res, "로그인에 실패했습니다.");
+  saveToStorage(AUTH_TOKEN_STORAGE_KEY, data.token);
+  saveToStorage(AUTH_EMAIL_STORAGE_KEY, data.email);
+}
+
+export function login(email: string, password: string): Promise<void> {
+  return authenticate("login", email, password);
+}
+
+export function signup(email: string, password: string): Promise<void> {
+  return authenticate("signup", email, password);
+}
+
+// 토큰이 없거나(만료/무효 포함) 서버가 401을 주면 로그인 화면으로 보낸다. 화면 코드는 신경 쓰지 않아도 된다.
+function redirectToLogin(): never {
+  logout();
+  if (typeof window !== "undefined") {
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+  }
+  throw new UnauthorizedError();
 }
 
 // ---- 서버(API) 기반 저장소: 대화 기록 / 친밀도 ----
 // 화면 코드는 fetch를 직접 쓰지 않고 아래 함수들만 사용한다.
-// 3단계에서 로그인이 붙으면 apiFetch의 인증 헤더만 바꾸면 된다.
 
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(path, {
+  const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY, "");
+  if (!token) redirectToLogin();
+  const res = await fetch(path, {
     ...init,
     cache: "no-store",
     headers: {
       ...init.headers,
-      "X-Anonymous-Id": getAnonymousId(),
+      Authorization: `Bearer ${token}`,
       ...(init.body ? { "Content-Type": "application/json" } : {}),
     },
   });
+  if (res.status === 401) redirectToLogin();
+  return res;
 }
 
 async function readJson<T>(res: Response, fallbackError: string): Promise<T> {

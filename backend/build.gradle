@@ -25,6 +25,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.flywaydb:flyway-database-postgresql'
     runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.springframework.security:spring-security-crypto' // BCrypt만 사용 (보안 필터 체인은 쓰지 않는다)
+    implementation 'com.nimbusds:nimbus-jose-jwt:10.10'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
