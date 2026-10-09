@@ -119,14 +119,13 @@ export default function TownPage() {
       loadFromStorage<PlacedBuilding[]>(PLACED_BUILDINGS_STORAGE_KEY, []).map(withThemeResident)
     );
 
-    // 배치 대기 건물은 마운트 시 한 번만 읽고 바로 지워서(소비) 새로고침해도
-    // 배치 모드가 다시 트리거되지 않게 한다.
+    // 배치 대기 건물은 실제로 배치할 때까지 남겨 둔다. 배치 전에 나가도 건물이 사라지지 않고,
+    // 테마 완료 기록은 이미 남아 있어 같은 테마로 중복 pending이 생기지도 않는다.
     const pending = loadFromStorage<PendingBuilding | null>(
       PENDING_BUILDING_STORAGE_KEY,
       null
     );
     if (pending) {
-      removeFromStorage(PENDING_BUILDING_STORAGE_KEY);
       setPendingBuilding(pending);
     }
   }, []);
@@ -302,6 +301,7 @@ export default function TownPage() {
     setPlacedBuildings(updated);
     saveToStorage(PLACED_BUILDINGS_STORAGE_KEY, updated);
     setPendingBuilding(null);
+    removeFromStorage(PENDING_BUILDING_STORAGE_KEY);
 
     setJustPlacedId(withResident.id);
     if (justPlacedTimeoutRef.current !== null) {

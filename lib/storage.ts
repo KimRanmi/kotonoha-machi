@@ -7,6 +7,18 @@ export const PENDING_BUILDING_STORAGE_KEY = "kotonoha:pending-building";
 // 사용자가 마을 맵에 실제로 배치한 건물 목록(새로고침 후에도 유지).
 export const PLACED_BUILDINGS_STORAGE_KEY = "kotonoha:placed-buildings";
 
+// 한 번이라도 완료한 테마 제목 목록. 건물은 테마를 처음 완료할 때만 생기고, 다시 하면 복습으로 친다.
+const COMPLETED_THEMES_STORAGE_KEY = "kotonoha:completed-themes";
+
+export function hasCompletedTheme(themeTitle: string): boolean {
+  return loadFromStorage<string[]>(COMPLETED_THEMES_STORAGE_KEY, []).includes(themeTitle);
+}
+
+export function markThemeCompleted(themeTitle: string): void {
+  const done = loadFromStorage<string[]>(COMPLETED_THEMES_STORAGE_KEY, []);
+  if (!done.includes(themeTitle)) saveToStorage(COMPLETED_THEMES_STORAGE_KEY, [...done, themeTitle]);
+}
+
 // 로그인 후 서버가 준 JWT와 이메일. 모든 API 요청에 Authorization: Bearer 헤더로 보낸다.
 // (localStorage에 두는 방식이라 XSS에 취약하다는 점은 README에 적어 두었다.)
 const AUTH_TOKEN_STORAGE_KEY = "kotonoha:auth-token";
