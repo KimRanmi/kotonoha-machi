@@ -30,6 +30,12 @@
   text-decoration: none;
   font-weight: 600;
   white-space: nowrap;
+  /* <button>(로그아웃)으로 쓰일 때도 링크처럼 보이게 */
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .mapWrapper {

@@ -11,10 +11,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.kotonoha.AuthTestSupport;
 import com.kotonoha.TestcontainersConfig;
 import com.kotonoha.llm.GeminiClient;
 import com.kotonoha.llm.GeminiException;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,19 +41,21 @@ class ChatPersistenceTest {
     @MockitoBean
     GeminiClient gemini;
 
-    // 테스트끼리 데이터가 섞이지 않도록 매번 새 익명 사용자를 쓴다.
-    String anon;
+    // 테스트끼리 데이터가 섞이지 않도록 매번 새 계정을 쓴다.
+    String email;
+    String anon; // Authorization 헤더 값(Bearer ...)
 
     @BeforeEach
-    void setUp() {
-        anon = UUID.randomUUID().toString();
+    void setUp() throws Exception {
+        email = AuthTestSupport.uniqueEmail();
+        anon = AuthTestSupport.signupAndGetBearer(mvc, email);
         when(gemini.isConfigured()).thenReturn(true);
         when(gemini.generateJson(any(), any()))
                 .thenReturn("{\"reply\":\"こんにちは\",\"translation\":\"안녕하세요\"}");
     }
 
-    ResultActions chat(String anonId, String villagerId, String text, String extra) throws Exception {
-        return mvc.perform(post("/api/chat").header("X-Anonymous-Id", anonId)
+    ResultActions chat(String authHeader, String villagerId, String text, String extra) throws Exception {
+        return mvc.perform(post("/api/chat").header("Authorization", authHeader)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"villagerId\":\"" + villagerId + "\"," + extra
                         + "\"messages\":[{\"role\":\"user\",\"content\":\"" + text + "\"}]}"));
@@ -63,7 +65,7 @@ class ChatPersistenceTest {
     void 대화하면_사용자_메시지와_주민_답변이_저장되고_조회된다() throws Exception {
         chat(anon, "cafe", "やあ", "").andExpect(status().isOk());
 
-        mvc.perform(get("/api/villagers/cafe/messages").header("X-Anonymous-Id", anon))
+        mvc.perform(get("/api/villagers/cafe/messages").header("Authorization", anon))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].role").value("user"))
@@ -77,9 +79,9 @@ class ChatPersistenceTest {
     void 기록은_사용자별_주민별로_분리된다() throws Exception {
         chat(anon, "cafe", "やあ", "").andExpect(status().isOk());
 
-        mvc.perform(get("/api/villagers/shop/messages").header("X-Anonymous-Id", anon))
+        mvc.perform(get("/api/villagers/shop/messages").header("Authorization", anon))
                 .andExpect(jsonPath("$.length()").value(0));
-        mvc.perform(get("/api/villagers/cafe/messages").header("X-Anonymous-Id", UUID.randomUUID().toString()))
+        mvc.perform(get("/api/villagers/cafe/messages").header("Authorization", AuthTestSupport.signupAndGetBearer(mvc, AuthTestSupport.uniqueEmail())))
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
@@ -89,12 +91,12 @@ class ChatPersistenceTest {
 
         Integer count = jdbc.sql("""
                         SELECT i.exchanges FROM intimacy i JOIN users u ON u.id = i.user_id
-                        WHERE u.anonymous_id = :a AND i.villager_id = 'cafe'""")
-                .param("a", UUID.fromString(anon)).query(Integer.class).single();
+                        WHERE u.email = :a AND i.villager_id = 'cafe'""")
+                .param("a", email).query(Integer.class).single();
         assertThat(count).isEqualTo(3);
 
         // 3회 → "얼굴은 알아보는 사이" 단계. 수치는 노출하지 않고 문구만 내려간다.
-        mvc.perform(get("/api/intimacy").header("X-Anonymous-Id", anon))
+        mvc.perform(get("/api/intimacy").header("Authorization", anon))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.villagerId=='cafe')].met").value(true))
                 .andExpect(jsonPath("$[?(@.villagerId=='cafe')].description").value("얼굴은 알아보는 사이가 됐어요"))
@@ -108,7 +110,7 @@ class ChatPersistenceTest {
         chat(anon, "cafe", "やあ", "\"exchanges\":999,").andExpect(status().isOk());
 
         verify(gemini).generateJson(contains("아직 거의 초면"), any());
-        mvc.perform(get("/api/intimacy").header("X-Anonymous-Id", anon))
+        mvc.perform(get("/api/intimacy").header("Authorization", anon))
                 .andExpect(jsonPath("$[?(@.villagerId=='cafe')].description").value("아직 낯선 사이예요"));
     }
 
@@ -118,31 +120,32 @@ class ChatPersistenceTest {
 
         chat(anon, "cafe", "やあ", "").andExpect(status().isBadGateway());
 
-        mvc.perform(get("/api/villagers/cafe/messages").header("X-Anonymous-Id", anon))
+        mvc.perform(get("/api/villagers/cafe/messages").header("Authorization", anon))
                 .andExpect(jsonPath("$.length()").value(0));
-        mvc.perform(get("/api/intimacy").header("X-Anonymous-Id", anon))
+        mvc.perform(get("/api/intimacy").header("Authorization", anon))
                 .andExpect(jsonPath("$[?(@.villagerId=='cafe')].met").value(false));
     }
 
     @Test
-    void 익명_ID_헤더가_없거나_UUID가_아니면_400() throws Exception {
-        mvc.perform(get("/api/intimacy")).andExpect(status().isBadRequest());
-        mvc.perform(get("/api/intimacy").header("X-Anonymous-Id", "nope")).andExpect(status().isBadRequest());
+    void 토큰이_없거나_잘못되면_401() throws Exception {
+        mvc.perform(get("/api/intimacy")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/intimacy").header("Authorization", "nope")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/intimacy").header("Authorization", "Bearer not.a.jwt")).andExpect(status().isUnauthorized());
     }
 
     @Test
     void 모르는_주민의_기록_조회는_404() throws Exception {
-        mvc.perform(get("/api/villagers/nobody/messages").header("X-Anonymous-Id", anon))
+        mvc.perform(get("/api/villagers/nobody/messages").header("Authorization", anon))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void 같은_익명_ID는_같은_users_행을_쓴다() throws Exception {
+    void 같은_계정은_같은_users_행을_쓴다() throws Exception {
         chat(anon, "cafe", "やあ", "").andExpect(status().isOk());
         chat(anon, "shop", "やあ", "").andExpect(status().isOk());
 
-        Integer users = jdbc.sql("SELECT count(*) FROM users WHERE anonymous_id = :a")
-                .param("a", UUID.fromString(anon)).query(Integer.class).single();
+        Integer users = jdbc.sql("SELECT count(*) FROM users WHERE email = :a")
+                .param("a", email).query(Integer.class).single();
         assertThat(users).isEqualTo(1);
     }
 }
