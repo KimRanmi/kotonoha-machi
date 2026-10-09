@@ -188,6 +188,14 @@ export default function ChatPanel({
       setIsRecording(false);
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         setMicBlocked(true);
+      } else if (event.error === "no-speech") {
+        setError("목소리가 들리지 않았어요. 마이크 버튼을 누르고 바로 말해보세요.");
+      } else if (event.error === "audio-capture") {
+        setError("마이크 장치를 찾을 수 없어요. 마이크 연결과 시스템 입력 장치를 확인해주세요.");
+      } else if (event.error === "network") {
+        setError("음성 인식 서버에 연결하지 못했어요. 인터넷 연결을 확인하거나 Chrome에서 시도해보세요.");
+      } else if (event.error !== "aborted") {
+        setError(`음성 인식에 실패했어요 (${event.error}). 텍스트로 계속 대화할 수 있어요.`);
       }
     };
     recognition.onend = () => {
