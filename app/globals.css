@@ -43,6 +43,8 @@ body {
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border);
+  /* 뒤의 마을/방 화면이 대화 로그 영역으로 비쳐 보이지 않게 한다. */
+  background: var(--bg);
 }
 
 .modalPage .header {
