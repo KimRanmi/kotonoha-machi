@@ -127,6 +127,8 @@ class ChatPersistenceTest {
             chat(named, villager, "やあ", "").andExpect(status().isOk());
         }
         verify(gemini, org.mockito.Mockito.times(2)).generateJson(contains("\"" + nickname + "\""), any());
+        // 한글/영문 닉네임은 가타카나로 바꿔 부르라는 지침이 함께 들어간다.
+        verify(gemini, org.mockito.Mockito.times(2)).generateJson(contains("가타카나로 바꿔서 부르세요"), any());
     }
 
     @Test
