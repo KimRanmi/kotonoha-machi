@@ -14,6 +14,7 @@ import {
   type PlacedBuilding,
 } from "./buildings";
 import { BuildingMarker } from "./BuildingMarker";
+import TownScenery from "./TownScenery";
 import { makeHomeBuilding } from "./home";
 import { getNextOnboardingStep } from "./onboarding";
 import {
@@ -252,16 +253,16 @@ export default function TownPage() {
       <header className={styles.header}>
         <div className={styles.title}>ことばのまち — 마을 지도</div>
         <div className={styles.headerLinks}>
-          <Link href="/theme-learning" className={styles.navLink}>
+          <Link href="/theme-learning" className="pill">
             학습하기
           </Link>
-          <Link href="/words" className={styles.navLink}>
+          <Link href="/words" className="pill">
             학습 단어 목록
           </Link>
-          <Link href="/villagers" className={styles.navLink}>
+          <Link href="/villagers" className="pill">
             주민 목록
           </Link>
-          <AuthStatus className={styles.navLink} />
+          <AuthStatus className="pill" />
         </div>
       </header>
 
@@ -276,14 +277,7 @@ export default function TownPage() {
           style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
           onClick={handleMapClick}
         >
-          <div
-            className={styles.path}
-            style={{ left: 0, top: MAP_HEIGHT / 2 - 30, width: MAP_WIDTH, height: 60 }}
-          />
-          <div
-            className={styles.path}
-            style={{ left: MAP_WIDTH / 2 - 30, top: 0, width: 60, height: MAP_HEIGHT }}
-          />
+          <TownScenery width={MAP_WIDTH} height={MAP_HEIGHT} />
 
           {allBuildings.map((b) => (
             <BuildingMarker
@@ -291,6 +285,7 @@ export default function TownPage() {
               building={b}
               isNear={nearBuildingId === b.id}
               isConstructing={justPlacedId === b.id}
+              mapHeight={MAP_HEIGHT}
             />
           ))}
 

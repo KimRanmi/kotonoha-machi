@@ -12,6 +12,7 @@ import {
   sendChat,
 } from "@/lib/storage";
 import { DEFAULT_VILLAGER_ID, getVillager } from "@/lib/villager";
+import VillagerFace from "@/components/VillagerFace";
 import VillagerMessage from "@/components/VillagerMessage";
 import AddWordPopup, { WordPopupState } from "@/components/AddWordPopup";
 
@@ -254,17 +255,17 @@ export default function ChatPanel({
     <div className={onClose ? "page modalPage" : "page"}>
       <header className="header">
         <div className="villagerInfo">
-          <div className="villagerAvatar">{villager.avatar}</div>
+          <VillagerFace villagerId={villager.id} />
           <div>
             <div className="villagerName">{villager.name}</div>
             <div className="villagerDesc">{villager.description}</div>
           </div>
         </div>
         <div className="headerActions">
-          <Link href="/villagers" className="navLink">
+          <Link href="/villagers" className="pill">
             주민 목록
           </Link>
-          <Link href="/words" className="navLink">
+          <Link href="/words" className="pill">
             학습 목록 ({words.length})
           </Link>
           {onClose && (

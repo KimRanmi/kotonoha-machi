@@ -34,10 +34,10 @@ export default function WordsPage() {
           </div>
         </div>
         <div className="headerActions">
-          <Link href="/villagers" className="navLink">
+          <Link href="/villagers" className="pill">
             주민 목록
           </Link>
-          <Link href="/" className="navLink">
+          <Link href="/" className="pill">
             ← 마을로 돌아가기
           </Link>
         </div>

@@ -49,7 +49,7 @@ export default function InsidePage() {
     return (
       <div className={townStyles.page}>
         <p className={townStyles.interactionBanner}>찾을 수 없는 건물입니다.</p>
-        <Link href="/" className={townStyles.navLink}>
+        <Link href="/" className="pill">
           마을로 돌아가기
         </Link>
       </div>
@@ -238,16 +238,16 @@ function RoomView({ building }: { building: Building }) {
           {isHome && (
             <button
               type="button"
-              className={townStyles.navLink}
+              className="pill"
               onClick={() => (decorating ? stopDecorating() : setDecorating(true))}
             >
               {decorating ? "꾸미기 끝내기" : "꾸미기"}
             </button>
           )}
-          <button type="button" className={townStyles.navLink} onClick={leave}>
+          <button type="button" className="pill" onClick={leave}>
             나가기 (Esc)
           </button>
-          <AuthStatus className={townStyles.navLink} />
+          <AuthStatus className="pill" />
         </div>
       </header>
 
