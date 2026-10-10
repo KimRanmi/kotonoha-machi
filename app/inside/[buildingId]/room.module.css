@@ -59,3 +59,59 @@
   font-weight: 700;
   white-space: nowrap;
 }
+
+.selected {
+  outline: 3px solid #ffd54f;
+  z-index: 5;
+}
+
+.ghost {
+  position: absolute;
+  background: rgba(80, 200, 120, 0.45);
+  border: 2px dashed #2e9e5b;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.ghostBad {
+  background: rgba(220, 80, 80, 0.45);
+  border-color: #c0392b;
+}
+
+.decorPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.decorRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.decorLabel {
+  font-size: 13px;
+  color: #5c6b57;
+}
+
+.decorButton {
+  padding: 4px 12px;
+  border-radius: 14px;
+  border: 1px solid #5c4a3a;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.decorButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.decorActive {
+  background: #ffd54f;
+}
