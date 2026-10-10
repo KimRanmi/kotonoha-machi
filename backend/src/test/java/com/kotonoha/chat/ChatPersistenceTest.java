@@ -115,6 +115,36 @@ class ChatPersistenceTest {
     }
 
     @Test
+    void 주민_프롬프트에_사용자의_닉네임이_들어간다() throws Exception {
+        String nickname = AuthTestSupport.uniqueNickname();
+        String named = "Bearer " + new tools.jackson.databind.ObjectMapper().readTree(mvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(AuthTestSupport.signupBody(AuthTestSupport.uniqueEmail(), nickname)))
+                .andReturn().getResponse().getContentAsString()).get("accessToken").asString();
+
+        // 어느 주민과 대화해도 같은 닉네임으로 부르도록 프롬프트에 들어간다.
+        for (String villager : new String[] {"cafe", "shop"}) {
+            chat(named, villager, "やあ", "").andExpect(status().isOk());
+        }
+        verify(gemini, org.mockito.Mockito.times(2)).generateJson(contains("\"" + nickname + "\""), any());
+    }
+
+    @Test
+    void 닉네임이_없는_계정은_이름_지침없이_대화한다() throws Exception {
+        String email = AuthTestSupport.uniqueEmail();
+        String hash = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(AuthTestSupport.PASSWORD);
+        jdbc.sql("INSERT INTO users (email, password_hash) VALUES (:e, :h)").param("e", email).param("h", hash).update();
+        String body = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + AuthTestSupport.PASSWORD + "\"}"))
+                .andReturn().getResponse().getContentAsString();
+        String legacy = "Bearer " + new tools.jackson.databind.ObjectMapper().readTree(body).get("accessToken").asString();
+
+        chat(legacy, "cafe", "やあ", "").andExpect(status().isOk());
+
+        verify(gemini, org.mockito.Mockito.never()).generateJson(contains("[상대의 이름]"), any());
+    }
+
+    @Test
     void Gemini가_실패하면_저장도_친밀도_증가도_없다() throws Exception {
         when(gemini.generateJson(any(), any())).thenThrow(new GeminiException("fail", null));
 

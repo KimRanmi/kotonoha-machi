@@ -130,11 +130,14 @@ export class UnauthorizedError extends Error {
 interface AuthResponse {
   accessToken: string;
   email: string;
+  // 닉네임 도입 전에 가입한 계정은 null (설정 화면으로 보낸다).
+  nickname: string | null;
 }
 
 let accessToken: string | null = null;
 let accessExpiresAt = 0;
 let authEmail: string | null = null;
+let authNickname: string | null = null;
 let refreshInFlight: Promise<boolean> | null = null;
 
 function jwtExpiryMs(token: string): number {
@@ -150,6 +153,7 @@ function applySession(data: AuthResponse): void {
   accessToken = data.accessToken;
   accessExpiresAt = jwtExpiryMs(data.accessToken);
   authEmail = data.email;
+  authNickname = data.nickname ?? null;
   saveToStorage(SESSION_HINT_KEY, true);
 }
 
@@ -157,6 +161,7 @@ function clearSession(): void {
   accessToken = null;
   accessExpiresAt = 0;
   authEmail = null;
+  authNickname = null;
   removeFromStorage(SESSION_HINT_KEY);
 }
 
@@ -167,6 +172,11 @@ function hasFreshAccessToken(): boolean {
 // 현재 메모리에 로그인 정보가 있는지(동기). 화면 표시용이며, 판단은 restoreSession()으로 한다.
 export function getAuthEmail(): string | null {
   return accessToken ? authEmail : null;
+}
+
+// 주민들이 사용자를 부르는 이름. 아직 정하지 않았으면 null.
+export function getAuthNickname(): string | null {
+  return accessToken ? authNickname : null;
 }
 
 // 같은 사용자가 탭 여러 개로 동시에 갱신하면 refresh 토큰이 교체되는 중에 겹쳐 재사용으로 오인될 수 있다.
@@ -213,21 +223,53 @@ export async function logout(): Promise<void> {
   clearSession();
 }
 
-async function authenticate(mode: "login" | "signup", email: string, password: string): Promise<void> {
+async function authenticate(mode: "login" | "signup", body: Record<string, string>): Promise<void> {
   const res = await fetch(`/api/auth/${mode}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
   applySession(await readJson<AuthResponse>(res, "로그인에 실패했습니다."));
 }
 
 export function login(email: string, password: string): Promise<void> {
-  return authenticate("login", email, password);
+  return authenticate("login", { email, password });
 }
 
-export function signup(email: string, password: string): Promise<void> {
-  return authenticate("signup", email, password);
+export function signup(email: string, password: string, nickname: string): Promise<void> {
+  return authenticate("signup", { email, password, nickname });
+}
+
+// ---- 닉네임 ----
+// 규칙은 백엔드(Nicknames.java)와 같아야 한다: 글자·숫자·밑줄만 2~12자.
+const NICKNAME_PATTERN = /^[\p{L}\p{N}_]{2,12}$/u;
+export const NICKNAME_RULE_MESSAGE = "닉네임은 2~12자의 글자, 숫자, 밑줄(_)만 쓸 수 있어요.";
+
+export function validateNickname(nickname: string): string | null {
+  return NICKNAME_PATTERN.test(nickname) ? null : NICKNAME_RULE_MESSAGE;
+}
+
+// 중복 확인 (로그인 전에도 호출하는 공개 API).
+export async function checkNickname(nickname: string): Promise<{ available: boolean; message: string }> {
+  const res = await fetch(`/api/auth/nickname-available?nickname=${encodeURIComponent(nickname)}`, {
+    cache: "no-store",
+  });
+  return readJson(res, "닉네임을 확인하지 못했습니다.");
+}
+
+// 닉네임 설정/변경. 이후 모든 주민이 이 이름으로 부른다.
+export async function setNickname(nickname: string): Promise<void> {
+  const res = await apiFetch("/api/auth/nickname", {
+    method: "PUT",
+    body: JSON.stringify({ nickname }),
+  });
+  const data = await readJson<{ nickname: string }>(res, "닉네임을 저장하지 못했습니다.");
+  authNickname = data.nickname;
+}
+
+// 로그인/닉네임 설정 후 돌아갈 경로는 같은 사이트 안의 경로만 허용한다 (open redirect 방지).
+export function safeNextPath(next: string | null): string {
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
 
 // 로그인이 필요한 상태(갱신도 실패)면 로그인 화면으로 보낸다. 화면 코드는 신경 쓰지 않아도 된다.
