@@ -1,27 +1,9 @@
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, LearnedWord, PendingBuilding, StoredBuilding } from "@/lib/types";
 import type { Furniture } from "@/app/interiors";
-
-export const WORDS_STORAGE_KEY = "kotonoha:word-list";
-// 테마 학습을 막 끝내고 마을로 넘어가는 중, 아직 배치되지 않은 건물 1건을 잠깐 들고 있는 키.
-// town 페이지가 마운트 시 이 값을 읽고 나면 바로 지워서 배치 모드를 한 번만 트리거한다.
-export const PENDING_BUILDING_STORAGE_KEY = "kotonoha:pending-building";
-// 사용자가 마을 맵에 실제로 배치한 건물 목록(새로고침 후에도 유지).
-export const PLACED_BUILDINGS_STORAGE_KEY = "kotonoha:placed-buildings";
-
-// 한 번이라도 완료한 테마 제목 목록. 건물은 테마를 처음 완료할 때만 생기고, 다시 하면 복습으로 친다.
-const COMPLETED_THEMES_STORAGE_KEY = "kotonoha:completed-themes";
-
-export function hasCompletedTheme(themeTitle: string): boolean {
-  return loadFromStorage<string[]>(COMPLETED_THEMES_STORAGE_KEY, []).includes(themeTitle);
-}
-
-export function markThemeCompleted(themeTitle: string): void {
-  const done = loadFromStorage<string[]>(COMPLETED_THEMES_STORAGE_KEY, []);
-  if (!done.includes(themeTitle)) saveToStorage(COMPLETED_THEMES_STORAGE_KEY, [...done, themeTitle]);
-}
 
 // 건물 내부에서 나와 마을로 돌아갈 때, 방금 나온 건물 id를 한 번만 넘겨주는 키.
 // 마을이 읽으면 지운다(새로고침해도 캐릭터가 계속 그 자리로 되돌려지지 않게).
+// 사용자 데이터가 아니라 화면 전환 중에만 쓰는 임시 값이라 서버가 아니라 브라우저에 둔다.
 const TOWN_RETURN_STORAGE_KEY = "kotonoha:town-return-building";
 
 export function setTownReturnBuilding(buildingId: string): void {
@@ -34,53 +16,7 @@ export function takeTownReturnBuilding(): string | null {
   return id;
 }
 
-// ---- 온보딩 / 내 집 ----
-// 곧 서버 API로 옮길 데이터라서, 화면 코드는 localStorage를 직접 쓰지 않고 아래 함수만 쓴다.
-
-// 끝낸 온보딩 단계 id 목록. 단계 목록 자체는 app/onboarding.ts에 있다.
-const ONBOARDING_DONE_STORAGE_KEY = "kotonoha:onboarding-done";
-// 내 집을 마을 맵에 배치한 자리(좌상단). 없으면 아직 배치하지 않은 것.
-const HOME_POSITION_STORAGE_KEY = "kotonoha:home-position";
-// 내 집 가구 배치: 방에 놓인 가구와 목록(보관함)에 있는 가구.
-const HOME_FURNITURE_STORAGE_KEY = "kotonoha:home-furniture";
-
-export interface HomePosition {
-  x: number;
-  y: number;
-}
-
-export interface HomeFurnitureState {
-  placed: Furniture[];
-  stored: Furniture[];
-}
-
-export function loadOnboardingDone(): string[] {
-  return loadFromStorage<string[]>(ONBOARDING_DONE_STORAGE_KEY, []);
-}
-
-export function markOnboardingStepDone(stepId: string): void {
-  const done = loadOnboardingDone();
-  if (!done.includes(stepId)) saveToStorage(ONBOARDING_DONE_STORAGE_KEY, [...done, stepId]);
-}
-
-export function loadHomePosition(): HomePosition | null {
-  return loadFromStorage<HomePosition | null>(HOME_POSITION_STORAGE_KEY, null);
-}
-
-export function saveHomePosition(position: HomePosition): void {
-  saveToStorage(HOME_POSITION_STORAGE_KEY, position);
-}
-
-// 저장된 가구 배치. 아직 한 번도 저장한 적 없으면 null(호출하는 쪽이 기본 가구로 시작한다).
-export function loadHomeFurniture(): HomeFurnitureState | null {
-  return loadFromStorage<HomeFurnitureState | null>(HOME_FURNITURE_STORAGE_KEY, null);
-}
-
-export function saveHomeFurniture(state: HomeFurnitureState): void {
-  saveToStorage(HOME_FURNITURE_STORAGE_KEY, state);
-}
-
-export function loadFromStorage<T>(key: string, fallback: T): T {
+function loadFromStorage<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(key);
@@ -91,7 +27,7 @@ export function loadFromStorage<T>(key: string, fallback: T): T {
   }
 }
 
-export function saveToStorage<T>(key: string, value: T): void {
+function saveToStorage<T>(key: string, value: T): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
@@ -100,7 +36,7 @@ export function saveToStorage<T>(key: string, value: T): void {
   }
 }
 
-export function removeFromStorage(key: string): void {
+function removeFromStorage(key: string): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(key);
@@ -348,4 +284,164 @@ export interface VillagerIntimacy {
 export async function fetchIntimacy(): Promise<VillagerIntimacy[]> {
   const res = await apiFetch("/api/intimacy");
   return readJson<VillagerIntimacy[]>(res, "친밀도를 불러오지 못했습니다.");
+}
+
+// ---- 서버(API) 기반 저장소: 학습 단어 / 테마 / 건물 / 내 집 / 온보딩 ----
+// 저장에 실패하면 Error(사용자에게 보여줄 메시지)를 던진다. 화면은 이를 잡아 화면에 표시해야 한다.
+
+// 204(내용 없음)는 "아직 저장된 값이 없음"이라서 null로 돌려준다.
+async function readJsonOrNull<T>(res: Response, fallbackError: string): Promise<T | null> {
+  if (res.status === 204) return null;
+  return readJson<T>(res, fallbackError);
+}
+
+async function expectOk(res: Response, fallbackError: string): Promise<void> {
+  if (res.ok) return;
+  const data = await res.json().catch(() => null);
+  throw new Error(data?.error || fallbackError);
+}
+
+// 네트워크가 끊겨 fetch 자체가 실패하면 브라우저 기본 메시지(Failed to fetch) 대신 한국어 안내를 쓴다.
+async function guarded<T>(action: () => Promise<T>, fallbackError: string): Promise<T> {
+  try {
+    return await action();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) throw err;
+    if (err instanceof TypeError) throw new Error(`${fallbackError} 네트워크 연결을 확인해주세요.`);
+    throw err;
+  }
+}
+
+// -- 학습 단어 --
+
+export function fetchWords(): Promise<LearnedWord[]> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/words");
+    return readJson<LearnedWord[]>(res, "학습 단어를 불러오지 못했습니다.");
+  }, "학습 단어를 불러오지 못했습니다.");
+}
+
+export function addWord(word: string): Promise<LearnedWord> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/words", { method: "POST", body: JSON.stringify({ word }) });
+    return readJson<LearnedWord>(res, "단어를 저장하지 못했습니다.");
+  }, "단어를 저장하지 못했습니다.");
+}
+
+export function removeWord(word: string): Promise<void> {
+  return guarded(async () => {
+    const res = await apiFetch(`/api/words?word=${encodeURIComponent(word)}`, { method: "DELETE" });
+    await expectOk(res, "단어를 삭제하지 못했습니다.");
+  }, "단어를 삭제하지 못했습니다.");
+}
+
+// -- 테마 완료 / 배치 대기 건물 / 배치한 건물 --
+
+// 테마 완료를 기록한다. 처음 완료한 것이면 true(서버가 배치 대기 건물도 함께 만든다), 복습이면 false.
+export function completeTheme(themeTitle: string): Promise<boolean> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/themes/complete", {
+      method: "POST",
+      body: JSON.stringify({ themeTitle }),
+    });
+    const data = await readJson<{ firstCompletion: boolean }>(res, "테마 완료를 저장하지 못했습니다.");
+    return data.firstCompletion;
+  }, "테마 완료를 저장하지 못했습니다.");
+}
+
+// 배치 대기 건물. 없으면 null. 배치할 때까지 서버에 남는다.
+export function fetchPendingBuilding(): Promise<PendingBuilding | null> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/buildings/pending");
+    return readJsonOrNull<PendingBuilding>(res, "배치할 건물을 불러오지 못했습니다.");
+  }, "배치할 건물을 불러오지 못했습니다.");
+}
+
+export function fetchPlacedBuildings(): Promise<StoredBuilding[]> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/buildings");
+    return readJson<StoredBuilding[]>(res, "건물 목록을 불러오지 못했습니다.");
+  }, "건물 목록을 불러오지 못했습니다.");
+}
+
+export interface BuildingPlacement {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+  color: string;
+}
+
+// 배치 대기 건물을 마을에 놓는다. 건물 id와 테마는 서버가 대기 건물에서 정해 돌려준다.
+export function placePendingBuilding(placement: BuildingPlacement): Promise<StoredBuilding> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/buildings", { method: "POST", body: JSON.stringify(placement) });
+    return readJson<StoredBuilding>(res, "건물을 저장하지 못했습니다.");
+  }, "건물을 저장하지 못했습니다.");
+}
+
+// -- 내 집 / 온보딩 --
+
+export interface HomePosition {
+  x: number;
+  y: number;
+}
+
+export interface HomeFurnitureState {
+  placed: Furniture[];
+  stored: Furniture[];
+}
+
+// 끝낸 온보딩 단계 id 목록. 단계 목록 자체는 app/onboarding.ts에 있다.
+export function fetchOnboardingDone(): Promise<string[]> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/onboarding");
+    return readJson<string[]>(res, "진행 상태를 불러오지 못했습니다.");
+  }, "진행 상태를 불러오지 못했습니다.");
+}
+
+export function markOnboardingStepDone(stepId: string): Promise<void> {
+  return guarded(async () => {
+    const res = await apiFetch(`/api/onboarding/${encodeURIComponent(stepId)}`, { method: "PUT" });
+    await expectOk(res, "진행 상태를 저장하지 못했습니다.");
+  }, "진행 상태를 저장하지 못했습니다.");
+}
+
+// 내 집을 마을 맵에 배치한 자리(좌상단). 없으면 아직 배치하지 않은 것.
+export function fetchHomePosition(): Promise<HomePosition | null> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/home/position");
+    return readJsonOrNull<HomePosition>(res, "내 집 위치를 불러오지 못했습니다.");
+  }, "내 집 위치를 불러오지 못했습니다.");
+}
+
+export function saveHomePosition(position: HomePosition): Promise<void> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/home/position", { method: "PUT", body: JSON.stringify(position) });
+    await expectOk(res, "내 집 위치를 저장하지 못했습니다.");
+  }, "내 집 위치를 저장하지 못했습니다.");
+}
+
+// 저장된 가구 배치. 아직 한 번도 저장한 적 없으면 null(호출하는 쪽이 기본 가구로 시작한다).
+export function fetchHomeFurniture(): Promise<HomeFurnitureState | null> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/home/furniture");
+    return readJsonOrNull<HomeFurnitureState>(res, "가구 배치를 불러오지 못했습니다.");
+  }, "가구 배치를 불러오지 못했습니다.");
+}
+
+// 가구 저장은 조작할 때마다 호출되므로 요청을 순서대로 이어서 보낸다(응답이 뒤바뀌어 옛 상태로
+// 덮어써지는 것을 막음). 호출하는 쪽은 기다리지 않고 화면을 먼저 바꾸고, 실패만 처리하면 된다.
+let furnitureSaveChain: Promise<unknown> = Promise.resolve();
+
+export function saveHomeFurniture(state: HomeFurnitureState): Promise<void> {
+  const run = () =>
+    guarded(async () => {
+      const res = await apiFetch("/api/home/furniture", { method: "PUT", body: JSON.stringify(state) });
+      await expectOk(res, "가구 배치를 저장하지 못했습니다.");
+    }, "가구 배치를 저장하지 못했습니다.");
+  const result = furnitureSaveChain.then(run, run);
+  furnitureSaveChain = result.catch(() => undefined);
+  return result;
 }

@@ -6,13 +6,7 @@ import Link from "next/link";
 import * as wanakana from "wanakana";
 import styles from "./theme-learning.module.css";
 import { travelTheme } from "./data";
-import {
-  saveToStorage,
-  hasCompletedTheme,
-  markThemeCompleted,
-  PENDING_BUILDING_STORAGE_KEY,
-} from "@/lib/storage";
-import type { PendingBuilding } from "@/lib/types";
+import { completeTheme } from "@/lib/storage";
 
 const MAX_WRONG_BEFORE_HINT = 3;
 // "테마 완료!" 화면을 잠깐 보여준 뒤 마을로 자동 전환하기까지의 대기 시간.
@@ -32,6 +26,8 @@ export default function ThemeLearning() {
   const [stage, setStage] = useState<Stage>("rounds");
   // 완료 시점에 한 번 정해진다: 이미 완료한 적 있는 테마를 다시 끝낸 것이면 복습(건물 없음).
   const [isReview, setIsReview] = useState(false);
+  // 서버에 완료 기록이 저장됐는지. 저장 전에 마을로 가면 새 건물이 안 보일 수 있어 버튼을 막는다.
+  const [saved, setSaved] = useState(false);
   const [roundIndex, setRoundIndex] = useState(0);
   const [itemIndex, setItemIndex] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
@@ -62,26 +58,37 @@ export default function ThemeLearning() {
     };
   }, [stage, reviewIndex]);
 
-  // 테마 완료 화면에 들어서면, 새로 지어질 건물 정보를 저장해두고 짧은 딜레이 후
-  // 마을 맵으로 자동 전환한다(REQ-013). 실시간 건설 대기는 town 페이지에서 연출로만 처리한다.
+  // 테마 완료 화면에 들어서면 서버에 완료를 기록한다(첫 완료면 서버가 배치 대기 건물도 만든다, REQ-013).
+  // 저장에 성공한 뒤에 짧은 딜레이를 두고 마을 맵으로 자동 전환한다. 실패하면 이동하지 않고
+  // 에러와 다시 시도 버튼을 보여준다. 개발 모드(StrictMode)에서 효과가 두 번 돌아도 요청은 한 번만 보낸다.
+  const completionRequestRef = useRef<Promise<boolean> | null>(null);
+  const [completeError, setCompleteError] = useState<string | null>(null);
+  const [saveAttempt, setSaveAttempt] = useState(0);
+
   useEffect(() => {
     if (stage !== "complete") return;
-    const repeat = hasCompletedTheme(theme.title);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsReview(repeat);
-    if (!repeat) {
-      markThemeCompleted(theme.title);
-      const pending: PendingBuilding = {
-        themeTitle: theme.title,
-        completedAt: Date.now(),
-      };
-      saveToStorage(PENDING_BUILDING_STORAGE_KEY, pending);
-    }
-    const timeoutId = window.setTimeout(() => {
-      router.push("/");
-    }, AUTO_REDIRECT_DELAY_MS);
-    return () => window.clearTimeout(timeoutId);
-  }, [stage, theme.title, router]);
+    let cancelled = false;
+    let timeoutId: number | undefined;
+    completionRequestRef.current ??= completeTheme(theme.title);
+    completionRequestRef.current
+      .then((firstCompletion) => {
+        if (cancelled) return;
+        setIsReview(!firstCompletion);
+        setSaved(true);
+        setCompleteError(null);
+        timeoutId = window.setTimeout(() => {
+          router.push("/");
+        }, AUTO_REDIRECT_DELAY_MS);
+      })
+      .catch((err) => {
+        completionRequestRef.current = null; // 다시 시도하면 새로 요청한다.
+        if (!cancelled) setCompleteError(err instanceof Error ? err.message : "테마 완료를 저장하지 못했습니다.");
+      });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [stage, theme.title, router, saveAttempt]);
 
   function resetItemState() {
     setSelected(null);
@@ -322,18 +329,35 @@ export default function ThemeLearning() {
 
       {stage === "complete" && (
         <div className={styles.completeScreen}>
-          <div className={styles.completeTitle}>{isReview ? "복습 완료!" : "테마 완료!"}</div>
-          <div>
-            &quot;{theme.title}&quot; 테마 {isReview ? "복습을 마쳤어요." : "학습을 모두 마쳤어요."}
-          </div>
-          <div>{isReview ? "건물은 처음 완료할 때만 지어져요." : "마을에 새 건물이 지어져요!"}</div>
-          <button
-            type="button"
-            className={styles.nextButton}
-            onClick={() => router.push("/")}
-          >
-            ← 마을로 돌아가기
-          </button>
+          {completeError ? (
+            <>
+              <div className={styles.completeTitle}>저장에 실패했어요</div>
+              <div role="alert">{completeError}</div>
+              <button
+                type="button"
+                className={styles.nextButton}
+                onClick={() => setSaveAttempt((n) => n + 1)}
+              >
+                다시 시도
+              </button>
+            </>
+          ) : (
+            <>
+              <div className={styles.completeTitle}>{isReview ? "복습 완료!" : "테마 완료!"}</div>
+              <div>
+                &quot;{theme.title}&quot; 테마 {isReview ? "복습을 마쳤어요." : "학습을 모두 마쳤어요."}
+              </div>
+              <div>{isReview ? "건물은 처음 완료할 때만 지어져요." : "마을에 새 건물이 지어져요!"}</div>
+              <button
+                type="button"
+                className={styles.nextButton}
+                disabled={!saved}
+                onClick={() => router.push("/")}
+              >
+                {saved ? "← 마을로 돌아가기" : "저장 중…"}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
