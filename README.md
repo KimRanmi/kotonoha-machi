@@ -10,8 +10,8 @@
 - 주민(미유)과의 자유 텍스트 대화 (대화 맥락 유지)
 - 주민 응답에서 단어를 클릭하면 "학습 목록에 추가" 버튼만 뜨는 최소 개입형 팝업
 - 별도의 학습 목록 화면에서 담아둔 단어 확인/삭제
-- 대화 기록과 주민별 친밀도는 서버(PostgreSQL)에 저장되어 새로고침/다른 브라우저에서도 유지됨 (같은 계정 기준)
-- 학습 목록·건물 등은 아직 localStorage에 저장됨 (4단계에서 서버로 이전 예정)
+- 대화 기록, 주민별 친밀도, 학습 단어, 완료한 테마, 배치한 건물(배치 대기 건물 포함), 내 집 위치/가구 배치, 온보딩 진행은 모두 서버(PostgreSQL)에 계정별로 저장되어 새로고침/다른 브라우저/다른 기기에서도 그대로 유지됨
+- 브라우저에는 로그인 표시(`kotonoha:session-hint`)와 건물 내부에서 마을로 돌아올 때 쓰는 임시 값(`kotonoha:town-return-building`)만 남음
 
 ## 실행 방법
 
@@ -126,8 +126,33 @@ docker compose --profile full down            # 중지 (DB 데이터는 볼륨�
 | POST | `/api/chat` | `{villagerId, messages}` → `{reply, translation}`. 성공 시 대화 2건 저장 + 친밀도 +1. 친밀도는 서버가 DB에서 읽으며 클라이언트가 보낸 `exchanges`는 무시합니다 |
 | GET | `/api/villagers/{id}/messages` | 주민별 대화 기록 (오래된 순, 최근 500건) |
 | GET | `/api/intimacy` | 주민별 `{villagerId, met, description}` (수치는 노출하지 않고 서술형 문구만) |
+| GET / POST / DELETE | `/api/words`, `/api/words?word=` | 학습 단어 목록 `[{word, addedAt}]` / 단어 추가 `{word}` (이미 있으면 그대로 성공) / 삭제 |
+| GET | `/api/themes/completed` | 완료한 테마 제목 목록 |
+| POST | `/api/themes/complete` | `{themeTitle}` → `{firstCompletion}`. 처음 완료면 같은 트랜잭션에서 배치 대기 건물을 만든다. 복습이면 아무것도 바꾸지 않는다 |
+| GET | `/api/buildings/pending` | 배치 대기 건물 `{themeTitle, completedAt}` (없으면 204). 배치할 때까지 유지 |
+| GET / POST | `/api/buildings` | 배치한 건물 목록 / 대기 건물을 `{x, y, width, height, label, color}` 자리에 배치 (대기 건물이 없으면 409). 건물 id와 테마는 서버가 정한다 |
+| GET / PUT | `/api/home/position` | 내 집 위치 `{x, y}` (없으면 204) |
+| GET / PUT | `/api/home/furniture` | 가구 배치 `{placed: [...], stored: [...]}` (저장한 적 없으면 204, 집을 짓기 전 PUT은 409) |
+| GET / PUT | `/api/onboarding`, `/api/onboarding/{step}` | 끝낸 온보딩 단계 id 목록 / 단계 완료 기록 (멱등) |
 
 `signup`/`login`/`refresh`/`logout`을 뺀 모든 API에 `Authorization: Bearer <access 토큰>` 헤더가 필요합니다.
+
+## 저장되는 데이터 (PostgreSQL)
+
+모든 테이블은 `user_id`(users.id)로 계정에 묶이고, 요청마다 access 토큰의 사용자 것만 읽고 씁니다(다른 계정의 행에는 접근할 방법이 없음). 스키마는 Flyway `V1`~`V4`에 있습니다.
+
+| 테이블 | 내용 |
+| --- | --- |
+| `chat_messages`, `intimacy` | 주민별 대화 기록 / 누적 대화 횟수 |
+| `learned_words` | 학습 단어 (PK `user_id, word`) |
+| `completed_themes` | 완료한 테마. PK 충돌 여부가 곧 "첫 완료" 판정이라 건물은 처음 완료할 때만 생긴다 |
+| `pending_buildings` | 배치 대기 건물 (사용자당 1건, 배치하면 삭제) |
+| `placed_buildings` | 마을에 배치한 테마 건물 (좌표, 라벨, 색, 테마). 주민 연결은 테마 제목으로 프론트가 계산 |
+| `homes` | 내 집 위치 + 가구 배치(`furniture` jsonb 한 컬럼: 항상 통째로 읽고 쓰는 값이라 행으로 쪼개지 않음) |
+| `onboarding_steps` | 끝낸 온보딩 단계 id |
+
+- 예전에 브라우저 `localStorage`에 쌓인 학습 단어/건물/내 집 데이터는 서버로 옮기지 않습니다(더 이상 읽지 않음).
+- 저장에 실패하면 화면에 에러 메시지가 뜹니다. 내 집 꾸미기는 화면을 먼저 바꾸고 뒤에서 저장하며, 실패하면 마지막으로 저장된 상태로 되돌립니다.
 
 ## 이 프로토타입에서 다루지 않는 것
 

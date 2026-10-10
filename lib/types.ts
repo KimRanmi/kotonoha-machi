@@ -13,9 +13,22 @@ export interface LearnedWord {
   addedAt: number;
 }
 
-// 테마 학습 완료 직후, 마을 맵으로 넘어가 사용자가 배치할 건물 1건의 정보.
-// theme-learning에서 저장하고, town 페이지가 마운트 시 한 번 읽어 소비한다.
+// 테마를 처음 완료했지만 아직 마을에 배치하지 않은 건물 1건의 정보.
+// 서버가 테마 완료 때 만들고, 배치할 때까지 유지한다.
 export interface PendingBuilding {
   themeTitle: string;
   completedAt: number;
+}
+
+// 서버에 저장된, 마을에 배치된 테마 건물 (app/buildings.ts의 PlacedBuilding에서 주민 연결만 뺀 모양).
+export interface StoredBuilding {
+  id: string;
+  themeTitle: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+  color: string;
+  placedAt: number;
 }

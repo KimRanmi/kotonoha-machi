@@ -7,7 +7,7 @@ import AuthStatus from "@/components/AuthStatus";
 import ChatPanel from "@/components/ChatPanel";
 import townStyles from "../../town.module.css";
 import styles from "./room.module.css";
-import { BUILDINGS, withThemeResident, type Building, type PlacedBuilding } from "../../buildings";
+import { BUILDINGS, withThemeResident, type Building } from "../../buildings";
 import { getRoomObstacles, getRoomTemplate, type Furniture, type Room } from "../../interiors";
 import {
   PLACE_FAILURE_MESSAGE,
@@ -18,33 +18,71 @@ import {
 import { CHAR_SIZE, isNearRect, rectsOverlap, useWalker } from "@/lib/walk";
 import { getVillager } from "@/lib/villager";
 import {
-  loadFromStorage,
-  loadHomeFurniture,
-  loadHomePosition,
+  fetchHomeFurniture,
+  fetchHomePosition,
+  fetchPlacedBuildings,
   saveHomeFurniture,
   setTownReturnBuilding,
-  PLACED_BUILDINGS_STORAGE_KEY,
+  type HomeFurnitureState,
 } from "@/lib/storage";
 
 const INTERACTION_MARGIN = 28; // 주민 테두리 밖으로 이 거리 안에 들어오면 "대화 가능"
 
-// 건물 내부 화면. 테마로 지은 건물은 localStorage에 있으므로 마운트 후에 건물을 찾는다.
+// 건물 내부 화면. 테마로 지은 건물과 내 집은 서버에 있으므로 마운트 후에 불러와 건물을 찾는다.
 export default function InsidePage() {
   const params = useParams<{ buildingId: string }>();
   const buildingId = decodeURIComponent(params.buildingId);
-  const [state, setState] = useState<{ building: Building | null } | null>(null);
+  const [state, setState] = useState<{
+    building: Building | null;
+    furniture: HomeFurnitureState | null;
+  } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    const placed = loadFromStorage<PlacedBuilding[]>(PLACED_BUILDINGS_STORAGE_KEY, []).map(
-      withThemeResident
-    );
-    const home = loadHomePosition();
-    const found = [...BUILDINGS, ...(home ? [makeHomeBuilding(home)] : []), ...placed].find((b) => b.id === buildingId) ?? null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState({ building: found });
-  }, [buildingId]);
+    let cancelled = false;
+    Promise.all([fetchPlacedBuildings(), fetchHomePosition()])
+      .then(async ([stored, home]) => {
+        const placed = stored.map(withThemeResident);
+        const found =
+          [...BUILDINGS, ...(home ? [makeHomeBuilding(home)] : []), ...placed].find((b) => b.id === buildingId) ??
+          null;
+        // 내 집이면 가구 배치도 함께 불러온 뒤에 방을 보여준다.
+        const furniture = found?.isHome ? await fetchHomeFurniture() : null;
+        if (cancelled) return;
+        setLoadError(null);
+        setState({ building: found, furniture });
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "방 정보를 불러오지 못했습니다.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [buildingId, reloadKey]);
 
-  if (!state) return <div className={townStyles.page} />;
+  if (loadError) {
+    return (
+      <div className={townStyles.page}>
+        <p className={townStyles.interactionBanner} role="alert">
+          {loadError}
+        </p>
+        <button type="button" className={townStyles.navLink} onClick={() => setReloadKey((k) => k + 1)}>
+          다시 시도
+        </button>{" "}
+        <Link href="/" className={townStyles.navLink}>
+          마을로 돌아가기
+        </Link>
+      </div>
+    );
+  }
+  if (!state) {
+    return (
+      <div className={townStyles.page}>
+        <p className={townStyles.hint}>불러오는 중…</p>
+      </div>
+    );
+  }
   if (!state.building) {
     return (
       <div className={townStyles.page}>
@@ -55,16 +93,28 @@ export default function InsidePage() {
       </div>
     );
   }
-  return <RoomView building={state.building} />;
+  return <RoomView building={state.building} initialFurniture={state.furniture} />;
 }
 
-function RoomView({ building }: { building: Building }) {
+function RoomView({
+  building,
+  initialFurniture,
+}: {
+  building: Building;
+  initialFurniture: HomeFurnitureState | null;
+}) {
   const router = useRouter();
   const isHome = !!building.isHome;
-  // 내 집의 가구는 저장소에서 읽는다(RoomView는 마운트 후에만 렌더되므로 lazy init으로 충분).
+  // 내 집의 가구는 서버에서 미리 불러온 값으로 시작한다(저장된 적 없으면 기본 가구).
   const [homeFurniture, setHomeFurniture] = useState(() =>
-    isHome ? (loadHomeFurniture() ?? defaultHomeFurniture()) : null
+    isHome ? (initialFurniture ?? defaultHomeFurniture()) : null
   );
+  // 서버에 마지막으로 저장이 확인된 가구 배치(저장 실패 시 되돌릴 기준)와, 진행 중인 저장 요청.
+  const lastSavedRef = useRef(homeFurniture);
+  const savingRef = useRef<Promise<void>>(Promise.resolve());
+  const latestSaveIdRef = useRef(0);
+  const saveFailedRef = useRef(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const room: Room = useMemo(() => {
     const template = getRoomTemplate(building);
     return homeFurniture ? { ...template, furniture: homeFurniture.placed } : template;
@@ -137,9 +187,26 @@ function RoomView({ building }: { building: Building }) {
     };
   }
 
-  function commitFurniture(next: { placed: Furniture[]; stored: Furniture[] }) {
+  // 화면은 바로 바꾸고 저장은 뒤에서 한다(조작마다 서버를 기다리지 않는다). 저장이 실패하면
+  // 가장 최근 조작에 한해 서버에 확인된 마지막 상태로 되돌리고 에러를 보여준다.
+  function commitFurniture(next: HomeFurnitureState) {
+    const saveId = ++latestSaveIdRef.current;
     setHomeFurniture(next);
-    saveHomeFurniture(next);
+    setSaveError(null);
+    const save = saveHomeFurniture(next).then(
+      () => {
+        lastSavedRef.current = next;
+        saveFailedRef.current = false;
+      },
+      (err) => {
+        saveFailedRef.current = true;
+        if (saveId === latestSaveIdRef.current) setHomeFurniture(lastSavedRef.current);
+        setSaveError(
+          `${err instanceof Error ? err.message : "가구 배치를 저장하지 못했습니다."} 변경을 되돌렸어요.`
+        );
+      }
+    );
+    savingRef.current = save;
   }
 
   function roomPoint(e: React.MouseEvent<HTMLDivElement>) {
@@ -194,9 +261,16 @@ function RoomView({ building }: { building: Building }) {
       ? checkFurniturePlacement(room, targetRect(selectedItem, hover), homeFurniture.placed, position, selectedItem.id)
       : null;
 
-  function leave() {
+  // 저장 중인 가구 배치가 있으면 끝날 때까지 기다렸다가 나간다. 저장이 실패했으면 나가지 않고 에러를 보여준다.
+  async function leave() {
     if (leavingRef.current) return;
     leavingRef.current = true;
+    await savingRef.current;
+    if (saveFailedRef.current) {
+      saveFailedRef.current = false; // 에러를 한 번 보여준 뒤에는 다음 시도에서 나갈 수 있다.
+      leavingRef.current = false;
+      return;
+    }
     setTownReturnBuilding(building.id);
     router.push("/");
   }
@@ -325,6 +399,12 @@ function RoomView({ building }: { building: Building }) {
           </div>
         </div>
       </main>
+
+      {saveError && (
+        <p className={townStyles.interactionBanner} role="alert">
+          {saveError}
+        </p>
+      )}
 
       {decorating && homeFurniture ? (
         <div className={styles.decorPanel}>

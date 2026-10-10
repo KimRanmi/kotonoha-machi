@@ -26,17 +26,15 @@ import {
   type Point,
 } from "@/lib/walk";
 import {
-  loadFromStorage,
-  saveToStorage,
-  removeFromStorage,
-  loadHomePosition,
-  saveHomePosition,
-  loadOnboardingDone,
+  fetchHomePosition,
+  fetchOnboardingDone,
+  fetchPendingBuilding,
+  fetchPlacedBuildings,
   markOnboardingStepDone,
+  placePendingBuilding,
+  saveHomePosition,
   setTownReturnBuilding,
   takeTownReturnBuilding,
-  PENDING_BUILDING_STORAGE_KEY,
-  PLACED_BUILDINGS_STORAGE_KEY,
 } from "@/lib/storage";
 import type { PendingBuilding } from "@/lib/types";
 
@@ -81,8 +79,7 @@ function findNearbyBuilding(x: number, y: number, buildings: Building[]) {
 export default function TownPage() {
   const router = useRouter();
   // 테마 학습에서 배치되어 저장된 건물들. 정적 BUILDINGS와 합쳐 이동 충돌/렌더링에 쓴다.
-  // localStorage는 서버에 없으므로, 하이드레이션 불일치를 피하기 위해 빈 상태로 시작했다가
-  // 클라이언트 마운트 후 한 번만 읽어온다.
+  // 서버에서 불러오기 전에는 빈 상태로 시작하고, 마운트 후 한 번만 읽어온다.
   const [placedBuildings, setPlacedBuildings] = useState<PlacedBuilding[]>([]);
   // 테마를 막 완료하고 넘어와서, 아직 배치하지 않은 건물이 있으면 배치 모드가 된다.
   const [pendingBuilding, setPendingBuilding] = useState<PendingBuilding | null>(null);
@@ -115,34 +112,54 @@ export default function TownPage() {
     },
   });
 
+  // 서버에서 마을 데이터를 불러오는 중인지, 실패했는지. 불러오기 전에는 배치 모드를 켜지 않는다.
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  // 저장 실패 같은 조작 에러. 지도 아래에 보여준다.
+  const [actionError, setActionError] = useState<string | null>(null);
+  // 배치 저장 요청이 진행 중일 때 같은 자리를 연타해도 한 번만 보내기 위한 표시.
+  const placingRef = useRef(false);
+
   useEffect(() => {
-    const placed = loadFromStorage<PlacedBuilding[]>(PLACED_BUILDINGS_STORAGE_KEY, []).map(
-      withThemeResident // 주민 연결이 생기기 전에 저장된 건물에는 테마 주민을 소급해서 붙여준다.
-    );
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPlacedBuildings(placed);
-    const home = loadHomePosition();
-    setHomePosition(home);
-    setOnboardingDone(loadOnboardingDone());
+    let cancelled = false;
+    Promise.all([
+      fetchPlacedBuildings(),
+      fetchHomePosition(),
+      fetchOnboardingDone(),
+      fetchPendingBuilding(),
+    ])
+      .then(([stored, home, done, pending]) => {
+        if (cancelled) return;
+        // 주민 연결이 생기기 전에 저장된 건물에는 테마 주민을 소급해서 붙여준다.
+        const placed = stored.map(withThemeResident);
+        setPlacedBuildings(placed);
+        setHomePosition(home);
+        setOnboardingDone(done);
 
-    // 건물 내부에서 나온 경우, 그 건물 입구 앞에 캐릭터를 세운다.
-    const returnId = takeTownReturnBuilding();
-    if (returnId) {
-      const all = [...BUILDINGS, ...(home ? [makeHomeBuilding(home)] : []), ...placed];
-      const from = all.find((b) => b.id === returnId);
-      if (from) teleport(findExitSpot(from, all));
-    }
+        // 건물 내부에서 나온 경우, 그 건물 입구 앞에 캐릭터를 세운다.
+        const returnId = takeTownReturnBuilding();
+        if (returnId) {
+          const all = [...BUILDINGS, ...(home ? [makeHomeBuilding(home)] : []), ...placed];
+          const from = all.find((b) => b.id === returnId);
+          if (from) teleport(findExitSpot(from, all));
+        }
 
-    // 배치 대기 건물은 실제로 배치할 때까지 남겨 둔다. 배치 전에 나가도 건물이 사라지지 않고,
-    // 테마 완료 기록은 이미 남아 있어 같은 테마로 중복 pending이 생기지도 않는다.
-    const pending = loadFromStorage<PendingBuilding | null>(
-      PENDING_BUILDING_STORAGE_KEY,
-      null
-    );
-    if (pending) {
-      setPendingBuilding(pending);
-    }
-  }, [teleport]);
+        // 배치 대기 건물은 실제로 배치할 때까지 서버에 남아 있다. 배치 전에 나가도 건물이 사라지지 않고,
+        // 테마 완료 기록도 서버에 있어 같은 테마로 중복 pending이 생기지도 않는다.
+        setPendingBuilding(pending);
+        setLoadError(null);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "마을 정보를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [teleport, reloadKey]);
 
   // 방금 배치된 건물 id. 짧은 건설 연출 클래스를 붙이는 동안만 값을 들고 있는다.
   const [justPlacedId, setJustPlacedId] = useState<string | null>(null);
@@ -192,8 +209,9 @@ export default function TownPage() {
   // 배치 모드일 때, 맵의 빈 자리를 클릭/탭하면 대기 중인 건물을 그 자리에 배치한다.
   // 온보딩의 집 배치가 먼저고, 끝나면 대기 중인 테마 건물 차례가 된다.
   // 기존 건물이나 캐릭터의 현재 위치와 겹치면 빈 자리가 아니므로 무시한다.
-  function handleMapClick(e: MouseEvent<HTMLDivElement>) {
+  async function handleMapClick(e: MouseEvent<HTMLDivElement>) {
     if (!onboardingStep && !pendingBuilding) return;
+    if (placingRef.current) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -209,42 +227,45 @@ export default function TownPage() {
       return;
     }
 
-    if (onboardingStep === "place-home") {
-      const position = { x, y };
-      saveHomePosition(position);
-      markOnboardingStepDone("place-home");
-      setHomePosition(position);
-      setOnboardingDone(loadOnboardingDone());
-      return;
+    // 배치는 서버에 저장이 끝난 뒤에 화면에 반영한다(드물게 하는 조작이라 기다려도 괜찮다).
+    placingRef.current = true;
+    setActionError(null);
+    try {
+      if (onboardingStep === "place-home") {
+        const position = { x, y };
+        await saveHomePosition(position);
+        await markOnboardingStepDone("place-home");
+        setHomePosition(position);
+        setOnboardingDone(await fetchOnboardingDone());
+        return;
+      }
+      if (!pendingBuilding) return;
+
+      const saved = await placePendingBuilding({
+        x,
+        y,
+        width,
+        height,
+        label: `${pendingBuilding.themeTitle} 학습관`,
+        color: nextBuildingColor(placedBuildings.length),
+      });
+      const withResident = withThemeResident(saved);
+
+      setPlacedBuildings((prev) => [...prev, withResident]);
+      setPendingBuilding(null);
+
+      setJustPlacedId(withResident.id);
+      if (justPlacedTimeoutRef.current !== null) {
+        window.clearTimeout(justPlacedTimeoutRef.current);
+      }
+      justPlacedTimeoutRef.current = window.setTimeout(() => {
+        setJustPlacedId(null);
+      }, 1300);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "저장하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      placingRef.current = false;
     }
-    if (!pendingBuilding) return;
-
-    const newBuilding: PlacedBuilding = {
-      id: `theme-${pendingBuilding.completedAt}`,
-      x,
-      y,
-      width,
-      height,
-      label: `${pendingBuilding.themeTitle} 학습관`,
-      color: nextBuildingColor(placedBuildings.length),
-      themeTitle: pendingBuilding.themeTitle,
-      placedAt: Date.now(),
-    };
-    const withResident = withThemeResident(newBuilding);
-
-    const updated = [...placedBuildings, withResident];
-    setPlacedBuildings(updated);
-    saveToStorage(PLACED_BUILDINGS_STORAGE_KEY, updated);
-    setPendingBuilding(null);
-    removeFromStorage(PENDING_BUILDING_STORAGE_KEY);
-
-    setJustPlacedId(withResident.id);
-    if (justPlacedTimeoutRef.current !== null) {
-      window.clearTimeout(justPlacedTimeoutRef.current);
-    }
-    justPlacedTimeoutRef.current = window.setTimeout(() => {
-      setJustPlacedId(null);
-    }, 1300);
   }
 
   return (
@@ -303,7 +324,27 @@ export default function TownPage() {
         </div>
       </main>
 
-      {onboardingStep === "place-home" ? (
+      {loadError ? (
+        <p className={styles.interactionBanner} role="alert">
+          {loadError}{" "}
+          <button
+            type="button"
+            className={styles.navLink}
+            onClick={() => {
+              setLoading(true);
+              setReloadKey((k) => k + 1);
+            }}
+          >
+            다시 시도
+          </button>
+        </p>
+      ) : loading ? (
+        <p className={styles.hint}>마을을 불러오는 중…</p>
+      ) : actionError ? (
+        <p className={styles.interactionBanner} role="alert">
+          {actionError}
+        </p>
+      ) : onboardingStep === "place-home" ? (
         <p className={styles.interactionBanner}>
           환영합니다! 빈 자리를 클릭/탭해서 &quot;내 집&quot;을 지어보세요. 한 번 지으면 옮길 수 없어요.
         </p>
