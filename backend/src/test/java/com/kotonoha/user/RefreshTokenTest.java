@@ -35,7 +35,7 @@ class RefreshTokenTest {
 
     MockHttpServletResponse signup(String email) throws Exception {
         return mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\",\"password\":\"" + AuthTestSupport.PASSWORD + "\"}"))
+                        .content(AuthTestSupport.signupBody(email, AuthTestSupport.uniqueNickname())))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse();
     }
