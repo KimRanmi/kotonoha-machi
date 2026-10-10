@@ -11,7 +11,7 @@ export default function AuthStatus({ className }: { className?: string }) {
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    // 토큰은 localStorage에 있어 서버 렌더링 시에는 알 수 없으므로 마운트 후 한 번 읽는다.
+    // 로그인 정보는 브라우저 메모리에 있어 서버 렌더링 시에는 알 수 없으므로 마운트 후 한 번 읽는다.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEmail(getAuthEmail());
   }, []);
@@ -28,8 +28,8 @@ export default function AuthStatus({ className }: { className?: string }) {
       type="button"
       className={className}
       title={email}
-      onClick={() => {
-        logout();
+      onClick={async () => {
+        await logout();
         setEmail(null);
         router.push("/login");
       }}

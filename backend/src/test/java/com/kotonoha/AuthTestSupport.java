@@ -22,6 +22,6 @@ public final class AuthTestSupport {
         String body = mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}"))
                 .andReturn().getResponse().getContentAsString();
-        return "Bearer " + new ObjectMapper().readTree(body).get("token").asString();
+        return "Bearer " + new ObjectMapper().readTree(body).get("accessToken").asString();
     }
 }

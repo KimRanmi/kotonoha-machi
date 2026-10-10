@@ -19,6 +19,13 @@ gemini:
   base-url: https://generativelanguage.googleapis.com
 
 jwt:
-  # HS256 서명 키(32바이트 이상). 비워두면 시작할 때마다 임의 키를 만들어 쓰므로 재시작하면 로그인이 풀린다(개발용).
+  # HS256 서명 키(32바이트 이상). 비워두면 시작할 때마다 임의 키를 만들어 쓰므로 재시작하면 access 토큰이 모두 무효가 된다(개발용).
   secret: ${JWT_SECRET:}
-  expiration: 7d
+  # access 토큰 유효기간. 짧게 두고, 만료되면 refresh 토큰으로 새로 받는다.
+  expiration: 15m
+
+auth:
+  # refresh 토큰(httpOnly 쿠키) 유효기간. 갱신할 때마다 새 토큰으로 교체된다.
+  refresh-expiration: 14d
+  # HTTPS로 서비스할 때는 true (쿠키가 HTTPS 연결에서만 전송된다). 로컬 http 개발에서는 false.
+  cookie-secure: ${AUTH_COOKIE_SECURE:false}
