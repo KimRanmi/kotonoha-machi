@@ -183,11 +183,13 @@ export function getAuthNickname(): string | null {
 // 탭 안에서는 진행 중인 요청 하나를 공유하고, 탭 사이에서는 Web Locks로 순서대로 실행한다.
 function refreshSession(): Promise<boolean> {
   if (!refreshInFlight) {
-    const run = () => doRefresh();
-    const locked =
-      typeof navigator !== "undefined" && navigator.locks
-        ? navigator.locks.request("kotonoha-refresh", run)
-        : run();
+    // navigator.locks.request는 콜백이 돌려준 Promise를 한 번 더 감싸므로 await로 풀어서 Promise<boolean>으로 맞춘다.
+    const locked = (async (): Promise<boolean> => {
+      if (typeof navigator !== "undefined" && navigator.locks) {
+        return await navigator.locks.request("kotonoha-refresh", () => doRefresh());
+      }
+      return doRefresh();
+    })();
     refreshInFlight = locked.finally(() => {
       refreshInFlight = null;
     });
