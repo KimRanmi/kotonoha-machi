@@ -75,6 +75,8 @@ export default function ChatPanel({
   const [isRecording, setIsRecording] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [micBlocked, setMicBlocked] = useState(false);
+  // 번역은 기본 숨김. 펼친 답변의 id만 들고 있다(메시지별 독립).
+  const [shownTranslations, setShownTranslations] = useState<Set<string>>(new Set());
   const logEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -228,6 +230,14 @@ export default function ChatPanel({
     }
   }
 
+  function toggleTranslation(id: string) {
+    setShownTranslations((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
   function handleWordClick(word: string, x: number, y: number) {
     const alreadyAdded = words.some((w) => w.word === word);
     setPopup({ word, x, y, alreadyAdded });
@@ -285,7 +295,19 @@ export default function ChatPanel({
               <>
                 <VillagerMessage text={m.content} onWordClick={handleWordClick} />
                 {m.translation && (
-                  <div className="translationText">{m.translation}</div>
+                  <>
+                    <button
+                      type="button"
+                      className="translationToggle"
+                      aria-expanded={shownTranslations.has(m.id)}
+                      onClick={() => toggleTranslation(m.id)}
+                    >
+                      {shownTranslations.has(m.id) ? "번역 숨기기" : "번역 보기"}
+                    </button>
+                    {shownTranslations.has(m.id) && (
+                      <div className="translationText">{m.translation}</div>
+                    )}
+                  </>
                 )}
               </>
             ) : (

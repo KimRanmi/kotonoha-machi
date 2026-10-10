@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { login, signup } from "@/lib/storage";
 
@@ -41,11 +40,6 @@ function LoginForm() {
             <div className="villagerName">{mode === "login" ? "로그인" : "회원가입"}</div>
             <div className="villagerDesc">대화 기록과 주민과의 사이가 계정에 저장돼요</div>
           </div>
-        </div>
-        <div className="headerActions">
-          <Link href="/" className="navLink">
-            ← 마을로 돌아가기
-          </Link>
         </div>
       </header>
 
