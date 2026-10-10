@@ -2,29 +2,29 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { login, signup } from "@/lib/storage";
-
-// 로그인 후 돌아갈 경로는 같은 사이트 안의 경로만 허용한다 (open redirect 방지).
-function safeNext(next: string | null): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-}
+import NicknameField from "@/components/NicknameField";
+import { useNicknameCheck } from "@/components/useNicknameCheck";
+import { login, safeNextPath, signup } from "@/lib/storage";
 
 function LoginForm() {
   const router = useRouter();
-  const next = safeNext(useSearchParams().get("next"));
+  const next = safeNextPath(useSearchParams().get("next"));
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [nickname, setNickname] = useState("");
+  const nicknameCheck = useNicknameCheck(nickname);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (submitting) return;
+    if (submitting || (mode === "signup" && !nicknameCheck.verified)) return;
     setError(null);
     setSubmitting(true);
     try {
-      await (mode === "login" ? login : signup)(email, password);
+      if (mode === "login") await login(email, password);
+      else await signup(email, password, nickname.trim());
       router.replace(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "요청에 실패했습니다.");
@@ -64,8 +64,15 @@ function LoginForm() {
             minLength={mode === "signup" ? 8 : undefined}
             required
           />
+          {mode === "signup" && (
+            <NicknameField value={nickname} onChange={setNickname} check={nicknameCheck} />
+          )}
           {error && <p className="errorText">{error}</p>}
-          <button type="submit" className="sendButton" disabled={submitting}>
+          <button
+            type="submit"
+            className="sendButton"
+            disabled={submitting || (mode === "signup" && !nicknameCheck.verified)}
+          >
             {mode === "login" ? "로그인" : "가입하고 시작하기"}
           </button>
           <button
