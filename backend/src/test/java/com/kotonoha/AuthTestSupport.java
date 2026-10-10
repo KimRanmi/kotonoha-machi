@@ -18,9 +18,18 @@ public final class AuthTestSupport {
         return "user-" + UUID.randomUUID() + "@example.com";
     }
 
+    // 닉네임 규칙(2~12자)에 맞는 중복되지 않는 값.
+    public static String uniqueNickname() {
+        return "nick" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    }
+
+    public static String signupBody(String email, String nickname) {
+        return "{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\",\"nickname\":\"" + nickname + "\"}";
+    }
+
     public static String signupAndGetBearer(MockMvc mvc, String email) throws Exception {
         String body = mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}"))
+                        .content(signupBody(email, uniqueNickname())))
                 .andReturn().getResponse().getContentAsString();
         return "Bearer " + new ObjectMapper().readTree(body).get("accessToken").asString();
     }
