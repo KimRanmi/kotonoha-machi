@@ -19,6 +19,8 @@ export interface Building {
   residentId?: string;
   // 내부 방 템플릿 종류(app/interiors.ts). 없으면(테마로 지은 건물) 공통 학습관 템플릿을 쓴다.
   kind?: InteriorKind;
+  // 플레이어의 "내 집". 학습과 무관하게 처음부터 있고, 내부에서만 꾸미기 모드를 쓸 수 있다.
+  isHome?: boolean;
 }
 
 // 테마 학습 완료 후 사용자가 마을 맵에 직접 배치한 건물. 정적 BUILDINGS와 달리 x/y가

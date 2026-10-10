@@ -5,7 +5,7 @@ import type { Building } from "./buildings";
 // (ROOM_TEMPLATES), 나중에 사용자가 가구를 옮기는 방(내 집)도 같은 Room 구조로 표현할 수 있다.
 // 내 집은 가구를 저장소에서 읽어 Room.furniture에 채우고, 가구마다 movable을 true로 두면 된다.
 
-export type InteriorKind = "cafe" | "shop" | "hall" | "learning";
+export type InteriorKind = "cafe" | "shop" | "hall" | "learning" | "home";
 
 export interface Furniture {
   id: string;
@@ -87,6 +87,8 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
     { id: "meeting", label: "회의 테이블", x: 170, y: 250, width: 300, height: 56, shape: "rect", color: "#7a6544", ...fixed },
     { id: "plant", x: 560, y: 380, width: 40, height: 40, shape: "round", color: "#4f8a4a", emoji: "🪴", ...fixed },
   ]),
+  // 내 집: 가구는 비어 있고, 실제 가구는 저장소(HomeFurnitureState)에서 읽어 채운다(app/home.ts).
+  home: baseRoom("home", "#f0dfc8", "#b5566b", { x: 0, y: 0 }, []),
   // 테마로 지은 학습관 공통 템플릿(테마마다 방을 새로 디자인하지 않는다).
   learning: baseRoom("learning", "#ead9c1", "#6a5a8a", { x: 304, y: 100 }, [
     { id: "board", label: "칠판", x: 180, y: 14, width: 280, height: 56, shape: "rect", color: "#2f4a3a", emoji: "✏️", solid: false, ...fixed },
