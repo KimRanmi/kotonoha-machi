@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getAuthEmail, logout } from "@/lib/storage";
 
 // 로그인 상태 표시: 로그인했으면 이메일 + 로그아웃, 아니면 로그인 링크.
 export default function AuthStatus({ className }: { className?: string }) {
+  const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export default function AuthStatus({ className }: { className?: string }) {
       onClick={() => {
         logout();
         setEmail(null);
+        router.push("/login");
       }}
     >
       로그아웃

@@ -122,6 +122,10 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export function isLoggedIn(): boolean {
+  return !!loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY, "");
+}
+
 export function getAuthEmail(): string | null {
   if (!loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY, "")) return null;
   return loadFromStorage<string>(AUTH_EMAIL_STORAGE_KEY, "") || null;
@@ -155,7 +159,7 @@ export function signup(email: string, password: string): Promise<void> {
 function redirectToLogin(): never {
   logout();
   if (typeof window !== "undefined") {
-    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+    window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
   }
   throw new UnauthorizedError();
 }
