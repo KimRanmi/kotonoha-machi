@@ -3,25 +3,41 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LearnedWord } from "@/lib/types";
-import { WORDS_STORAGE_KEY, loadFromStorage, saveToStorage } from "@/lib/storage";
+import { fetchWords, removeWord as removeWordFromServer } from "@/lib/storage";
 
 export default function WordsPage() {
   const [words, setWords] = useState<LearnedWord[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // localStorage는 서버에 없으므로 클라이언트 마운트 후 한 번만 읽어와 하이드레이션한다.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setWords(loadFromStorage<LearnedWord[]>(WORDS_STORAGE_KEY, []));
-    setHydrated(true);
+    let cancelled = false;
+    fetchWords()
+      .then((loaded) => {
+        if (!cancelled) setWords(loaded);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "학습 단어를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  useEffect(() => {
-    if (hydrated) saveToStorage(WORDS_STORAGE_KEY, words);
-  }, [words, hydrated]);
-
-  function removeWord(word: string) {
+  // 화면에서는 바로 지우고 서버에 반영한다. 실패하면 되돌리고 에러를 보여준다.
+  async function removeWord(word: string) {
+    const removed = words.find((w) => w.word === word);
     setWords((prev) => prev.filter((w) => w.word !== word));
+    setError(null);
+    try {
+      await removeWordFromServer(word);
+    } catch (err) {
+      if (removed) setWords((prev) => (prev.some((w) => w.word === word) ? prev : [...prev, removed]));
+      setError(err instanceof Error ? err.message : "단어를 삭제하지 못했습니다.");
+    }
   }
 
   return (
@@ -44,7 +60,14 @@ export default function WordsPage() {
       </header>
 
       <main className="wordListMain">
-        {words.length === 0 ? (
+        {error && (
+          <p className="emptyHint" role="alert">
+            {error}
+          </p>
+        )}
+        {loading ? (
+          <p className="emptyHint">불러오는 중…</p>
+        ) : words.length === 0 ? (
           <p className="emptyHint">
             아직 담은 단어가 없어요. 마을에서 주민과 대화하며 주민의 말 중 궁금한 단어를 탭해보세요.
           </p>
