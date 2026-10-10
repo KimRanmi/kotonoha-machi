@@ -14,13 +14,12 @@ export function BuildingMarker({
   isNear: boolean;
   isConstructing?: boolean;
 }) {
+  const classes = [styles.building];
+  if (isConstructing) classes.push(styles.constructing);
+  if (building.isHome) classes.push(styles.homeBuilding);
   return (
     <div
-      className={
-        isConstructing
-          ? `${styles.building} ${styles.constructing}`
-          : styles.building
-      }
+      className={classes.join(" ")}
       style={{
         left: building.x,
         top: building.y,
@@ -31,7 +30,14 @@ export function BuildingMarker({
     >
       {isNear && <div className={styles.interactionHint}>🚪</div>}
       {isConstructing && <div className={styles.interactionHint}>🚧</div>}
-      {building.label}
+      {building.isHome ? (
+        <>
+          <span className={styles.homeIcon}>🏠</span>
+          <span className={styles.homeBadge}>{building.label}</span>
+        </>
+      ) : (
+        building.label
+      )}
     </div>
   );
 }

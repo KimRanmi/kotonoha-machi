@@ -1,4 +1,5 @@
 import type { ChatMessage } from "@/lib/types";
+import type { Furniture } from "@/app/interiors";
 
 export const WORDS_STORAGE_KEY = "kotonoha:word-list";
 // 테마 학습을 막 끝내고 마을로 넘어가는 중, 아직 배치되지 않은 건물 1건을 잠깐 들고 있는 키.
@@ -36,6 +37,52 @@ export function takeTownReturnBuilding(): string | null {
   const id = loadFromStorage<string | null>(TOWN_RETURN_STORAGE_KEY, null);
   if (id) removeFromStorage(TOWN_RETURN_STORAGE_KEY);
   return id;
+}
+
+// ---- 온보딩 / 내 집 ----
+// 곧 서버 API로 옮길 데이터라서, 화면 코드는 localStorage를 직접 쓰지 않고 아래 함수만 쓴다.
+
+// 끝낸 온보딩 단계 id 목록. 단계 목록 자체는 app/onboarding.ts에 있다.
+const ONBOARDING_DONE_STORAGE_KEY = "kotonoha:onboarding-done";
+// 내 집을 마을 맵에 배치한 자리(좌상단). 없으면 아직 배치하지 않은 것.
+const HOME_POSITION_STORAGE_KEY = "kotonoha:home-position";
+// 내 집 가구 배치: 방에 놓인 가구와 목록(보관함)에 있는 가구.
+const HOME_FURNITURE_STORAGE_KEY = "kotonoha:home-furniture";
+
+export interface HomePosition {
+  x: number;
+  y: number;
+}
+
+export interface HomeFurnitureState {
+  placed: Furniture[];
+  stored: Furniture[];
+}
+
+export function loadOnboardingDone(): string[] {
+  return loadFromStorage<string[]>(ONBOARDING_DONE_STORAGE_KEY, []);
+}
+
+export function markOnboardingStepDone(stepId: string): void {
+  const done = loadOnboardingDone();
+  if (!done.includes(stepId)) saveToStorage(ONBOARDING_DONE_STORAGE_KEY, [...done, stepId]);
+}
+
+export function loadHomePosition(): HomePosition | null {
+  return loadFromStorage<HomePosition | null>(HOME_POSITION_STORAGE_KEY, null);
+}
+
+export function saveHomePosition(position: HomePosition): void {
+  saveToStorage(HOME_POSITION_STORAGE_KEY, position);
+}
+
+// 저장된 가구 배치. 아직 한 번도 저장한 적 없으면 null(호출하는 쪽이 기본 가구로 시작한다).
+export function loadHomeFurniture(): HomeFurnitureState | null {
+  return loadFromStorage<HomeFurnitureState | null>(HOME_FURNITURE_STORAGE_KEY, null);
+}
+
+export function saveHomeFurniture(state: HomeFurnitureState): void {
+  saveToStorage(HOME_FURNITURE_STORAGE_KEY, state);
 }
 
 export function loadFromStorage<T>(key: string, fallback: T): T {

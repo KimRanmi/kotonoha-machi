@@ -14,6 +14,8 @@ import {
   type PlacedBuilding,
 } from "./buildings";
 import { BuildingMarker } from "./BuildingMarker";
+import { makeHomeBuilding } from "./home";
+import { getNextOnboardingStep } from "./onboarding";
 import {
   CHAR_SIZE,
   clamp,
@@ -27,6 +29,10 @@ import {
   loadFromStorage,
   saveToStorage,
   removeFromStorage,
+  loadHomePosition,
+  saveHomePosition,
+  loadOnboardingDone,
+  markOnboardingStepDone,
   setTownReturnBuilding,
   takeTownReturnBuilding,
   PENDING_BUILDING_STORAGE_KEY,
@@ -81,9 +87,19 @@ export default function TownPage() {
   // 테마를 막 완료하고 넘어와서, 아직 배치하지 않은 건물이 있으면 배치 모드가 된다.
   const [pendingBuilding, setPendingBuilding] = useState<PendingBuilding | null>(null);
 
+  // 내 집 위치(온보딩에서 배치). 아직 배치 전이면 null.
+  const [homePosition, setHomePosition] = useState<Point | null>(null);
+  // 끝낸 온보딩 단계. 저장소를 읽기 전(null)에는 온보딩 모드를 켜지 않는다.
+  const [onboardingDone, setOnboardingDone] = useState<string[] | null>(null);
+  const onboardingStep = onboardingDone ? getNextOnboardingStep(onboardingDone) : null;
+
   const allBuildings = useMemo<Building[]>(
-    () => [...BUILDINGS, ...placedBuildings],
-    [placedBuildings]
+    () => [
+      ...BUILDINGS,
+      ...(homePosition ? [makeHomeBuilding(homePosition)] : []),
+      ...placedBuildings,
+    ],
+    [homePosition, placedBuildings]
   );
   // rAF 루프(마운트 시 한 번만 등록)가 항상 최신 건물 목록으로 충돌 판정을 하도록 ref로도 들고 있는다.
   const allBuildingsRef = useRef<Building[]>(allBuildings);
@@ -105,11 +121,14 @@ export default function TownPage() {
     );
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlacedBuildings(placed);
+    const home = loadHomePosition();
+    setHomePosition(home);
+    setOnboardingDone(loadOnboardingDone());
 
     // 건물 내부에서 나온 경우, 그 건물 입구 앞에 캐릭터를 세운다.
     const returnId = takeTownReturnBuilding();
     if (returnId) {
-      const all = [...BUILDINGS, ...placed];
+      const all = [...BUILDINGS, ...(home ? [makeHomeBuilding(home)] : []), ...placed];
       const from = all.find((b) => b.id === returnId);
       if (from) teleport(findExitSpot(from, all));
     }
@@ -170,10 +189,11 @@ export default function TownPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [router]);
 
-  // 배치 모드일 때, 맵의 빈 자리를 클릭/탭하면 대기 중인 새 건물을 그 자리에 배치한다.
+  // 배치 모드일 때, 맵의 빈 자리를 클릭/탭하면 대기 중인 건물을 그 자리에 배치한다.
+  // 온보딩의 집 배치가 먼저고, 끝나면 대기 중인 테마 건물 차례가 된다.
   // 기존 건물이나 캐릭터의 현재 위치와 겹치면 빈 자리가 아니므로 무시한다.
   function handleMapClick(e: MouseEvent<HTMLDivElement>) {
-    if (!pendingBuilding) return;
+    if (!onboardingStep && !pendingBuilding) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -188,6 +208,16 @@ export default function TownPage() {
     if (rectsOverlap(x, y, width, height, current.x, current.y, CHAR_SIZE, CHAR_SIZE)) {
       return;
     }
+
+    if (onboardingStep === "place-home") {
+      const position = { x, y };
+      saveHomePosition(position);
+      markOnboardingStepDone("place-home");
+      setHomePosition(position);
+      setOnboardingDone(loadOnboardingDone());
+      return;
+    }
+    if (!pendingBuilding) return;
 
     const newBuilding: PlacedBuilding = {
       id: `theme-${pendingBuilding.completedAt}`,
@@ -241,7 +271,7 @@ export default function TownPage() {
       >
         <div
           className={
-            pendingBuilding ? `${styles.map} ${styles.placementMode}` : styles.map
+            onboardingStep || pendingBuilding ? `${styles.map} ${styles.placementMode}` : styles.map
           }
           style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
           onClick={handleMapClick}
@@ -273,7 +303,11 @@ export default function TownPage() {
         </div>
       </main>
 
-      {pendingBuilding ? (
+      {onboardingStep === "place-home" ? (
+        <p className={styles.interactionBanner}>
+          환영합니다! 빈 자리를 클릭/탭해서 &quot;내 집&quot;을 지어보세요. 한 번 지으면 옮길 수 없어요.
+        </p>
+      ) : pendingBuilding ? (
         <p className={styles.interactionBanner}>
           빈 자리를 클릭/탭해서 &quot;{pendingBuilding.themeTitle}&quot; 건물을 지어보세요!
         </p>
