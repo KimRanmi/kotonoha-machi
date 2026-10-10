@@ -91,29 +91,43 @@ docker compose --profile full down            # 중지 (DB 데이터는 볼륨�
 - 프론트의 `/api/*` 프록시 대상은 빌드 시점에 고정됩니다(`BACKEND_URL` 빌드 인자, compose에서는 `http://backend:8080`).
 - 컨테이너를 막 띄운 직후 몇 초간은 백엔드가 준비되지 않아 API가 에러를 낼 수 있습니다.
 
-## 로그인 (JWT, 3단계)
+## 로그인 (access + refresh 토큰)
 
-이메일 + 비밀번호로 가입/로그인하고, 서버가 발급한 JWT로 사용자를 식별합니다.
+이메일 + 비밀번호로 가입/로그인합니다. 비밀번호는 8~72자이며 BCrypt 해시로만 저장하고, 이메일은 소문자로 정규화합니다. 틀린 비밀번호와 없는 계정은 같은 오류 메시지를 줍니다.
 
-- **가입/로그인**: `POST /api/auth/signup`, `POST /api/auth/login` → `{token, email}`. 비밀번호는 8~72자이며 BCrypt 해시로만 저장합니다. 이메일은 소문자로 정규화합니다. 틀린 비밀번호와 없는 계정은 같은 오류 메시지를 줍니다.
-- **토큰**: HS256, 유효기간 7일(`jwt.expiration`), subject = `users.id`. 서명 키는 환경변수 `JWT_SECRET`(32바이트 이상)로만 받습니다. 비워 두면 서버 시작 때마다 임의 키를 만들어 쓰므로 **재시작하면 로그인이 풀립니다**(개발용). 계속 유지하려면 `.env.local`에 `JWT_SECRET`을 넣으세요(`openssl rand -base64 48`로 생성, 커밋 금지).
-- **요청 방식**: 모든 `/api/chat`, `/api/villagers/**`, `/api/intimacy`, `/api/auth/me` 요청에 `Authorization: Bearer <JWT>`가 필요하며, 없거나 무효/만료면 401을 돌려줍니다. 프론트는 401을 받으면 `/login`으로 보냅니다.
-- **구현 위치**: 2단계의 익명 ID 헤더 방식을 `CurrentUserArgumentResolver` 한 곳만 바꿔 교체했습니다(컨트롤러/서비스는 그대로). Spring Security 필터 체인은 쓰지 않고, 비밀번호 해시(`spring-security-crypto`)와 JWT(`nimbus-jose-jwt`)만 사용합니다.
-- **프론트**: 토큰은 localStorage(`kotonoha:auth-token`)에 둡니다. 구현이 단순하지만 XSS로 탈취될 수 있어, 운영 환경에서는 httpOnly 쿠키 방식으로 바꾸는 것을 권장합니다.
-- **2단계의 익명 데이터**: 로그인 도입으로 익명 ID로 쌓였던 대화 기록/친밀도는 더 이상 접근할 수 없습니다(이전 코드는 만들지 않았습니다. 개발용 데이터이므로 버려도 된다는 결정에 따름).
-- **아직 없는 것**: 로그인 시도 제한(5단계 rate limit), 토큰 갱신(refresh), 비밀번호 재설정, 이메일 인증.
+**토큰 구조**
+| | access 토큰 | refresh 토큰 |
+| --- | --- | --- |
+| 형태 | JWT(HS256), subject = `users.id` | 서버가 만든 무작위 값(256비트) |
+| 유효기간 | 15분 (`jwt.expiration`) | 14일 (`auth.refresh-expiration`), 갱신할 때마다 새 토큰으로 교체 |
+| 브라우저 보관 | **JS 메모리에만** (localStorage에 두지 않음) | **httpOnly 쿠키** (JS가 읽을 수 없음) |
+| 서버 보관 | 없음 (stateless) | **SHA-256 해시만** `refresh_tokens` 테이블에 저장 |
+| 용도 | 모든 API 요청의 `Authorization: Bearer` | `/api/auth/refresh`로 새 access 토큰을 받을 때만 |
+
+- **새로고침/재접속**: 메모리의 access 토큰은 사라지므로, 프론트가 refresh 쿠키로 `/api/auth/refresh`를 호출해 복구합니다. 로그인한 적이 없는 브라우저는 이 요청을 건너뜁니다(`kotonoha:session-hint`는 비밀이 아닌 표시일 뿐).
+- **교체(rotation)와 탈취 감지**: refresh할 때마다 기존 토큰은 폐기되고 같은 로그인 계열(family)의 새 토큰이 발급됩니다. 이미 폐기된 토큰이 다시 오면 탈취로 보고 그 계열 전체를 폐기합니다(정당한 사용자도 다시 로그인해야 합니다).
+- **로그아웃**: 서버에서 refresh 토큰 계열을 폐기하고 쿠키를 지웁니다. 이미 발급된 access 토큰은 만료(최대 15분)까지 유효합니다.
+- **쿠키 속성**: `HttpOnly`, `SameSite=Strict`(다른 사이트에서 온 요청에는 붙지 않아 CSRF 방어), `Path=/api/auth`(인증 엔드포인트에만 전송). **HTTPS로 서비스할 때는 `AUTH_COOKIE_SECURE=true`**를 설정하세요(로컬 http에서는 false).
+- **같은 사이트 전제**: 프론트의 `/api/*`를 같은 주소로 프록시하므로 CORS 설정 없이 쿠키가 전달됩니다. 프론트와 API를 다른 도메인으로 분리하면 쿠키/CORS 설정을 다시 해야 합니다.
+- **여러 탭**: 탭 안에서는 진행 중인 refresh 요청 하나를 공유하고, 탭 사이에서는 Web Locks로 순서대로 실행합니다(동시에 갱신해 재사용으로 오인되는 것을 막기 위함).
+- **서명 키**: 환경변수 `JWT_SECRET`(32바이트 이상)으로만 받습니다. 비워 두면 서버 시작 때마다 임의 키를 쓰므로 **재시작하면 access 토큰이 모두 무효**가 됩니다(refresh 쿠키로 곧바로 복구되므로 로그인은 유지됩니다). 생성 예: `openssl rand -base64 48` (실제 값은 `.env.local`에만, 커밋 금지).
+- **화면 흐름**: 로그인하지 않으면 어느 화면으로 들어와도 `/login`(첫 화면)으로 이동합니다(`AuthGuard`). 구현은 `CurrentUserArgumentResolver`가 access 토큰을 검증하고, 컨트롤러/서비스는 `CurrentUser`만 압니다. Spring Security 필터 체인은 쓰지 않고 `spring-security-crypto`(BCrypt)와 `nimbus-jose-jwt`만 사용합니다.
+- **2단계의 익명 데이터**: 익명 ID로 쌓였던 대화 기록/친밀도는 더 이상 접근할 수 없습니다(개발용 데이터라 이전하지 않기로 한 결정에 따름).
+- **아직 없는 것**: 로그인 시도 제한(5단계 rate limit), 비밀번호 재설정, 이메일 인증, 만료된 refresh 행의 주기적 정리(지금은 로그인할 때 그 사용자 것만 정리).
 
 ## API
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| POST | `/api/auth/signup`, `/api/auth/login` | `{email, password}` → `{token, email}` (공개) |
+| POST | `/api/auth/signup`, `/api/auth/login` | `{email, password}` → `{accessToken, email}` + refresh 쿠키 (공개) |
+| POST | `/api/auth/refresh` | refresh 쿠키 → 새 `{accessToken, email}` + 새 refresh 쿠키. 무효하면 401 |
+| POST | `/api/auth/logout` | refresh 토큰 폐기 + 쿠키 삭제 (204) |
 | GET | `/api/auth/me` | 현재 로그인한 사용자 `{email}` |
 | POST | `/api/chat` | `{villagerId, messages}` → `{reply, translation}`. 성공 시 대화 2건 저장 + 친밀도 +1. 친밀도는 서버가 DB에서 읽으며 클라이언트가 보낸 `exchanges`는 무시합니다 |
 | GET | `/api/villagers/{id}/messages` | 주민별 대화 기록 (오래된 순, 최근 500건) |
 | GET | `/api/intimacy` | 주민별 `{villagerId, met, description}` (수치는 노출하지 않고 서술형 문구만) |
 
-`signup`/`login`을 뺀 모든 API에 `Authorization: Bearer <JWT>` 헤더가 필요합니다.
+`signup`/`login`/`refresh`/`logout`을 뺀 모든 API에 `Authorization: Bearer <access 토큰>` 헤더가 필요합니다.
 
 ## 이 프로토타입에서 다루지 않는 것
 

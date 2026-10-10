@@ -40,7 +40,7 @@ class AuthTest {
 
         send("/api/auth/signup", email, AuthTestSupport.PASSWORD)
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.email").value(email));
 
         String stored = jdbc.sql("SELECT password_hash FROM users WHERE email = :e").param("e", email)
@@ -71,7 +71,7 @@ class AuthTest {
 
         send("/api/auth/login", email, AuthTestSupport.PASSWORD)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty());
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
         // 틀린 비밀번호와 없는 계정은 같은 메시지 (계정 존재 여부를 알려주지 않는다).
         send("/api/auth/login", email, "wrong-password")
                 .andExpect(status().isUnauthorized())
