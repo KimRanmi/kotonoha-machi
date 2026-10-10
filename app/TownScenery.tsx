@@ -2,24 +2,45 @@
 // 전부 SVG 마크업이고 pointer-events: none 이라 클릭/충돌/배치 판정에 영향을 주지 않는다.
 // 길은 눈에 보이는 그림일 뿐, 이동 충돌과는 무관하다(기존과 동일).
 
-// 벚나무: 그림자 + 굵은 줄기 + 겹겹의 꽃 뭉치(밝은 윗면/어두운 아랫면) + 흰 꽃잎. (x, y)는 왼쪽 위, 크기 64x80.
+// 벚나무: 윤곽선 없이 겹친 동그란 꽃 뭉치(진한→연한 분홍) + 통통한 짧은 줄기. (x, y)는 왼쪽 위, 크기 64x80.
 function SakuraTree({ x, y }: { x: number; y: number }) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <ellipse cx={36} cy={78} rx={24} ry={6} fill="rgba(70,45,30,0.3)" filter="url(#sc-blur)" />
-      <path d="M27 79 L29 52 Q30 44 25 37 M30 54 Q36 46 41 39" fill="none" stroke="#8a5a36" strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M27 79 L29 52 Q30 44 25 37 M30 54 Q36 46 41 39" fill="none" stroke="#bf8a5c" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={22} cy={34} r={17} fill="#ee9db1" />
-      <circle cx={45} cy={34} r={17} fill="#ee9db1" />
-      <circle cx={33} cy={38} r={16} fill="#f2a9ba" />
-      <circle cx={21} cy={29} r={16} fill="url(#sc-blossom)" />
-      <circle cx={44} cy={29} r={16} fill="url(#sc-blossom)" />
-      <circle cx={32} cy={18} r={18} fill="url(#sc-blossom)" />
-      <circle cx={25} cy={12} r={8} fill="#fff" opacity={0.35} />
+      <ellipse cx={34} cy={77} rx={26} ry={7} fill="rgba(80,110,60,0.3)" filter="url(#sc-blur)" />
+      <path d="M32 78 V48" stroke="#c99768" strokeWidth={11} strokeLinecap="round" />
+      <path d="M29 76 V50" stroke="#e0b88a" strokeWidth={3.5} strokeLinecap="round" />
+      <circle cx={19} cy={40} r={16} fill="#f2a6b8" />
+      <circle cx={47} cy={40} r={16} fill="#f2a6b8" />
+      <circle cx={33} cy={44} r={17} fill="#f2a6b8" />
+      <circle cx={19} cy={33} r={16} fill="#f8bccb" />
+      <circle cx={47} cy={33} r={16} fill="#f8bccb" />
+      <circle cx={33} cy={22} r={20} fill="#f8bccb" />
+      <circle cx={26} cy={17} r={10} fill="#fdd9e2" />
+      <circle cx={44} cy={27} r={7} fill="#fdd9e2" />
+      <circle cx={14} cy={30} r={6} fill="#fdd9e2" />
       {[
-        [14, 28], [26, 40], [38, 33], [50, 26], [30, 12], [20, 18], [42, 15], [34, 26], [47, 38], [18, 38],
+        [30, 34], [40, 18], [20, 40], [48, 40], [12, 42], [36, 48],
       ].map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r={2.3} fill="#fff" />
+        <circle key={i} cx={cx} cy={cy} r={2.6} fill="#fff" />
+      ))}
+      {[[10, 76], [52, 80], [44, 74]].map(([cx, cy], i) => (
+        <ellipse key={i} cx={cx} cy={cy} rx={2.6} ry={1.6} fill="#fbd0da" />
+      ))}
+    </g>
+  );
+}
+
+// 덤불: 둥근 초록 뭉치 + 작은 꽃. (x, y)는 왼쪽 위, 크기 40x28.
+function Bush({ x, y, flower = "#f9c6d0" }: { x: number; y: number; flower?: string }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <ellipse cx={21} cy={26} rx={18} ry={4.5} fill="rgba(80,110,60,0.28)" filter="url(#sc-blur)" />
+      <circle cx={11} cy={17} r={10} fill="#8fc27a" />
+      <circle cx={29} cy={17} r={10} fill="#8fc27a" />
+      <circle cx={20} cy={13} r={12} fill="#a6d48f" />
+      <circle cx={15} cy={9} r={5} fill="#c4e6ae" />
+      {[[10, 16], [24, 9], [31, 18], [19, 19]].map(([cx, cy], i) => (
+        <circle key={i} cx={cx} cy={cy} r={2.3} fill={i % 2 ? flower : "#fff"} />
       ))}
     </g>
   );
@@ -34,7 +55,7 @@ function Lantern({ x, y }: { x: number; y: number }) {
       <rect x={10.5} y={30} width={3} height={22} rx={1.5} fill="#7a4f2d" />
       <rect x={6} y={50} width={12} height={3.5} rx={1.75} fill="#7a4f2d" />
       <rect x={6} y={2} width={12} height={4.5} rx={2.2} fill="#5c3b26" />
-      <ellipse cx={12} cy={17} rx={10} ry={12} fill="url(#sc-paper)" stroke="#a63a2c" strokeWidth={1.8} />
+      <ellipse cx={12} cy={17} rx={10} ry={12} fill="url(#sc-paper)" />
       <path d="M3 13Q12 17 21 13M2.5 18Q12 22 21.5 18M4 23Q12 27 20 23" fill="none" stroke="#a63a2c" strokeWidth={1.2} opacity={0.6} />
       <ellipse cx={8.5} cy={12} rx={2.2} ry={4} fill="#fff" opacity={0.4} />
       <rect x={6} y={28} width={12} height={4.5} rx={2.2} fill="#5c3b26" />
@@ -62,6 +83,10 @@ export default function TownScenery({ width, height }: { width: number; height: 
   const road =
     `M${-e} ${hy1}H${vx1}V${-e}H${vx2}V${hy1}H${width + e}V${hy2}H${vx2}V${height + e}H${vx1}V${hy2}H${-e}Z`;
 
+  const m = 8; // 점선이 길 가장자리에서 들어오는 거리
+  const inner =
+    `M${-e} ${hy1 + m}H${vx1 + m}V${-e}H${vx2 - m}V${hy1 + m}H${width + e}V${hy2 - m}H${vx2 - m}V${height + e}H${vx1 + m}V${hy2 - m}H${-e}Z`;
+
   // 꽃은 길 위에는 심지 않는다.
   const rnd = seeded(20240611);
   const flowers: { x: number; y: number; c: string }[] = [];
@@ -79,6 +104,13 @@ export default function TownScenery({ width, height }: { width: number; height: 
     rx: 40 + rnd() * 60,
     dark: rnd() > 0.55,
   }));
+  const tufts: { x: number; y: number }[] = [];
+  while (tufts.length < 46) {
+    const x = 10 + rnd() * (width - 20);
+    const y = 14 + rnd() * (height - 20);
+    const onRoad = (y > hy1 - 10 && y < hy2 + 10) || (x > vx1 - 10 && x < vx2 + 10);
+    if (!onRoad) tufts.push({ x, y });
+  }
   // 길 위의 자갈
   const pebbles = Array.from({ length: 26 }, () => {
     const horizontal = rnd() > 0.5;
@@ -121,16 +153,13 @@ export default function TownScenery({ width, height }: { width: number; height: 
       {patches.map((p, i) => (
         <ellipse key={i} cx={p.x} cy={p.y} rx={p.rx} ry={p.rx * 0.55} fill={p.dark ? "rgba(120,170,100,0.22)" : "url(#sc-patch)"} />
       ))}
-      {/* 길의 두께(아래로 살짝 어두운 면) */}
-      <path d={road} transform="translate(0 5)" fill="#dfc79b" stroke="#d3b685" strokeWidth={3} strokeLinejoin="round" />
-      <path
-        d={road}
-        fill="var(--road)"
-        stroke="var(--line)"
-        strokeWidth={3}
-        strokeDasharray="8 6"
-        strokeLinejoin="round"
-      />
+      {/* 길: 둥근 모서리의 흙길 (테두리 → 본체 → 안쪽 점선) */}
+      <path d={road} fill="#ecd5ab" stroke="#ecd5ab" strokeWidth={14} strokeLinejoin="round" />
+      <path d={road} fill="var(--road)" stroke="var(--road)" strokeWidth={6} strokeLinejoin="round" />
+      <path d={inner} fill="none" stroke="#e3c796" strokeWidth={2.5} strokeDasharray="8 7" strokeLinecap="round" strokeLinejoin="round" />
+      {tufts.map((t, i) => (
+        <path key={i} d={`M${t.x - 4} ${t.y}l2 -6M${t.x} ${t.y}v-8M${t.x + 4} ${t.y}l-2 -6`} stroke="#b4d896" strokeWidth={2} strokeLinecap="round" fill="none" />
+      ))}
       {pebbles.map((p, i) => (
         <ellipse key={i} cx={p.x} cy={p.y} rx={3 + (i % 3)} ry={1.8 + (i % 2)} fill="#e6cfa6" stroke="#d6bb8e" strokeWidth={0.8} />
       ))}
@@ -152,6 +181,12 @@ export default function TownScenery({ width, height }: { width: number; height: 
       <SakuraTree x={50} y={500} />
       <SakuraTree x={600} y={470} />
       <SakuraTree x={850} y={500} />
+      <Bush x={22} y={232} />
+      <Bush x={878} y={236} flower="#fff3b8" />
+      <Bush x={300} y={480} />
+      <Bush x={552} y={566} flower="#fff3b8" />
+      <Bush x={700} y={78} />
+      <Bush x={120} y={546} />
       <Lantern x={ 421} y={246} />
       <Lantern x={515} y={246} />
       <Lantern x={421} y={354} />
