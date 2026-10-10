@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import VillagerFace from "@/components/VillagerFace";
 import { VILLAGERS } from "@/lib/villager";
 import { VillagerIntimacy, fetchIntimacy } from "@/lib/storage";
 
@@ -28,10 +29,10 @@ export default function VillagersPage() {
           </div>
         </div>
         <div className="headerActions">
-          <Link href="/words" className="navLink">
+          <Link href="/words" className="pill">
             학습 단어 목록
           </Link>
-          <Link href="/" className="navLink">
+          <Link href="/" className="pill">
             ← 마을로 돌아가기
           </Link>
         </div>
@@ -48,7 +49,7 @@ export default function VillagersPage() {
                 className={met ? "intimacyItem" : "intimacyItem intimacyItemLocked"}
               >
                 <div className="intimacyTop">
-                  <div className="villagerAvatar">{v.avatar}</div>
+                  <VillagerFace villagerId={v.id} />
                   <div>
                     <div className="villagerName">{v.name}</div>
                     <div className="villagerDesc">{v.description}</div>
