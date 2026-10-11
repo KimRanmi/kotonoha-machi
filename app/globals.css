@@ -44,6 +44,7 @@
   --radius-sm: 0px;
   --radius-pill: 0px;
   --radius-map: 0px;
+  --radius-face: 0px; /* 주민 얼굴 아이콘 */
   --border-w: 3px; /* 카드·말풍선 */
   --border-w-thin: 2px; /* 알약 버튼·입력 */
   --border-w-map: 6px;
@@ -679,4 +680,30 @@ a {
 
 .wordPopupButton {
   border-color: transparent;
+}
+
+/* ───────── 대화창만 다시 둥글게 (나머지 화면은 각진 그대로) ───────── */
+.modalPage {
+  --radius-card: 20px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
+  --radius-pill: 999px;
+  --radius-face: 14px;
+}
+
+.modalPage .bubbleUser {
+  border-bottom-right-radius: 4px;
+}
+
+.modalPage .bubbleVillager {
+  border-bottom-left-radius: 4px;
+}
+
+.modalPage .closeButton,
+.modalPage .micButton {
+  border-radius: 50%;
+}
+
+.villagerFace rect {
+  rx: var(--radius-face, 0px);
 }
