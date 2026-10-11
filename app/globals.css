@@ -707,3 +707,41 @@ a {
 .villagerFace rect {
   rx: var(--radius-face, 0px);
 }
+
+/* 3D 방 위에 얹는 라벨들 (위치는 RoomCanvas가 매 프레임 계산해서 transform으로 옮긴다) */
+.roomLabel,
+.roomHint,
+.roomDoorTag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  font-weight: 700;
+  will-change: transform;
+}
+
+.roomLabel {
+  padding: 1px 9px;
+  background: var(--white);
+  color: var(--ink);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.roomHint {
+  padding: 2px 8px;
+  background: var(--white);
+  border: var(--border-w-thin) solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+}
+
+.roomDoorTag {
+  padding: 0 8px;
+  background: rgba(90, 64, 52, 0.75);
+  color: #fff4e4;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
