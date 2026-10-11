@@ -34,7 +34,7 @@ export default function VillagerFace({
       viewBox="0 0 48 48"
       aria-hidden="true"
     >
-      <rect x="2" y="2" width="44" height="44" rx="8" fill={fill} stroke="#b98a5a" strokeWidth="2.5" />
+      <rect x="2" y="2" width="44" height="44" rx="0" fill={fill} stroke="#b98a5a" strokeWidth="2.5" />
       {/* 앞머리 한 가닥 */}
             <circle cx="16.5" cy="25" r="2.6" fill="#5a4034" />
       <circle cx="31.5" cy="25" r="2.6" fill="#5a4034" />
