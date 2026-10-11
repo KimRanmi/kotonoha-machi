@@ -76,6 +76,7 @@ export function useWalker({
   obstacles,
   initial,
   paused = false,
+  isometric = false,
 }: {
   width: number;
   height: number;
@@ -83,6 +84,9 @@ export function useWalker({
   initial: Point;
   // true면 이동 입력을 무시하고 눌려 있던 키도 비운다(대화 모달이 열려 있을 때 등).
   paused?: boolean;
+  // true면 방향키를 "화면 기준"으로 해석한다(비스듬한 시점의 마을: 위쪽 키 = 화면 위쪽).
+  // 월드 좌표로는 위=(-1,-1), 아래=(+1,+1), 왼쪽=(-1,+1), 오른쪽=(+1,-1) 대각선이다.
+  isometric?: boolean;
 }) {
   const [position, setPosition] = useState<Point>(initial);
   const positionRef = useRef(position);
@@ -93,10 +97,15 @@ export function useWalker({
   const obstaclesRef = useRef(obstacles);
   const pausedRef = useRef(paused);
   const sizeRef = useRef({ width, height });
+  const isoRef = useRef(isometric);
 
   useEffect(() => {
     obstaclesRef.current = obstacles;
   }, [obstacles]);
+
+  useEffect(() => {
+    isoRef.current = isometric;
+  }, [isometric]);
 
   useEffect(() => {
     sizeRef.current = { width, height };
@@ -155,6 +164,13 @@ export function useWalker({
           dy += dir.dy;
         }
       });
+
+      if (isoRef.current) {
+        const sx = dx;
+        const sy = dy;
+        dx = sx + sy;
+        dy = sy - sx;
+      }
 
       if (dx !== 0 || dy !== 0) {
         const length = Math.hypot(dx, dy) || 1;

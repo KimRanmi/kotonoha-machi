@@ -53,6 +53,21 @@
   overflow: hidden;
 }
 
+/* 비스듬한 시점의 마을 무대: 월드를 project()로 그린 SVG + 그 위에 얹는 이름표/힌트(HTML) */
+.stageScroll {
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.stage {
+  position: relative;
+}
+
+.stageSvg {
+  display: block;
+}
+
 /* 건물 영역(충돌·입장 판정에 쓰이는 rect). 그림은 안쪽 SVG가 맡고, 지붕/차양은 영역 밖으로 튀어나올 수 있다. */
 .building {
   position: absolute;
@@ -61,8 +76,6 @@
 
 .buildingLabel {
   position: absolute;
-  left: 50%;
-  bottom: -13px;
   transform: translateX(-50%);
   padding: 2px 12px;
   border: var(--border-w-thin) solid var(--line);
@@ -100,6 +113,8 @@
 
 .constructing {
   animation: buildPulse 1.2s ease-out;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
 }
 
 @keyframes buildPulse {
