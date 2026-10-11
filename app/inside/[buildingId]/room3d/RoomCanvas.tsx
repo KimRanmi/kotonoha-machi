@@ -180,7 +180,7 @@ export default function RoomCanvas({
       renderer.setSize(size.w, size.h, false);
       camera.aspect = size.w / size.h;
       // 화면이 좁으면(세로 모바일) 더 멀리서 본다
-      camera.zoom = Math.min(1.1, Math.max(0.45, Math.min(size.w / 1500, size.h / 800)));
+      camera.zoom = Math.min(0.85, Math.max(0.3, Math.min(size.w / 2100, size.h / 1100)));
       camera.updateProjectionMatrix();
       needs = true;
     };
