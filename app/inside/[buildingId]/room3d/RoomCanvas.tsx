@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { Furniture, Room } from "../../../interiors";
 import { CHAR_SIZE } from "@/lib/walk";
-import { buildFurniture, buildShell, emojiSprite, shadowBlob } from "./build";
+import { buildFurniture, buildShell, shadowBlob } from "./build";
+import { PLAYER_SPEC, createCharacter, specForVillager, type CharacterRig } from "../../../character3d";
 
 // 건물 내부 방을 진짜 3D(three.js)로 보여주는 컴포넌트.
 // - 시점: 지금까지와 같은 비스듬한 위쪽 시점(원근이 약한 카메라)이고, 캐릭터를 부드럽게 따라간다.
@@ -29,7 +30,7 @@ export default function RoomCanvas({
   ghost,
   position,
   residentRect,
-  residentEmoji,
+  residentId,
   residentName,
   nearResident,
   decorating,
@@ -41,7 +42,7 @@ export default function RoomCanvas({
   ghost: Ghost | null;
   position: { x: number; y: number };
   residentRect: { x: number; y: number } | null;
-  residentEmoji: string | null;
+  residentId: string | null;
   residentName: string | null;
   nearResident: boolean;
   decorating: boolean;
@@ -126,17 +127,28 @@ export default function RoomCanvas({
     };
     rebuildFurniture();
 
-    // 플레이어 / 주민 (이모지 빌보드 + 바닥 그림자)
+    // 플레이어 / 주민: 3D 캐릭터(app/character3d.ts) + 바닥 그림자
+    const rigs: CharacterRig[] = [];
+    const playerRig = createCharacter(PLAYER_SPEC);
+    rigs.push(playerRig);
+    playerRig.root.scale.setScalar(1.3); // 방 안에서 또렷이 보이도록 살짝 키운다
     const player = new THREE.Group();
-    player.add(shadowBlob(), emojiSprite("🧑"));
+    player.add(shadowBlob(), playerRig.root);
     scene.add(player);
     let resident: THREE.Group | null = null;
-    if (residentEmoji && residentRect) {
+    let residentRig: CharacterRig | null = null;
+    if (residentId && residentRect) {
+      residentRig = createCharacter(specForVillager(residentId));
+      rigs.push(residentRig);
+      residentRig.root.scale.setScalar(1.3);
       resident = new THREE.Group();
-      resident.add(shadowBlob(), emojiSprite(residentEmoji));
+      resident.add(shadowBlob(), residentRig.root);
       resident.position.set(residentRect.x + CHAR_SIZE / 2, 0, residentRect.y + CHAR_SIZE / 2);
       scene.add(resident);
     }
+    let prevX = position.x;
+    let prevZ = position.y;
+    let movingFor = 0; // 마지막으로 움직인 뒤 지난 시간(걷기 동작을 부드럽게 끝내려고)
 
     // 꾸미기 보조: 놓을 자리 표시 + 선택 표시
     const ghostMat = new THREE.MeshBasicMaterial({ color: 0x50c878, transparent: true, opacity: 0.45, depthWrite: false });
@@ -168,7 +180,7 @@ export default function RoomCanvas({
       renderer.setSize(size.w, size.h, false);
       camera.aspect = size.w / size.h;
       // 화면이 좁으면(세로 모바일) 더 멀리서 본다
-      camera.zoom = Math.min(0.95, Math.max(0.36, Math.min(size.w / 2000, size.h / 1050)));
+      camera.zoom = Math.min(1.1, Math.max(0.45, Math.min(size.w / 1500, size.h / 800)));
       camera.updateProjectionMatrix();
       needs = true;
     };
@@ -242,6 +254,27 @@ export default function RoomCanvas({
         needs = true;
       }
       player.position.set(l.position.x + CHAR_SIZE / 2, 0, l.position.y + CHAR_SIZE / 2);
+      const mx = l.position.x - prevX;
+      const mz = l.position.y - prevZ;
+      const movedNow = mx * mx + mz * mz > 0.0004;
+      if (movedNow) {
+        movingFor = 0;
+        playerRig.face(Math.atan2(mx, mz), dt);
+        prevX = l.position.x;
+        prevZ = l.position.y;
+      } else movingFor += dt;
+      const walking = movingFor < 0.12;
+      playerRig.update(dt, walking);
+      // 주민은 가까이 온 플레이어 쪽을 바라본다
+      if (residentRig && resident) {
+        const dx = player.position.x - resident.position.x;
+        const dz = player.position.z - resident.position.z;
+        if (dx * dx + dz * dz < 220 * 220) residentRig.face(Math.atan2(dx, dz), dt);
+        else residentRig.face(0, dt);
+        residentRig.update(dt, false);
+      }
+      // 걷는 동안과 직후(동작이 멈추는 동안)는 계속 그린다
+      if (walking || movingFor < 0.5 || (residentRig && Math.abs(residentRig.root.rotation.y) > 0.01)) needs = true;
 
       const g = l.ghost;
       if (l.decorating && g) {
@@ -291,12 +324,13 @@ export default function RoomCanvas({
         if (Array.isArray(mat)) mat.forEach(kill);
         else if (mat) kill(mat);
       });
+      rigs.forEach((r) => r.dispose());
       renderer.dispose();
       renderer.domElement.remove();
     };
     // 방(건물)이 바뀔 때만 다시 만든다. 위치·가구 같은 나머지는 live ref와 별도 effect로 갱신한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room.id, room.width, room.height, residentEmoji]);
+  }, [room.id, room.width, room.height, residentId]);
 
   return (
     <div ref={hostRef} style={{ position: "absolute", inset: 0, cursor: decorating ? "crosshair" : undefined }}>

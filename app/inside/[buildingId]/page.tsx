@@ -241,7 +241,7 @@ function RoomView({ building }: { building: Building }) {
           ghost={ghostRect ? { ...ghostRect, round: selectedItem?.shape === "round", bad: !!hoverFailure } : null}
           position={position}
           residentRect={resident ? residentRect : null}
-          residentEmoji={resident ? resident.avatar : null}
+          residentId={resident ? residentId : null}
           residentName={resident ? resident.name : null}
           nearResident={isNearResident}
           decorating={decorating}
