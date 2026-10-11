@@ -16,6 +16,7 @@ const H = MAP_HEIGHT;
 const S = ISO_SCALE;
 
 // ───────── 소품 (밑동이 (0,0), 위로 -y로 솟는다) ─────────
+// 부풀린 동그라미 대신 "각진 면"(로우폴리)으로 그려서, 귀여움보다 정돈된 미니어처 느낌을 낸다.
 
 function Sway({ delay, children }: { delay: number; children: React.ReactNode }) {
   return (
@@ -25,40 +26,70 @@ function Sway({ delay, children }: { delay: number; children: React.ReactNode })
   );
 }
 
-function Sakura({ d }: { d: number }) {
+type Tones = { dark: string; mid: string; light: string; top: string };
+const GREEN: Tones = { dark: "#6e8f69", mid: "#86a67c", light: "#a2bf93", top: "#bdd2a9" };
+const PINK: Tones = { dark: "#cf949c", mid: "#e0a9ae", light: "#edc0c3", top: "#f6d5d5" };
+const TRUNK = ["#a9835f", "#8d6a4a"];
+
+const poly = (a: [number, number][]) => a.map((p) => p.join(",")).join(" ");
+
+// 각진 돔 한 덩어리: 육각형을 여섯 개의 삼각 면으로 나눠 면마다 명암을 준다.
+function Dome({ cx, cy, r, t }: { cx: number; cy: number; r: number; t: Tones }) {
+  const A: [number, number] = [cx - r, cy];
+  const B: [number, number] = [cx - r * 0.55, cy - r * 0.82];
+  const C: [number, number] = [cx + r * 0.55, cy - r * 0.82];
+  const D: [number, number] = [cx + r, cy];
+  const E: [number, number] = [cx + r * 0.5, cy + r * 0.58];
+  const F: [number, number] = [cx - r * 0.5, cy + r * 0.58];
+  const M: [number, number] = [cx - r * 0.12, cy - r * 0.18];
   return (
     <g>
-      <ellipse cx={0} cy={0} rx={26} ry={7.5} fill={SHADOW} />
-      <rect x={-5} y={-34} width={9} height={34} rx={4} fill="#c9a47c" />
-      <rect x={0} y={-34} width={4} height={34} rx={2} fill="#b98f68" />
+      <polygon points={poly([M, A, B])} fill={t.light} />
+      <polygon points={poly([M, B, C])} fill={t.top} />
+      <polygon points={poly([M, C, D])} fill={t.mid} />
+      <polygon points={poly([M, D, E])} fill={t.dark} />
+      <polygon points={poly([M, E, F])} fill={t.dark} opacity={0.9} />
+      <polygon points={poly([M, F, A])} fill={t.mid} opacity={0.95} />
+    </g>
+  );
+}
+
+function Trunk() {
+  return (
+    <g>
+      <polygon points={poly([[-4, 0], [-2.5, -34], [3, -34], [5, 0]])} fill={TRUNK[0]} />
+      <polygon points={poly([[1, 0], [1.5, -34], [3, -34], [5, 0]])} fill={TRUNK[1]} />
+    </g>
+  );
+}
+
+function Broadleaf({ d, t }: { d: number; t: Tones }) {
+  return (
+    <g>
+      <ellipse cx={0} cy={0} rx={26} ry={7} fill={SHADOW} />
+      <Trunk />
       <Sway delay={d}>
-        <circle cx={-13} cy={-42} r={16} fill="#e3a3a6" />
-        <circle cx={13} cy={-42} r={16} fill="#e3a3a6" />
-        <circle cx={0} cy={-37} r={15} fill="#e3a3a6" />
-        <circle cx={-13} cy={-49} r={16} fill="#ecb8b8" />
-        <circle cx={13} cy={-50} r={16} fill="#ecb8b8" />
-        <circle cx={0} cy={-60} r={19} fill="#ecb8b8" />
-        <circle cx={-6} cy={-65} r={9} fill="#f3cdcd" />
-        {[[-3, -48], [8, -60], [-15, -42], [15, -40], [3, -36], [-9, -58]].map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r={2.4} fill="#fffaf0" />)}
+        <Dome cx={0} cy={-46} r={27} t={t} />
+        <Dome cx={-3} cy={-70} r={19} t={t} />
       </Sway>
     </g>
   );
 }
 
-function Leafy({ d }: { d: number }) {
+// 침엽수: 쌓은 삼각형 층
+function Conifer({ d }: { d: number }) {
+  const tiers: [number, number, number][] = [[-22, 26, 30], [-42, 21, 28], [-62, 15, 26]]; // [base y, half width, height]
   return (
     <g>
-      <ellipse cx={0} cy={0} rx={26} ry={7.5} fill={SHADOW} />
-      <rect x={-5} y={-34} width={9} height={34} rx={4} fill="#c9a47c" />
-      <rect x={0} y={-34} width={4} height={34} rx={2} fill="#b98f68" />
+      <ellipse cx={0} cy={0} rx={22} ry={6} fill={SHADOW} />
+      <polygon points={poly([[-3, 0], [-2, -22], [3, -22], [4, 0]])} fill={TRUNK[0]} />
       <Sway delay={d}>
-        <circle cx={-13} cy={-42} r={16} fill="#8fb685" />
-        <circle cx={13} cy={-42} r={16} fill="#8fb685" />
-        <circle cx={0} cy={-37} r={15} fill="#8fb685" />
-        <circle cx={-13} cy={-49} r={16} fill="#a9ca97" />
-        <circle cx={13} cy={-50} r={16} fill="#a9ca97" />
-        <circle cx={0} cy={-60} r={19} fill="#a9ca97" />
-        <circle cx={-6} cy={-65} r={9} fill="#c6dcb4" />
+        {tiers.map(([by, hw, h], i) => (
+          <g key={i}>
+            <polygon points={poly([[0, by - h], [-hw, by], [0, by + 5]])} fill={GREEN.light} />
+            <polygon points={poly([[0, by - h], [0, by + 5], [hw, by]])} fill={GREEN.dark} />
+          </g>
+        ))}
       </Sway>
     </g>
   );
@@ -68,11 +99,11 @@ function Bush({ flower }: { flower: string }) {
   return (
     <g>
       <ellipse cx={0} cy={0} rx={20} ry={5} fill={SHADOW} />
-      <circle cx={-10} cy={-9} r={10} fill="#8fb685" />
-      <circle cx={10} cy={-9} r={10} fill="#8fb685" />
-      <circle cx={0} cy={-13} r={12} fill="#a9ca97" />
-      <circle cx={-5} cy={-17} r={5} fill="#c6dcb4" />
-      {[[-11, -10], [4, -17], [11, -8], [-1, -7]].map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r={2.3} fill={i % 2 ? flower : "#fffaf0"} />)}
+      <Dome cx={-7} cy={-9} r={11} t={GREEN} />
+      <Dome cx={8} cy={-8} r={10} t={GREEN} />
+      {[[-9, -14], [6, -15], [10, -6]].map(([cx, cy], i) => (
+        <polygon key={i} points={poly([[cx, cy - 2.4], [cx + 2.4, cy], [cx, cy + 2.4], [cx - 2.4, cy]])} fill={i % 2 ? flower : "#fffaf0"} />
+      ))}
     </g>
   );
 }
@@ -81,24 +112,28 @@ function Rock() {
   return (
     <g>
       <ellipse cx={0} cy={0} rx={19} ry={5} fill={SHADOW} />
-      <path d="M-16 -2Q-17 -14 -7 -18Q4 -22 13 -15Q18 -9 16 -2Z" fill="#cfc6b4" />
-      <path d="M4 -17Q14 -15 16 -2H6Q8 -10 4 -17Z" fill="#b3aa98" />
-      <path d="M-12 -11Q-8 -17 -1 -18Q-6 -15 -8 -9Z" fill="#e4dccb" />
+      <polygon points={poly([[-16, -1], [-12, -13], [-2, -19], [6, -15], [16, -1]])} fill="#c5bcab" />
+      <polygon points={poly([[-12, -13], [-2, -19], [-1, -3], [-16, -1]])} fill="#ddd5c5" />
+      <polygon points={poly([[6, -15], [16, -1], [-1, -3], [-2, -19]])} fill="#a89f8d" />
     </g>
   );
 }
 
+// 돌등롱(이시도로): 받침 + 기둥 + 불집 + 지붕. 따뜻한 불빛이 은은하게 일렁인다.
 function Lantern() {
   return (
     <g>
-      <ellipse cx={0} cy={0} rx={10} ry={3.2} fill={SHADOW} />
-      <circle cx={0} cy={-37} r={26} fill="#ffd27a" opacity={0.2} className={styles.glow} />
-      <rect x={-1.5} y={-26} width={3} height={26} rx={1.5} fill="#c9a47c" />
-      <rect x={-6} y={-52} width={12} height={4} rx={2} fill="#b98f68" />
-      <ellipse cx={0} cy={-37} rx={10} ry={12} fill="#e68576" />
-      <ellipse cx={3} cy={-36} rx={6} ry={11} fill="#d6705f" />
-      <ellipse cx={-4} cy={-42} rx={2.2} ry={4} fill="#fff" opacity={0.5} />
-      <rect x={-6} y={-26} width={12} height={4} rx={2} fill="#b98f68" />
+      <ellipse cx={0} cy={0} rx={12} ry={3.5} fill={SHADOW} />
+      <circle cx={0} cy={-34} r={26} fill="#ffd27a" opacity={0.18} className={styles.glow} />
+      <polygon points={poly([[-9, 0], [9, 0], [7, -5], [-7, -5]])} fill="#b4ad9e" />
+      <polygon points={poly([[-3, -5], [3, -5], [3, -22], [-3, -22]])} fill="#cfc8b8" />
+      <polygon points={poly([[0, -5], [3, -5], [3, -22], [0, -22]])} fill="#a69f90" />
+      <polygon points={poly([[-10, -22], [10, -22], [8, -26], [-8, -26]])} fill="#bdb6a6" />
+      <polygon points={poly([[-7, -26], [7, -26], [7, -40], [-7, -40]])} fill="#a39c8d" />
+      <polygon points={poly([[-4.5, -29], [4.5, -29], [4.5, -37], [-4.5, -37]])} fill="#ffdd96" className={styles.glow} />
+      <polygon points={poly([[-13, -40], [13, -40], [0, -52]])} fill="#8f887a" />
+      <polygon points={poly([[0, -40], [13, -40], [0, -52]])} fill="#756e61" />
+      <polygon points={poly([[-2, -52], [2, -52], [0, -56]])} fill="#b4ad9e" />
     </g>
   );
 }
@@ -120,13 +155,12 @@ function Bench() {
 function Flowerbed({ c }: { c: string }) {
   return (
     <g>
-      <ellipse cx={0} cy={0} rx={24} ry={9} fill="#c9a47c" />
-      <ellipse cx={0} cy={-2} rx={21} ry={7} fill="#a98a63" />
+      <polygon points={poly([[-26, 0], [0, -12], [26, 0], [0, 12]])} fill="#b98f68" />
+      <polygon points={poly([[-22, -1], [0, -10], [22, -1], [0, 9]])} fill="#a98a63" />
       {[[-12, -4], [-4, -8], [6, -5], [14, -3], [0, -2], [-8, 0], [10, -9]].map(([cx, cy], i) => (
         <g key={i}>
           <path d={`M${cx} ${cy}v-6`} stroke="#6f9a52" strokeWidth={1.6} />
-          <circle cx={cx} cy={cy - 8} r={3.4} fill={i % 2 ? c : "#fffaf0"} />
-          <circle cx={cx} cy={cy - 8} r={1.2} fill="#e6bb62" />
+          <polygon points={poly([[cx, cy - 12], [cx + 3.6, cy - 8], [cx, cy - 4], [cx - 3.6, cy - 8]])} fill={i % 2 ? c : "#fffaf0"} />
         </g>
       ))}
     </g>
@@ -240,8 +274,8 @@ export function Prop({ def, i }: { def: PropDef; i: number }) {
   const s = base * S * (def.s ?? 1);
   return (
     <g transform={`translate(${sx} ${sy}) scale(${s})`}>
-      {def.kind === "sakura" && <Sakura d={i} />}
-      {def.kind === "leafy" && <Leafy d={i} />}
+      {def.kind === "sakura" && <Broadleaf d={i} t={PINK} />}
+      {def.kind === "leafy" && (i % 3 === 0 ? <Conifer d={i} /> : <Broadleaf d={i} t={GREEN} />)}
       {def.kind === "bush" && <Bush flower="#efbcc0" />}
       {def.kind === "bushY" && <Bush flower="#f3dc9c" />}
       {def.kind === "rock" && <Rock />}

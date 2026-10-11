@@ -7,6 +7,8 @@ import AuthStatus from "@/components/AuthStatus";
 import ChatPanel from "@/components/ChatPanel";
 import townStyles from "../../town.module.css";
 import styles from "./room.module.css";
+import RoomScene from "./RoomScene";
+import { makeRoomIso } from "../../roomIso";
 import { BUILDINGS, withThemeResident, type Building, type PlacedBuilding } from "../../buildings";
 import { getRoomObstacles, getRoomTemplate, type Furniture, type Room } from "../../interiors";
 import {
@@ -69,6 +71,8 @@ function RoomView({ building }: { building: Building }) {
     const template = getRoomTemplate(building);
     return homeFurniture ? { ...template, furniture: homeFurniture.placed } : template;
   }, [building, homeFurniture]);
+
+  const iso = useMemo(() => makeRoomIso(room), [room]);
 
   const residentId = building.residentId ?? (building.hasResident ? building.id : null);
   const resident = residentId ? getVillager(residentId) : null;
@@ -142,9 +146,11 @@ function RoomView({ building }: { building: Building }) {
     saveHomeFurniture(next);
   }
 
+  // 화면(비스듬한 시점) 클릭 위치 -> 방의 평면 좌표. 무대가 화면에 맞게 축소돼 있으므로 배율로 나눈다.
   function roomPoint(e: React.MouseEvent<HTMLDivElement>) {
     const r = e.currentTarget.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    const scale = r.width / iso.stageWidth;
+    return iso.unproject((e.clientX - r.left) / scale, (e.clientY - r.top) / scale);
   }
 
   function handleRoomClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -230,9 +236,73 @@ function RoomView({ building }: { building: Building }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 방 무대를 화면 가운데에 맞춰 놓는다(작은 화면에서는 축소).
+  const [view, setView] = useState({ w: 1280, h: 800 });
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => setView({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const fit = Math.min(1.15, (view.w - 24) / iso.stageWidth, (view.h - 190) / iso.stageHeight);
+  const stageLeft = (view.w - iso.stageWidth * fit) / 2;
+  const stageTop = Math.max(64, (view.h - iso.stageHeight * fit) / 2 - 10);
+
+  const ghostRect = decorating && selectedItem && hover ? targetRect(selectedItem, hover) : null;
+  const [resPx, resPy] = resident ? iso.project(residentRect.x + CHAR_SIZE / 2, residentRect.y + CHAR_SIZE / 2, 0) : [0, 0];
+  const [doorX, doorY] = iso.project(room.door.x + room.door.width / 2, room.height - 6, 0);
+
   return (
-    <div className={townStyles.page}>
-      <header className={townStyles.header}>
+    <div className={`${townStyles.townRoot} ${styles.roomRoot}`}>
+      <div ref={viewportRef} className={townStyles.viewport}>
+        <div
+          className={styles.stage}
+          style={{
+            width: iso.stageWidth,
+            height: iso.stageHeight,
+            transform: `translate(${stageLeft}px, ${stageTop}px) scale(${fit})`,
+            cursor: decorating ? "crosshair" : undefined,
+          }}
+          onClick={handleRoomClick}
+          onMouseMove={(e) => decorating && setHover(roomPoint(e))}
+          onMouseLeave={() => setHover(null)}
+        >
+          <svg width={iso.stageWidth} height={iso.stageHeight} viewBox={`0 0 ${iso.stageWidth} ${iso.stageHeight}`} aria-hidden="true" className={townStyles.stageSvg}>
+            <RoomScene
+              room={room}
+              iso={iso}
+              furniture={room.furniture}
+              selectedId={selected}
+              ghost={ghostRect ? { ...ghostRect, round: selectedItem?.shape === "round", bad: !!hoverFailure } : null}
+              residentRect={resident ? residentRect : null}
+              residentEmoji={resident ? resident.avatar : null}
+              position={position}
+            />
+          </svg>
+          {resident && (
+            <>
+              <div className={styles.nameTag} style={{ left: resPx, top: resPy + 6 }}>
+                {resident.name}
+              </div>
+              {isNearResident && (
+                <div className={townStyles.interactionHint} style={{ left: resPx, top: resPy - 62 }}>
+                  💬
+                </div>
+              )}
+            </>
+          )}
+          <div className={styles.doorTag} style={{ left: doorX, top: doorY + 6 }}>
+            문
+          </div>
+        </div>
+        <div className={townStyles.vignette} />
+      </div>
+
+      <header className={townStyles.townHeader}>
         <div className={townStyles.title}>ことばのまち — {building.label} 내부</div>
         <div className={townStyles.headerLinks}>
           {isHome && (
@@ -251,82 +321,8 @@ function RoomView({ building }: { building: Building }) {
         </div>
       </header>
 
-      <main className={townStyles.mapWrapper} style={{ width: room.width, height: room.height }}>
-        <div
-          className={styles.room}
-          style={{
-            width: room.width,
-            height: room.height,
-            background: room.floorColor,
-            cursor: decorating ? "crosshair" : undefined,
-          }}
-          onClick={handleRoomClick}
-          onMouseMove={(e) => decorating && setHover(roomPoint(e))}
-          onMouseLeave={() => setHover(null)}
-        >
-          <div
-            className={styles.wall}
-            style={{ height: room.wallHeight, background: room.wallColor }}
-          />
-          <div
-            className={styles.door}
-            style={{ left: room.door.x, top: room.door.y, width: room.door.width, height: room.door.height }}
-          >
-            문
-          </div>
-
-          {room.furniture.map((f) => (
-            <div
-              key={f.id}
-              className={f.id === selected ? `${styles.furniture} ${styles.selected}` : styles.furniture}
-              title={f.label}
-              style={{
-                left: f.x,
-                top: f.y,
-                width: f.width,
-                height: f.height,
-                background: f.color,
-                borderRadius: f.shape === "round" ? "50%" : 4,
-              }}
-            >
-              {f.emoji}
-            </div>
-          ))}
-
-          {decorating && selectedItem && hover && (
-            <div
-              className={hoverFailure ? `${styles.ghost} ${styles.ghostBad}` : styles.ghost}
-              style={{
-                left: targetRect(selectedItem, hover).x,
-                top: targetRect(selectedItem, hover).y,
-                width: selectedItem.width,
-                height: selectedItem.height,
-                borderRadius: selectedItem.shape === "round" ? "50%" : 4,
-              }}
-            />
-          )}
-
-          {resident && (
-            <div
-              className={styles.resident}
-              style={{ left: residentRect.x, top: residentRect.y, width: CHAR_SIZE, height: CHAR_SIZE }}
-            >
-              {isNearResident && <div className={townStyles.interactionHint}>💬</div>}
-              <span>{resident.avatar}</span>
-              <div className={styles.nameTag}>{resident.name}</div>
-            </div>
-          )}
-
-          <div
-            className={townStyles.character}
-            style={{ left: position.x, top: position.y, width: CHAR_SIZE, height: CHAR_SIZE }}
-          >
-            🧑
-          </div>
-        </div>
-      </main>
-
-      {decorating && homeFurniture ? (
+      <div className={townStyles.townFooter}>
+        {decorating && homeFurniture ? (
         <div className={styles.decorPanel}>
           <p className={townStyles.interactionBanner}>
             {decorMessage ??
@@ -368,6 +364,7 @@ function RoomView({ building }: { building: Building }) {
           {!resident && !isHome && " (이 건물에는 아직 주민이 없어요.)"}
         </p>
       )}
+      </div>
 
       {chatOpen && residentId && (
         <div className={townStyles.chatOverlay}>
