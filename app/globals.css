@@ -39,11 +39,11 @@
   --ok-ink: #2a5a22; /* 정답/성공 글자 — 연한 말차 6.19 */
 
   /* 모서리 / 테두리 */
-  --radius-card: 24px;
-  --radius-md: 16px;
-  --radius-sm: 10px;
-  --radius-pill: 999px;
-  --radius-map: 28px;
+  --radius-card: 6px;
+  --radius-md: 5px;
+  --radius-sm: 3px;
+  --radius-pill: 5px;
+  --radius-map: 6px;
   --border-w: 3px; /* 카드·말풍선 */
   --border-w-thin: 2px; /* 알약 버튼·입력 */
   --border-w-map: 6px;
@@ -260,7 +260,7 @@ a {
 .closeButton {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
   border: var(--border-w-thin) solid var(--line);
   background: var(--white);
   color: var(--ink);
@@ -298,7 +298,7 @@ a {
 .bubbleVillager {
   max-width: 80%;
   padding: 10px 14px;
-  border-radius: 20px;
+  border-radius: 8px;
   line-height: 1.6;
   font-size: 15px;
   word-break: break-word;
@@ -311,7 +311,7 @@ a {
   background: var(--matcha-soft);
   border-color: var(--matcha);
   color: var(--on-matcha);
-  border-bottom-right-radius: 6px;
+  border-bottom-right-radius: 1px;
 }
 
 /* 주민: 흰 바탕 + 도톰한 연한 갈색 테두리, 왼쪽 아래만 작게 둥글게 */
@@ -320,7 +320,7 @@ a {
   background: var(--white);
   border-color: var(--line);
   color: var(--ink);
-  border-bottom-left-radius: 6px;
+  border-bottom-left-radius: 1px;
 }
 
 .bubbleLoading {
@@ -411,7 +411,7 @@ a {
   width: 42px;
   height: 42px;
   flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
   border: var(--border-w-thin) solid var(--line);
   background: var(--white);
   font-size: 17px;
@@ -511,7 +511,7 @@ a {
 .wordRemoveButton {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
   background: var(--cream-deep);
   border: none;
   color: var(--ink-soft);
