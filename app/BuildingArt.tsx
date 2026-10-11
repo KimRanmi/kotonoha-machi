@@ -1,293 +1,232 @@
 import type { InteriorKind } from "./interiors";
 
-// 마을 맵의 건물 그림 (지브리풍): 따뜻한 흙빛 팔레트, 손으로 그린 듯 살짝 일렁이는 가장자리와
-// 종이 질감(SVG 필터), 널판/회벽/석재/기와 질감, 불 켜진 창, 덩굴과 꽃으로 사람 사는 느낌을 낸다.
-// 이미지 파일 없이 SVG만 쓴다. 건물 영역(x/y/width/height)은 그대로이고, 그림은 그 영역을 꽉 채운다.
+// 마을 맵의 건물 그림 (파스텔 미니어처): 윤곽선 없이 면 색만 쓰는 납작한 디자인에,
+// "옆면 + 지붕 옆면"을 비스듬히 붙여서 작은 블록 모형처럼 보이게 한다. 이미지 파일 없이 SVG만 쓴다.
+// 건물 영역(x/y/width/height)은 그대로이고, 그림은 그 영역 안에 앞면+옆면이 들어가게 그린다.
 // 지붕·차양·그림자는 영역 밖으로 살짝 튀어나올 수 있지만(overflow: visible)
 // 충돌/클릭 판정과는 무관한 장식이다. kind가 없는 건물(테마로 지은 건물)은 학습관 모양으로 그린다.
+// 방향 규칙: 건물 깊이는 오른쪽 위(+S, -DY)로 이어진다.
 
-type ArtProps = { w: number; h: number; id: string };
+type ArtProps = { w: number; h: number };
 
-const WOOD = "#d9a56b";
-const WOOD_LINE = "#b57f4a";
-const PLASTER = "#f4e6c6";
-const PLASTER_SHADE = "#e3cba0";
-const STONE = "#b9ad98";
-const STONE_DARK = "#948873";
-const GLOW = "#ffe08a";
-const FRAME = "#6b4a2f";
+const S = 16; // 옆면 폭
+const DY = 8; // 옆면이 올라가는 높이
 
-function GroundShadow({ w, h }: { w: number; h: number }) {
-  return <ellipse cx={w / 2 + 6} cy={h + 2} rx={w * 0.62} ry={11} fill="rgba(40,70,30,0.38)" filter="url(#gh-blur)" />;
+type Tone = {
+  front: string; // 앞벽
+  side: string; // 옆벽
+  roofF: string; // 지붕 앞면
+  roofS: string; // 지붕 옆면(박공)
+  door: string;
+};
+
+const WIN = "#c2dce0";
+const WIN_SIDE = "#a9ced6";
+const SILL = "#fffaf0";
+
+function GroundShadow({ w, h }: ArtProps) {
+  return <ellipse cx={w / 2 + 8} cy={h + 1} rx={w * 0.58} ry={9} fill="rgba(90,110,70,0.2)" />;
 }
 
-// 벽 재질
-function WoodWall({ w, h, top }: { w: number; h: number; top: number }) {
-  const lines = [];
-  for (let y = top + 9; y < h - 12; y += 9) lines.push(<path key={y} d={`M5 ${y}H${w - 5}`} stroke={WOOD_LINE} strokeWidth={1.4} opacity={0.6} />);
+// 옆면 위의 점: t(0~1)는 앞→뒤 깊이, z는 바닥에서의 높이
+const sidePt = (fw: number, h: number, t: number, z: number): [number, number] => [fw + S * t, h - z - DY * t];
+const pts = (a: [number, number][]) => a.map((p) => p.join(",")).join(" ");
+
+// 벽(앞면 + 옆면) + 바닥 띠
+function Block({ w, h, bt, tone }: ArtProps & { bt: number; tone: Tone }) {
+  const fw = w - S; // 앞면 폭
   return (
     <g>
-      <rect x={3} y={top} width={w - 6} height={h - top} rx={7} fill={WOOD} />
-      <rect x={3} y={top} width={(w - 6) * 0.3} height={h - top} rx={7} fill="#f0c590" opacity={0.45} />
-      {lines}
+      <rect x={2} y={bt} width={fw - 2} height={h - bt} rx={4} fill={tone.front} />
+      <polygon points={pts([[fw, bt], [w, bt - DY], [w, h - DY], [fw, h]])} fill={tone.side} />
+      <rect x={2} y={h - 7} width={fw - 2} height={7} rx={3} fill="#000" opacity={0.05} />
+      <rect x={6} y={bt + 5} width={fw * 0.28} height={4} rx={2} fill="#fff" opacity={0.55} />
     </g>
   );
 }
 
-function PlasterWall({ w, h, top, color = PLASTER, shade = PLASTER_SHADE }: { w: number; h: number; top: number; color?: string; shade?: string }) {
-  return (
-    <g>
-      <rect x={3} y={top} width={w - 6} height={h - top} rx={7} fill={color} />
-      <rect x={w * 0.62} y={top} width={w * 0.38 - 3} height={h - top} rx={7} fill={shade} opacity={0.55} />
-      {[[0.2, 0.55], [0.45, 0.8], [0.7, 0.6], [0.3, 0.85]].map(([fx, fy], i) => (
-        <circle key={i} cx={w * fx} cy={top + (h - top) * fy} r={1.6} fill={shade} opacity={0.8} />
-      ))}
-    </g>
-  );
-}
-
-// 아래쪽 석재 기단
-function StoneBase({ w, h }: { w: number; h: number }) {
-  const out = [];
-  const bh = 12;
-  for (let x = 4, i = 0; x < w - 8; x += 15 + (i % 3) * 3, i++) {
-    const sw = 14 + (i % 3) * 3;
-    out.push(<rect key={x} x={x} y={h - bh + (i % 2) * 2} width={Math.min(sw, w - 5 - x)} height={bh - (i % 2) * 2} rx={4} fill={i % 2 ? STONE : "#c6bba6"} />);
-  }
-  return (
-    <g>
-      <rect x={3} y={h - bh} width={w - 6} height={bh} rx={5} fill={STONE_DARK} />
-      {out}
-    </g>
-  );
-}
-
-function Door({ w, h, dw, dh, color = "#8a5a36" }: { w: number; h: number; dw: number; dh: number; color?: string }) {
-  const x = w / 2 - dw / 2;
-  const y = h - 11 - dh;
+// 앞면의 문 (아치)
+function Door({ cx, h, dw, dh, color }: { cx: number; h: number; dw: number; dh: number; color: string }) {
+  const x = cx - dw / 2;
+  const y = h - dh;
   const r = dw / 2;
   return (
     <g>
-      <path d={`M${x - 4} ${h - 11}V${y + r}A${r + 4} ${r + 4} 0 0 1 ${x + dw + 4} ${y + r}V${h - 11}Z`} fill={FRAME} />
-      <path d={`M${x} ${h - 11}V${y + r}A${r} ${r} 0 0 1 ${x + dw} ${y + r}V${h - 11}Z`} fill={color} />
-      <path d={`M${x + dw / 2} ${y}V${h - 11}`} stroke="#6b4426" strokeWidth={1.3} opacity={0.7} />
-      <path d={`M${x + 3} ${y + r}V${h - 14}`} stroke="#f0c590" strokeWidth={2} strokeLinecap="round" opacity={0.5} />
-      <circle cx={x + dw * 0.78} cy={h - 11 - dh * 0.4} r={2.2} fill="#f3d27a" />
+      <path d={`M${x - 3} ${h}V${y + r}A${r + 3} ${r + 3} 0 0 1 ${x + dw + 3} ${y + r}V${h}Z`} fill={SILL} />
+      <path d={`M${x} ${h}V${y + r}A${r} ${r} 0 0 1 ${x + dw} ${y + r}V${h}Z`} fill={color} />
+      <circle cx={x + dw * 0.76} cy={h - dh * 0.42} r={2} fill={SILL} />
     </g>
   );
 }
 
-// 불 켜진 창
-function Win({ cx, cy, s = 20, box }: { cx: number; cy: number; s?: number; box?: string }) {
+// 앞면 창
+function FrontWin({ cx, cy, s = 18, flower }: { cx: number; cy: number; s?: number; flower?: string }) {
   const x = cx - s / 2;
   const y = cy - s / 2;
   return (
     <g>
-      <circle cx={cx} cy={cy} r={s * 0.95} fill={GLOW} opacity={0.22} />
-      <rect x={x - 3} y={y - 3} width={s + 6} height={s + 6} rx={5} fill={FRAME} />
-      <rect x={x} y={y} width={s} height={s} rx={3} fill={GLOW} />
-      <rect x={x} y={y + s * 0.55} width={s} height={s * 0.45} rx={3} fill="#f6b95a" opacity={0.6} />
-      <path d={`M${cx} ${y}V${y + s}M${x} ${cy}H${x + s}`} stroke={FRAME} strokeWidth={2} />
-      <path d={`M${x + 3} ${y + 7}L${x + 8} ${y + 2.5}`} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" opacity={0.7} />
-      {box && (
+      <rect x={x - 3} y={y - 3} width={s + 6} height={s + 6} rx={6} fill={SILL} />
+      <rect x={x} y={y} width={s} height={s} rx={4} fill={WIN} />
+      <path d={`M${cx} ${y}V${y + s}M${x} ${cy}H${x + s}`} stroke={SILL} strokeWidth={2} />
+      {flower && (
         <g>
-          <rect x={x - 5} y={y + s + 2} width={s + 10} height={7} rx={3} fill="#8a5a36" />
-          {[0.1, 0.3, 0.5, 0.7, 0.9].map((f, i) => (
-            <circle key={i} cx={x - 5 + (s + 10) * f} cy={y + s + 1} r={3.2} fill={i % 2 ? box : "#fff7e0"} />
-          ))}
-          <path d={`M${x - 3} ${y + s + 3}H${x + s + 3}`} stroke="#6f9a52" strokeWidth={3} strokeLinecap="round" />
+          <rect x={x - 3} y={y + s + 1} width={s + 6} height={5} rx={2.5} fill="#9cc08a" />
+          {[0.2, 0.5, 0.8].map((f, i) => <circle key={i} cx={x - 3 + (s + 6) * f} cy={y + s + 1} r={2.6} fill={i === 1 ? "#fffaf0" : flower} />)}
         </g>
       )}
     </g>
   );
 }
 
-// 벽을 타고 오르는 덩굴
-function Ivy({ x, h, top }: { x: number; h: number; top: number }) {
-  const leaves = [];
-  for (let y = h - 14, i = 0; y > top + 6; y -= 8, i++) {
-    leaves.push(<circle key={i} cx={x + Math.sin(i * 1.7) * 3.5} cy={y} r={3.4 + (i % 2)} fill={i % 3 ? "#6f9a52" : "#8fb866"} />);
-  }
-  return <g>{leaves}</g>;
+// 옆면 창 (비스듬한 평행사변형)
+function SideWin({ w, h, z0, z1 }: { w: number; h: number; z0: number; z1: number }) {
+  const fw = w - S;
+  return <polygon points={pts([sidePt(fw, h, 0.28, z0), sidePt(fw, h, 0.72, z0), sidePt(fw, h, 0.72, z1), sidePt(fw, h, 0.28, z1)])} fill={WIN_SIDE} />;
 }
 
-// 기와지붕: 모양 위에 기와 줄무늬를 깔고 처마·이끼·하이라이트를 얹는다.
-function TileRoof({ id, d, base, light, dark, w, top, bottom, rows = 4, moss }: { id: string; d: string; base: string; light: string; dark: string; w: number; top: number; bottom: number; rows?: number; moss?: boolean }) {
-  const cid = `rc-${id}`;
-  const r = 7;
-  const arcs = [];
-  for (let row = 0; row < rows; row++) {
-    const y = top + ((bottom - top) * (row + 1)) / (rows + 0.4);
-    const off = row % 2 ? r : 0;
-    let p = "";
-    for (let x = -12 + off; x < w + 14; x += r * 2) p += `M${x} ${y}q${r} ${r * 1.1} ${r * 2} 0`;
-    arcs.push(<path key={row} d={p} fill="none" stroke={dark} strokeWidth={1.8} opacity={0.55} strokeLinecap="round" />);
-  }
+// 박공지붕: 앞 경사면(평행사변형) + 오른쪽 박공 삼각형 + 용마루 하이라이트 + 처마 그림자
+function Roof({ w, bt, rh, tone, over = 6 }: { w: number; bt: number; rh: number; tone: Tone; over?: number }) {
+  const fw = w - S;
+  const L: [number, number] = [-over, bt];
+  const R: [number, number] = [fw + over, bt];
+  const RR: [number, number] = [fw + over + S / 2, bt - DY / 2 - rh];
+  const LL: [number, number] = [-over + S / 2, bt - DY / 2 - rh];
+  const B: [number, number] = [fw + over + S, bt - DY];
   return (
     <g>
-      <clipPath id={cid}>
-        <path d={d} />
-      </clipPath>
-      <path d={d} transform="translate(0 7)" fill={dark} />
-      <path d={d} fill={base} />
-      <g clipPath={`url(#${cid})`}>
-        <rect x={-14} y={top - 4} width={w + 28} height={(bottom - top) * 0.34} fill={light} opacity={0.45} />
-        {arcs}
-        {moss && [[0.2, 0.72], [0.34, 0.8], [0.72, 0.7], [0.82, 0.78]].map(([fx, fy], i) => <circle key={i} cx={w * fx} cy={top + (bottom - top) * fy} r={4.5} fill="#7fa457" opacity={0.65} />)}
-      </g>
-      <path d={d} fill="none" stroke={dark} strokeWidth={1.6} opacity={0.5} strokeLinejoin="round" />
+      <polygon points={pts([[-over + 2, bt + 6], [fw + over - 2, bt + 6], [fw + over - 2, bt + 1], [-over + 2, bt + 1]])} fill="#000" opacity={0.08} />
+      <polygon points={pts([R, B, RR])} fill={tone.roofS} />
+      <polygon points={pts([L, R, RR, LL])} fill={tone.roofF} />
+      <polygon points={pts([LL, RR, [RR[0], RR[1] + 5], [LL[0], LL[1] + 5]])} fill="#fff" opacity={0.4} />
+      <polygon points={pts([L, R, [R[0], R[1] - 4], [L[0], L[1] - 4]])} fill="#000" opacity={0.06} />
     </g>
   );
 }
 
-function Smoke({ x, y }: { x: number; y: number }) {
-  return (
-    <g fill="#fff" opacity={0.7}>
-      <circle cx={x} cy={y - 6} r={5} />
-      <circle cx={x + 5} cy={y - 15} r={6.5} opacity={0.75} />
-      <circle cx={x + 3} cy={y - 26} r={8} opacity={0.55} />
-    </g>
-  );
-}
-
-function Cafe({ w, h, id }: ArtProps) {
-  const bt = h * 0.4;
-  const dw = Math.max(30, w * 0.26);
-  const dh = h * 0.46;
-  const doorTop = h - 11 - dh;
-  const strip = dw / 3;
-  const roof = `M-9 ${bt + 6} Q${w * 0.12} ${bt * 0.45} ${w * 0.32} -4 Q${w / 2} -10 ${w * 0.68} -4 Q${w * 0.88} ${bt * 0.45} ${w + 9} ${bt + 6} Q${w / 2} ${bt + 12} -9 ${bt + 6}Z`;
-  return (
-    <>
-      <WoodWall w={w} h={h} top={bt} />
-      <StoneBase w={w} h={h} />
-      <Ivy x={w - 10} h={h} top={bt} />
-      <Win cx={w * 0.8} cy={h * 0.66} s={18} box="#f08aa5" />
-      {/* 찻집 간판 */}
-      <path d={`M${w * 0.17} ${bt + 4}V${bt + 12}`} stroke={FRAME} strokeWidth={2} />
-      <rect x={w * 0.17 - 12} y={bt + 12} width={24} height={22} rx={6} fill="#f6e7c8" stroke={FRAME} strokeWidth={2.2} />
-      <text x={w * 0.17} y={bt + 28} textAnchor="middle" fontSize={15} fontWeight={900} fill="#5c7a3c">茶</text>
-      <Door w={w} h={h} dw={dw} dh={dh} />
-      <rect x={w / 2 - dw / 2 - 6} y={doorTop - 2} width={dw + 12} height={4} rx={2} fill={FRAME} />
-      {[0, 1, 2].map((i) => {
-        const x = w / 2 - dw / 2 + i * strip + 1;
-        const bw = strip - 2;
-        const bh = dh * 0.58;
-        return <path key={i} d={`M${x} ${doorTop + 2}H${x + bw}V${doorTop + bh}L${x + bw / 2} ${doorTop + bh - 6}L${x} ${doorTop + bh}Z`} fill={i === 1 ? "#8fb866" : "#7da85a"} stroke="#5c7a3c" strokeWidth={1.2} strokeLinejoin="round" />;
-      })}
-      <rect x={w * 0.66} y={-12} width={13} height={bt * 0.7} rx={2} fill={STONE} />
-      <Smoke x={w * 0.66 + 6} y={-12} />
-      <TileRoof id={`${id}r`} d={roof} base="#c9694a" light="#e08d6b" dark="#9a4d35" w={w} top={-8} bottom={bt + 6} rows={4} moss />
-    </>
-  );
-}
-
-function Shop({ w, h, id }: ArtProps) {
-  const bt = h * 0.28;
-  const ah = h * 0.28;
-  const n = 8;
-  const total = w + 12;
-  const sw = total / n;
-  const dw = Math.max(28, w * 0.22);
-  const roof = `M-8 ${bt} Q${w * 0.2} ${bt * 0.3} ${w / 2} -4 Q${w * 0.8} ${bt * 0.3} ${w + 8} ${bt} Q${w / 2} ${bt + 5} -8 ${bt}Z`;
-  return (
-    <>
-      <PlasterWall w={w} h={h} top={bt} />
-      <StoneBase w={w} h={h} />
-      <Win cx={w * 0.2} cy={h * 0.7} s={22} />
-      <Win cx={w * 0.8} cy={h * 0.7} s={22} />
-      <Door w={w} h={h} dw={dw} dh={h * 0.46} color="#5f8f9e" />
-      {/* 과일 상자 */}
-      <rect x={w * 0.8 - 2} y={h - 24} width={24} height={13} rx={3} fill="#a97a4a" />
-      {[0, 1, 2].map((i) => <circle key={i} cx={w * 0.8 + 5 + i * 7} cy={h - 25} r={4.2} fill={["#e8694f", "#f2b84b", "#8fb866"][i]} />)}
-      <rect x={-3} y={bt + ah - 2} width={w + 6} height={11} rx={5} fill="rgba(60,40,25,0.2)" />
-      {/* 줄무늬 차양 */}
-      {Array.from({ length: n }, (_, i) => {
-        const x = -6 + i * sw;
-        return <path key={i} d={`M${x} ${bt}H${x + sw}V${bt + ah}A${sw / 2} ${sw / 2} 0 0 1 ${x} ${bt + ah}Z`} fill={i % 2 === 0 ? "#d9604c" : "#fbf0d8"} stroke="#a64a3a" strokeWidth={1} strokeOpacity={0.4} />;
-      })}
-      <TileRoof id={`${id}r`} d={roof} base="#b8573f" light="#d77d5e" dark="#8f3f2c" w={w} top={-4} bottom={bt} rows={2} />
-    </>
-  );
-}
-
-function Hall({ w, h, id }: ArtProps) {
+function Cafe({ w, h }: ArtProps) {
+  const t: Tone = { front: "#f7ebd8", side: "#e5d0b4", roofF: "#e2a3a3", roofS: "#cd8886", door: "#93b99a" };
   const bt = h * 0.42;
-  const dw = Math.max(34, w * 0.2);
-  const roof = `M-12 ${bt + 6} Q${w * 0.08} ${bt - 2} ${w * 0.22} 8 H${w * 0.78} Q${w * 0.92} ${bt - 2} ${w + 12} ${bt + 6} Q${w / 2} ${bt + 16} -12 ${bt + 6}Z`;
+  const fw = w - S;
+  const dw = Math.max(26, fw * 0.24);
+  const dh = h * 0.44;
+  const strip = dw / 3;
   return (
     <>
-      <PlasterWall w={w} h={h} top={bt} />
-      {/* 목조 뼈대 */}
-      {[0.06, 0.34, 0.66, 0.94].map((f, i) => <path key={i} d={`M${w * f} ${bt + 4}V${h - 12}`} stroke="#8a5a36" strokeWidth={3} strokeLinecap="round" />)}
-      <path d={`M5 ${bt + 5}H${w - 5}`} stroke="#8a5a36" strokeWidth={3} />
-      <StoneBase w={w} h={h} />
-      <Win cx={w * 0.2} cy={h * 0.7} s={20} box="#f2b84b" />
-      <Win cx={w * 0.8} cy={h * 0.7} s={20} box="#f2b84b" />
-      <Door w={w} h={h} dw={dw} dh={h * 0.44} />
-      <TileRoof id={`${id}r`} d={roof} base="#6f918f" light="#9ec0b4" dark="#4f726f" w={w} top={6} bottom={bt + 6} rows={4} moss />
-      {/* 시계 */}
-      <circle cx={w / 2} cy={bt * 0.5} r={9} fill="#f6e7c8" stroke={FRAME} strokeWidth={2.2} />
-      <path d={`M${w / 2} ${bt * 0.5 - 5}V${bt * 0.5}L${w / 2 + 4} ${bt * 0.5 + 2}`} stroke={FRAME} strokeWidth={1.6} fill="none" strokeLinecap="round" />
-      {[0.22, 0.78].map((f, i) => <circle key={i} cx={w * f} cy={7} r={5} fill="#d4a45a" />)}
+      <GroundShadow w={w} h={h} />
+      <Block w={w} h={h} bt={bt} tone={t} />
+      <FrontWin cx={fw * 0.82} cy={h * 0.68} flower="#e6a6a9" />
+      <circle cx={fw * 0.17} cy={h * 0.66} r={12} fill={SILL} />
+      <circle cx={fw * 0.17} cy={h * 0.66} r={9} fill="#c4dcb4" />
+      <text x={fw * 0.17} y={h * 0.66 + 4.5} textAnchor="middle" fontSize={12} fontWeight={900} fill="#4f6f3c">茶</text>
+      <Door cx={fw / 2} h={h} dw={dw} dh={dh} color={t.door} />
+      <rect x={fw / 2 - dw / 2 - 5} y={h - dh - 2} width={dw + 10} height={4} rx={2} fill="#c09c72" />
+      {[0, 1, 2].map((i) => {
+        const x = fw / 2 - dw / 2 + i * strip + 1;
+        const bw = strip - 2;
+        const bh = dh * 0.5;
+        return <path key={i} d={`M${x} ${h - dh + 2}H${x + bw}V${h - dh + bh}L${x + bw / 2} ${h - dh + bh - 5}L${x} ${h - dh + bh}Z`} fill="#9cc08a" />;
+      })}
+      <SideWin w={w} h={h} z0={h * 0.3} z1={h * 0.52} />
+      <Roof w={w} bt={bt} rh={22} tone={t} />
     </>
   );
 }
 
-function Learning({ w, h, id }: ArtProps) {
-  const bt = h * 0.4;
-  const dw = Math.max(28, w * 0.22);
-  const dh = h * 0.4;
-  const by = h - 11 - dh - 14;
-  const roof = `M-9 ${bt + 6} Q${w * 0.25} ${bt * 0.55} ${w / 2} -8 Q${w * 0.75} ${bt * 0.55} ${w + 9} ${bt + 6} Q${w / 2} ${bt + 12} -9 ${bt + 6}Z`;
+function Shop({ w, h }: ArtProps) {
+  const t: Tone = { front: "#f7ebd8", side: "#e5d0b4", roofF: "#9ec0c6", roofS: "#84aab0", door: "#9ec0c6" };
+  const bt = h * 0.32;
+  const fw = w - S;
+  const ah = h * 0.24;
+  const n = 7;
+  const sw = (fw + 8) / n;
+  const dw = Math.max(26, fw * 0.2);
   return (
     <>
-      <WoodWall w={w} h={h} top={bt} />
-      <StoneBase w={w} h={h} />
-      <Ivy x={10} h={h} top={bt} />
-      <Win cx={w * 0.2} cy={h * 0.67} s={17} box="#f08aa5" />
-      <Win cx={w * 0.8} cy={h * 0.67} s={17} />
-      <Door w={w} h={h} dw={dw} dh={dh} />
-      {/* 펼친 책 간판 */}
-      <rect x={w / 2 - 20} y={by - 10} width={40} height={22} rx={7} fill="#f6e7c8" stroke={FRAME} strokeWidth={2} />
-      <path d={`M${w / 2} ${by - 3} Q${w / 2 - 7} ${by - 7} ${w / 2 - 14} ${by - 4} V${by + 6} Q${w / 2 - 7} ${by + 3} ${w / 2} ${by + 8}Z M${w / 2} ${by - 3} Q${w / 2 + 7} ${by - 7} ${w / 2 + 14} ${by - 4} V${by + 6} Q${w / 2 + 7} ${by + 3} ${w / 2} ${by + 8}Z`} fill="#fff" stroke="#5f8f9e" strokeWidth={1.6} strokeLinejoin="round" />
-      <TileRoof id={`${id}r`} d={roof} base="#5f9aa8" light="#8cc3c8" dark="#437580" w={w} top={-8} bottom={bt + 6} rows={4} moss />
+      <GroundShadow w={w} h={h} />
+      <Block w={w} h={h} bt={bt} tone={t} />
+      <FrontWin cx={fw * 0.2} cy={h * 0.7} s={20} />
+      <FrontWin cx={fw * 0.8} cy={h * 0.7} s={20} />
+      <Door cx={fw / 2} h={h} dw={dw} dh={h * 0.44} color={t.door} />
+      <SideWin w={w} h={h} z0={h * 0.3} z1={h * 0.52} />
+      <rect x={-2} y={bt + ah - 1} width={fw + 4} height={9} rx={4} fill="#000" opacity={0.07} />
+      {Array.from({ length: n }, (_, i) => {
+        const x = -4 + i * sw;
+        return <path key={i} d={`M${x} ${bt}H${x + sw}V${bt + ah}A${sw / 2} ${sw / 2} 0 0 1 ${x} ${bt + ah}Z`} fill={i % 2 === 0 ? "#ecb8b8" : "#fffaf0"} />;
+      })}
+      <Roof w={w} bt={bt} rh={14} tone={t} over={5} />
+    </>
+  );
+}
+
+function Hall({ w, h }: ArtProps) {
+  const t: Tone = { front: "#f7ebd8", side: "#e5d0b4", roofF: "#b9aec9", roofS: "#a79bb8", door: "#c09c72" };
+  const bt = h * 0.42;
+  const fw = w - S;
+  const dw = Math.max(30, fw * 0.2);
+  return (
+    <>
+      <GroundShadow w={w} h={h} />
+      <Block w={w} h={h} bt={bt} tone={t} />
+      <FrontWin cx={fw * 0.2} cy={h * 0.7} s={20} />
+      <FrontWin cx={fw * 0.8} cy={h * 0.7} s={20} />
+      <Door cx={fw / 2} h={h} dw={dw} dh={h * 0.42} color={t.door} />
+      <SideWin w={w} h={h} z0={h * 0.3} z1={h * 0.52} />
+      <Roof w={w} bt={bt} rh={24} tone={t} over={8} />
+      <circle cx={fw / 2 + 4} cy={bt - 11} r={8} fill={SILL} />
+      <path d={`M${fw / 2 + 4} ${bt - 16}V${bt - 11}L${fw / 2 + 8} ${bt - 9}`} stroke="#8a7a6e" strokeWidth={1.8} fill="none" strokeLinecap="round" />
+    </>
+  );
+}
+
+function Learning({ w, h }: ArtProps) {
+  const t: Tone = { front: "#f7ebd8", side: "#e5d0b4", roofF: "#a9c6cb", roofS: "#8fb5bd", door: "#c09c72" };
+  const bt = h * 0.42;
+  const fw = w - S;
+  const dw = Math.max(26, fw * 0.22);
+  const dh = h * 0.4;
+  const by = h - dh - 12;
+  return (
+    <>
+      <GroundShadow w={w} h={h} />
+      <Block w={w} h={h} bt={bt} tone={t} />
+      <FrontWin cx={fw * 0.2} cy={h * 0.68} s={16} flower="#e6a6a9" />
+      <FrontWin cx={fw * 0.8} cy={h * 0.68} s={16} />
+      <Door cx={fw / 2} h={h} dw={dw} dh={dh} color={t.door} />
+      <rect x={fw / 2 - 18} y={by - 9} width={36} height={19} rx={9} fill={SILL} />
+      <path d={`M${fw / 2} ${by - 3}Q${fw / 2 - 7} ${by - 6} ${fw / 2 - 13} ${by - 4}V${by + 5}Q${fw / 2 - 7} ${by + 3} ${fw / 2} ${by + 7}Z M${fw / 2} ${by - 3}Q${fw / 2 + 7} ${by - 6} ${fw / 2 + 13} ${by - 4}V${by + 5}Q${fw / 2 + 7} ${by + 3} ${fw / 2} ${by + 7}Z`} fill="#a9c6cb" />
+      <SideWin w={w} h={h} z0={h * 0.3} z1={h * 0.52} />
+      <Roof w={w} bt={bt} rh={20} tone={t} />
     </>
   );
 }
 
 function Heart({ cx, cy, s }: { cx: number; cy: number; s: number }) {
-  return (
-    <g>
-      <path d={`M${cx} ${cy + s * 0.9} C${cx - s * 1.6} ${cy - s * 0.2} ${cx - s * 0.6} ${cy - s * 1.2} ${cx} ${cy - s * 0.3} C${cx + s * 0.6} ${cy - s * 1.2} ${cx + s * 1.6} ${cy - s * 0.2} ${cx} ${cy + s * 0.9}Z`} fill="#e0525e" />
-      <circle cx={cx - s * 0.6} cy={cy - s * 0.3} r={s * 0.22} fill="#fff" opacity={0.8} />
-    </g>
-  );
+  return <path d={`M${cx} ${cy + s * 0.9} C${cx - s * 1.6} ${cy - s * 0.2} ${cx - s * 0.6} ${cy - s * 1.2} ${cx} ${cy - s * 0.3} C${cx + s * 0.6} ${cy - s * 1.2} ${cx + s * 1.6} ${cy - s * 0.2} ${cx} ${cy + s * 0.9}Z`} fill="#e08a90" />;
 }
 
-function Home({ w, h, id }: ArtProps) {
-  const bt = h * 0.4;
-  const dw = Math.max(28, w * 0.24);
-  const dh = h * 0.44;
-  const roof = `M-9 ${bt + 6} Q${w * 0.25} ${bt * 0.55} ${w / 2} -8 Q${w * 0.75} ${bt * 0.55} ${w + 9} ${bt + 6} Q${w / 2} ${bt + 12} -9 ${bt + 6}Z`;
+function Home({ w, h }: ArtProps) {
+  const t: Tone = { front: "#f8e2e0", side: "#ecc3c4", roofF: "#ecb8b8", roofS: "#dc9ea0", door: "#fffaf0" };
+  const bt = h * 0.42;
+  const fw = w - S;
+  const dw = Math.max(26, fw * 0.24);
+  const dh = h * 0.42;
   return (
     <>
-      <PlasterWall w={w} h={h} top={bt} color="#f8dccb" shade="#e8b9a4" />
-      <StoneBase w={w} h={h} />
-      <rect x={w * 0.68} y={-8} width={14} height={bt * 0.75} rx={2} fill={STONE} />
-      <Smoke x={w * 0.68 + 7} y={-8} />
-      <Win cx={w * 0.2} cy={h * 0.67} s={17} box="#f08aa5" />
-      <Win cx={w * 0.8} cy={h * 0.67} s={17} box="#f08aa5" />
-      <Door w={w} h={h} dw={dw} dh={dh} color="#f6e7c8" />
-      <Heart cx={w / 2} cy={h - 11 - dh * 0.48} s={7} />
-      <TileRoof id={`${id}r`} d={roof} base="#c9675f" light="#e38d80" dark="#9a4440" w={w} top={-8} bottom={bt + 6} rows={4} />
+      <GroundShadow w={w} h={h} />
+      <Block w={w} h={h} bt={bt} tone={t} />
+      <FrontWin cx={fw * 0.2} cy={h * 0.68} s={16} flower="#e08a90" />
+      <FrontWin cx={fw * 0.8} cy={h * 0.68} s={16} flower="#e08a90" />
+      <Door cx={fw / 2} h={h} dw={dw} dh={dh} color={t.door} />
+      <Heart cx={fw / 2} cy={h - dh * 0.48} s={6.5} />
+      <SideWin w={w} h={h} z0={h * 0.3} z1={h * 0.52} />
+      <rect x={fw * 0.62} y={bt - 30} width={13} height={22} rx={3} fill="#dc9ea0" />
+      <Roof w={w} bt={bt} rh={20} tone={t} />
     </>
   );
 }
 
-export function BuildingArt({ kind, w, h }: { kind?: InteriorKind; w: number; h: number }) {
+export function BuildingArt({ kind, w, h }: { kind?: InteriorKind } & ArtProps) {
   const Art = kind === "cafe" ? Cafe : kind === "shop" ? Shop : kind === "hall" ? Hall : kind === "home" ? Home : Learning;
-  const id = `${kind ?? "learning"}-${w}-${h}`;
   return (
     <svg
       width={w}
@@ -297,24 +236,7 @@ export function BuildingArt({ kind, w, h }: { kind?: InteriorKind; w: number; h:
       aria-hidden="true"
       style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }}
     >
-      <defs>
-        <filter id="gh-blur" x="-20%" y="-60%" width="140%" height="220%">
-          <feGaussianBlur stdDeviation="4" />
-        </filter>
-        {/* 손그림 느낌: 가장자리를 살짝 일렁이게 + 종이 질감을 입힌다 */}
-        <filter id="gh-paint" x="-8%" y="-12%" width="116%" height="124%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="3" result="warp" />
-          <feDisplacementMap in="SourceGraphic" in2="warp" scale="3.2" result="wob" />
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="8" result="grain" />
-          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0.35  0 0 0 0 0.24  0 0 0 0 0.12  0 0 0 -0.9 0.55" result="grainTint" />
-          <feComposite in="grainTint" in2="wob" operator="in" result="grainIn" />
-          <feBlend in="grainIn" in2="wob" mode="multiply" />
-        </filter>
-      </defs>
-      <GroundShadow w={w} h={h} />
-      <g filter="url(#gh-paint)">
-        <Art w={w} h={h} id={id} />
-      </g>
+      <Art w={w} h={h} />
     </svg>
   );
 }
