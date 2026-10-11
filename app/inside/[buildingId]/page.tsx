@@ -17,7 +17,7 @@ import {
   makeHomeBuilding,
 } from "../../home";
 import { CHAR_SIZE, isNearRect, rectsOverlap, useWalker } from "@/lib/walk";
-import { getVillager } from "@/lib/villager";
+import { VILLAGERS, getVillager } from "@/lib/villager";
 import {
   loadFromStorage,
   loadHomeFurniture,
@@ -89,7 +89,19 @@ function RoomView({ building }: { building: Building }) {
     [room, resident, residentRect, npcRects]
   );
 
-  const [chatOpen, setChatOpen] = useState(false);
+  // 대화 가능한 사람들: 건물 담당 주민 + 방 안의 직원·손님·학생(주민 목록에 등록된 사람). 가까이 가면 대화할 수 있다.
+  const talkables = useMemo(() => {
+    const list: { id: string; name: string; x: number; y: number }[] = [];
+    if (resident && residentId) list.push({ id: residentId, name: resident.name, x: residentRect.x, y: residentRect.y });
+    room.npcs.forEach((n) => {
+      const v = VILLAGERS[n.id];
+      if (v) list.push({ id: n.id, name: v.name, x: n.x, y: n.y });
+    });
+    return list;
+  }, [resident, residentId, residentRect, room]);
+  // 지금 대화 중인 주민 id (없으면 대화창 닫힘)
+  const [chatWith, setChatWith] = useState<string | null>(null);
+  const chatOpen = chatWith !== null;
   // 꾸미기 모드(내 집만). 켜져 있으면 캐릭터 이동을 멈추고 클릭으로 가구를 옮긴다.
   const [decorating, setDecorating] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -103,16 +115,19 @@ function RoomView({ building }: { building: Building }) {
     paused: chatOpen || decorating,
   });
 
-  const isNearResident =
-    !!resident && isNearRect(position.x, position.y, residentRect, INTERACTION_MARGIN);
-  const nearResidentRef = useRef(false);
+  // 가장 가까운 대화 가능한 사람
+  const nearTalk =
+    talkables
+      .filter((t) => isNearRect(position.x, position.y, { x: t.x, y: t.y, width: CHAR_SIZE, height: CHAR_SIZE }, INTERACTION_MARGIN))
+      .sort((a, b) => Math.hypot(a.x - position.x, a.y - position.y) - Math.hypot(b.x - position.x, b.y - position.y))[0] ?? null;
+  const nearTalkRef = useRef<string | null>(null);
   const chatOpenRef = useRef(false);
   const leavingRef = useRef(false);
   const decoratingRef = useRef(false);
 
   useEffect(() => {
-    nearResidentRef.current = isNearResident;
-  }, [isNearResident]);
+    nearTalkRef.current = nearTalk?.id ?? null;
+  }, [nearTalk?.id]);
   useEffect(() => {
     chatOpenRef.current = chatOpen;
   }, [chatOpen]);
@@ -217,9 +232,9 @@ function RoomView({ building }: { building: Building }) {
     function handleKeyDown(e: KeyboardEvent) {
       if (chatOpenRef.current) return;
       const key = e.key.toLowerCase();
-      if ((key === "enter" || key === " ") && nearResidentRef.current) {
+      if ((key === "enter" || key === " ") && nearTalkRef.current) {
         e.preventDefault();
-        setChatOpen(true);
+        setChatWith(nearTalkRef.current);
       } else if (key === "escape") {
         // 꾸미기 중 Esc는 방을 나가지 않고 꾸미기만 끈다.
         if (decoratingRef.current) stopDecorating();
@@ -245,7 +260,8 @@ function RoomView({ building }: { building: Building }) {
           residentRect={resident ? residentRect : null}
           residentId={resident ? residentId : null}
           residentName={resident ? resident.name : null}
-          nearResident={isNearResident}
+          npcNames={Object.fromEntries(room.npcs.filter((n) => VILLAGERS[n.id]).map((n) => [n.id, VILLAGERS[n.id].name]))}
+          hintAt={nearTalk ? { x: nearTalk.x + CHAR_SIZE / 2, z: nearTalk.y + CHAR_SIZE / 2 } : null}
           decorating={decorating}
           onFloorPoint={(pt, type) => (type === "click" ? pt && handleRoomClick(pt) : setHover(pt))}
         />
@@ -306,8 +322,8 @@ function RoomView({ building }: { building: Building }) {
             ))}
           </div>
         </div>
-      ) : isNearResident ? (
-        <p className={townStyles.interactionBanner}>Enter 또는 Space로 대화하기</p>
+      ) : nearTalk ? (
+        <p className={townStyles.interactionBanner}>Enter 또는 Space로 {nearTalk.name}와 대화하기</p>
       ) : (
         <p className={townStyles.hint}>
           방향키 또는 WASD로 걸어 다니세요. 아래쪽 문으로 가거나 Esc를 누르면 나갑니다.
@@ -316,9 +332,9 @@ function RoomView({ building }: { building: Building }) {
       )}
       </div>
 
-      {chatOpen && residentId && (
+      {chatWith && (
         <div className={townStyles.chatOverlay}>
-          <ChatPanel villagerId={residentId} onClose={() => setChatOpen(false)} />
+          <ChatPanel villagerId={chatWith} onClose={() => setChatWith(null)} />
         </div>
       )}
     </div>
