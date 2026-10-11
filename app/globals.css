@@ -628,3 +628,55 @@ a {
     max-width: 88%;
   }
 }
+
+/* ───────── 대화창은 단순하게: 테두리 대신 면 색으로만 구분한다 ───────── */
+.modalPage {
+  border: none;
+}
+
+.modalPage .header {
+  border-bottom: none;
+}
+
+.modalPage .pill,
+.modalPage .navLink,
+.modalPage .closeButton {
+  border-color: transparent;
+}
+
+.bubbleVillager,
+.bubbleUser {
+  border: none;
+  padding: 11px 15px;
+}
+
+.bubbleUser {
+  background: var(--matcha-soft);
+}
+
+.bubbleVillager {
+  background: var(--white);
+  box-shadow: 0 1px 0 rgba(90, 64, 52, 0.08);
+}
+
+.modalPage .translationText {
+  border-top: 1px solid var(--cream-deep);
+}
+
+.modalPage .inputBar {
+  border-top: none;
+  background: var(--cream-deep);
+}
+
+.modalPage .textInput,
+.modalPage .micButton {
+  border-color: transparent;
+}
+
+.modalPage .sendButton {
+  border-color: transparent;
+}
+
+.wordPopupButton {
+  border-color: transparent;
+}
