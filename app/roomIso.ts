@@ -8,7 +8,7 @@ import type { P2 } from "./iso";
 
 export const ROOM_K = 1;
 export const ROOM_SCALE = ROOM_K / 0.6; // 가구·벽 높이 배율(마을과 같은 규칙)
-export const WALL_Z = 150; // 벽 높이
+export const WALL_Z = 190; // 벽 높이
 const MARGIN = 56;
 export const FLOOR_SLAB = 16;
 

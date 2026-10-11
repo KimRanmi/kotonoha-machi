@@ -248,9 +248,9 @@ function RoomView({ building }: { building: Building }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const fit = Math.min(1.15, (view.w - 24) / iso.stageWidth, (view.h - 190) / iso.stageHeight);
+  const fit = Math.min(1.7, (view.w - 16) / iso.stageWidth, (view.h - 110) / iso.stageHeight);
   const stageLeft = (view.w - iso.stageWidth * fit) / 2;
-  const stageTop = Math.max(64, (view.h - iso.stageHeight * fit) / 2 - 10);
+  const stageTop = Math.max(52, (view.h - iso.stageHeight * fit) / 2 - 8);
 
   const ghostRect = decorating && selectedItem && hover ? targetRect(selectedItem, hover) : null;
   const [resPx, resPy] = resident ? iso.project(residentRect.x + CHAR_SIZE / 2, residentRect.y + CHAR_SIZE / 2, 0) : [0, 0];

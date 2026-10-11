@@ -40,8 +40,15 @@ export interface Room {
   furniture: Furniture[];
 }
 
-const ROOM_W = 640;
-const ROOM_H = 480;
+// 방 크기. 캐릭터(CHAR_SIZE)는 그대로라서 방이 커질수록 상대적으로 넓은 공간이 된다.
+// 아래 템플릿의 좌표는 예전 기준(640x480)으로 적혀 있고, baseRoom이 ROOM_SCALE만큼 키워서 쓴다.
+export const ROOM_SCALE = 1.25;
+const ROOM_W = 640 * ROOM_SCALE;
+const ROOM_H = 480 * ROOM_SCALE;
+
+export function scaleFurniture(list: Furniture[]): Furniture[] {
+  return list.map((f) => ({ ...f, x: f.x * ROOM_SCALE, y: f.y * ROOM_SCALE, width: f.width * ROOM_SCALE, height: f.height * ROOM_SCALE }));
+}
 
 // 모든 템플릿이 공유하는 뼈대: 같은 크기, 아래쪽 가운데 문, 문 바로 위 스폰.
 function baseRoom(
@@ -55,13 +62,13 @@ function baseRoom(
     id,
     width: ROOM_W,
     height: ROOM_H,
-    wallHeight: 80,
+    wallHeight: 80 * ROOM_SCALE,
     floorColor,
     wallColor,
-    door: { x: ROOM_W / 2 - 40, y: ROOM_H - 16, width: 80, height: 16 },
-    spawn: { x: ROOM_W / 2 - 16, y: ROOM_H - 96 },
-    residentSpot,
-    furniture,
+    door: { x: ROOM_W / 2 - 50, y: ROOM_H - 20, width: 100, height: 20 },
+    spawn: { x: ROOM_W / 2 - 16, y: ROOM_H - 120 },
+    residentSpot: { x: residentSpot.x * ROOM_SCALE, y: residentSpot.y * ROOM_SCALE },
+    furniture: scaleFurniture(furniture),
   };
 }
 
