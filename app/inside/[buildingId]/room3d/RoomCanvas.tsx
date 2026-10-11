@@ -32,7 +32,8 @@ export default function RoomCanvas({
   residentRect,
   residentId,
   residentName,
-  nearResident,
+  npcNames,
+  hintAt,
   decorating,
   onFloorPoint,
 }: {
@@ -44,7 +45,8 @@ export default function RoomCanvas({
   residentRect: { x: number; y: number } | null;
   residentId: string | null;
   residentName: string | null;
-  nearResident: boolean;
+  npcNames: Record<string, string>;
+  hintAt: { x: number; z: number } | null;
   decorating: boolean;
   onFloorPoint: (pt: { x: number; y: number } | null, type: "click" | "move") => void;
 }) {
@@ -54,10 +56,10 @@ export default function RoomCanvas({
   const doorRef = useRef<HTMLDivElement>(null);
 
   // 최신 props를 렌더 루프/이벤트에서 읽기 위한 ref
-  const live = useRef({ position, nearResident, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture });
+  const live = useRef({ position, hintAt, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture });
   const apiRef = useRef<{ dirty: () => void; rebuildFurniture: () => void; updateOverlay: () => void } | null>(null);
   useEffect(() => {
-    live.current = { position, nearResident, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture };
+    live.current = { position, hintAt, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture };
     apiRef.current?.updateOverlay();
     apiRef.current?.dirty();
   });
@@ -159,10 +161,11 @@ export default function RoomCanvas({
       grp.add(shadowBlob(), rig.root);
       grp.position.set(n.x + CHAR_SIZE / 2, 0, n.y + CHAR_SIZE / 2);
       scene.add(grp);
-      if (n.label) {
+      const text = npcNames[n.id] ?? n.label;
+      if (text) {
         const el = document.createElement("div");
         el.className = "roomLabel";
-        el.textContent = n.label;
+        el.textContent = text;
         host.appendChild(el);
         npcLabels.push({ el, x: n.x + CHAR_SIZE / 2, z: n.y + CHAR_SIZE / 2 });
       }
@@ -223,7 +226,11 @@ export default function RoomCanvas({
         const rx = l.residentRect.x + CHAR_SIZE / 2;
         const rz = l.residentRect.y + CHAR_SIZE / 2;
         place(nameRef.current, rx, -2, rz, true);
-        place(hintRef.current, rx, 70, rz, l.nearResident);
+      }
+      if (hintRef.current) {
+        const h = l.hintAt;
+        if (h) place(hintRef.current, h.x, 80, h.z, true);
+        else hintRef.current.style.display = "none";
       }
       npcLabels.forEach((l) => place(l.el, l.x, -2, l.z, true));
       place(doorRef.current, room.door.x + room.door.width / 2, 2, H - 6, true);
@@ -263,9 +270,6 @@ export default function RoomCanvas({
       last = now;
       const l = live.current;
       const goal = new THREE.Vector3(l.position.x + CHAR_SIZE / 2, 20, l.position.y + CHAR_SIZE / 2);
-      // 카메라가 방 가장자리 밖을 너무 보지 않게 방 안쪽으로 살짝 묶는다
-      goal.x = THREE.MathUtils.clamp(goal.x, W * 0.12, W * 0.88);
-      goal.z = THREE.MathUtils.clamp(goal.z, wh + 40, H - 20);
       if (!focusInit) {
         focus.copy(goal);
         focusInit = true;
@@ -366,15 +370,13 @@ export default function RoomCanvas({
   return (
     <div ref={hostRef} style={{ position: "absolute", inset: 0, cursor: decorating ? "crosshair" : undefined }}>
       {residentName && (
-        <>
-          <div ref={nameRef} className="roomLabel">
-            {residentName}
-          </div>
-          <div ref={hintRef} className="roomHint">
-            💬
-          </div>
-        </>
+        <div ref={nameRef} className="roomLabel">
+          {residentName}
+        </div>
       )}
+      <div ref={hintRef} className="roomHint">
+        💬
+      </div>
       <div ref={doorRef} className="roomDoorTag">
         문
       </div>
