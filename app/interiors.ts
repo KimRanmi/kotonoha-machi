@@ -23,6 +23,18 @@ export interface Furniture {
   movable?: boolean;
 }
 
+// 방 안의 사람(주인 말고 직원·손님·학생 등). 이동 판정에서는 주민처럼 통과할 수 없고,
+// 대화는 건물 담당 주민(residentSpot)과만 한다. look은 app/character3d.ts의 모습 키.
+// 좌표는 아래 템플릿과 같은 예전 기준(640x480)이고 baseRoom이 ROOM_SCALE만큼 키운다.
+export interface RoomNpc {
+  id: string;
+  look: string;
+  x: number;
+  y: number;
+  facing?: number; // 라디안, 0 = 화면 아래쪽(+Y) 방향
+  label?: string; // 머리 위 이름표(없으면 표시하지 않음)
+}
+
 export interface Room {
   id: string;
   width: number;
@@ -38,6 +50,7 @@ export interface Room {
   // 주민이 서는 자리(캐릭터 좌상단 기준). 주민이 없는 방이면 무시된다.
   residentSpot: { x: number; y: number };
   furniture: Furniture[];
+  npcs: RoomNpc[];
 }
 
 // 방 크기. 캐릭터(CHAR_SIZE)는 그대로라서 방이 커질수록 상대적으로 넓은 공간이 된다.
@@ -56,7 +69,8 @@ function baseRoom(
   floorColor: string,
   wallColor: string,
   residentSpot: { x: number; y: number },
-  furniture: Furniture[]
+  furniture: Furniture[],
+  npcs: RoomNpc[] = []
 ): Room {
   return {
     id,
@@ -69,6 +83,7 @@ function baseRoom(
     spawn: { x: ROOM_W / 2 - 16, y: ROOM_H - 120 },
     residentSpot: { x: residentSpot.x * ROOM_SCALE, y: residentSpot.y * ROOM_SCALE },
     furniture: scaleFurniture(furniture),
+    npcs: npcs.map((n) => ({ ...n, x: n.x * ROOM_SCALE, y: n.y * ROOM_SCALE })),
   };
 }
 
@@ -80,6 +95,11 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
     { id: "table1", x: 380, y: 200, width: 64, height: 64, shape: "round", color: "#b98a5a", ...fixed },
     { id: "table2", x: 500, y: 310, width: 64, height: 64, shape: "round", color: "#b98a5a", ...fixed },
     { id: "table3", x: 110, y: 300, width: 64, height: 64, shape: "round", color: "#b98a5a", ...fixed },
+  ], [
+    // 사장님이 두 분: 한 분은 건물 담당 주민(residentSpot), 다른 한 분은 카운터 안쪽에서 일한다.
+    { id: "cafe-owner2", look: "cafe-owner2", x: 130, y: 82, facing: 0, label: "공동 사장님" },
+    { id: "cafe-guest1", look: "guest-a", x: 340, y: 215, facing: Math.PI / 2 },
+    { id: "cafe-guest2", look: "guest-b", x: 80, y: 318, facing: -Math.PI / 2 },
   ]),
   shop: baseRoom("shop", "#d9dfe8", "#4a638a", { x: 304, y: 112 }, [
     { id: "shelf1", label: "선반", x: 50, y: 100, width: 170, height: 40, shape: "rect", color: "#8a6a45", emoji: "🥫", ...fixed },
@@ -87,12 +107,20 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
     { id: "display1", x: 90, y: 230, width: 60, height: 100, shape: "rect", color: "#a88b63", ...fixed },
     { id: "display2", x: 200, y: 230, width: 60, height: 100, shape: "rect", color: "#a88b63", ...fixed },
     { id: "register", label: "계산대", x: 420, y: 280, width: 150, height: 44, shape: "rect", color: "#5b4636", emoji: "💴", ...fixed },
+  ], [
+    { id: "shop-clerk", look: "shop-clerk", x: 475, y: 238, facing: 0, label: "점원" },
+    { id: "shop-stocker", look: "shop-stocker", x: 130, y: 150, facing: Math.PI, label: "점원" },
+    { id: "shop-guest", look: "guest-c", x: 230, y: 330, facing: Math.PI },
   ]),
   hall: baseRoom("hall", "#dde5cf", "#5f7f45", { x: 304, y: 112 }, [
     { id: "desk1", label: "책상", x: 70, y: 110, width: 150, height: 50, shape: "rect", color: "#8a7350", emoji: "📋", ...fixed },
     { id: "desk2", label: "책상", x: 420, y: 110, width: 150, height: 50, shape: "rect", color: "#8a7350", emoji: "🗂️", ...fixed },
     { id: "meeting", label: "회의 테이블", x: 170, y: 250, width: 300, height: 56, shape: "rect", color: "#7a6544", ...fixed },
     { id: "plant", x: 560, y: 380, width: 40, height: 40, shape: "round", color: "#4f8a4a", emoji: "🪴", ...fixed },
+  ], [
+    { id: "hall-clerk1", look: "hall-clerk", x: 130, y: 82, facing: 0, label: "직원" },
+    { id: "hall-clerk2", look: "hall-clerk2", x: 480, y: 82, facing: 0, label: "직원" },
+    { id: "hall-guest", look: "guest-a", x: 130, y: 268, facing: Math.PI / 2 },
   ]),
   // 내 집: 가구는 비어 있고, 실제 가구는 저장소(HomeFurnitureState)에서 읽어 채운다(app/home.ts).
   home: baseRoom("home", "#f0dfc8", "#b5566b", { x: 0, y: 0 }, []),
@@ -104,6 +132,10 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
     { id: "desk3", label: "책상", x: 460, y: 240, width: 90, height: 40, shape: "rect", color: "#a07a4c", ...fixed },
     { id: "desk4", label: "책상", x: 90, y: 330, width: 90, height: 40, shape: "rect", color: "#a07a4c", ...fixed },
     { id: "desk5", label: "책상", x: 460, y: 330, width: 90, height: 40, shape: "rect", color: "#a07a4c", ...fixed },
+  ], [
+    { id: "student1", look: "student-a", x: 110, y: 292, facing: Math.PI },
+    { id: "student2", look: "student-b", x: 295, y: 292, facing: Math.PI },
+    { id: "student3", look: "student-c", x: 480, y: 292, facing: Math.PI },
   ]),
 };
 

@@ -82,9 +82,11 @@ function RoomView({ building }: { building: Building }) {
   );
 
   // 벽·가구에 주민이 서 있는 자리를 더해, 주민도 통과할 수 없게 한다.
+  // 방 안의 다른 사람들(직원·손님 등)도 통과할 수 없다.
+  const npcRects = useMemo(() => room.npcs.map((n) => ({ x: n.x, y: n.y, width: CHAR_SIZE, height: CHAR_SIZE })), [room]);
   const obstacles = useMemo(
-    () => (resident ? [...getRoomObstacles(room), residentRect] : getRoomObstacles(room)),
-    [room, resident, residentRect]
+    () => [...getRoomObstacles(room), ...(resident ? [residentRect] : []), ...npcRects],
+    [room, resident, residentRect, npcRects]
   );
 
   const [chatOpen, setChatOpen] = useState(false);

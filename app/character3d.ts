@@ -6,7 +6,7 @@ import * as THREE from "three";
 // 크기 기준: 발바닥이 y=0, 키 약 48(방 데이터의 CHAR_SIZE=32 발자국 기준), 정면은 +Z.
 
 export type HairStyle = "short" | "bob" | "bun" | "spiky" | "cap";
-export type Accessory = "none" | "apron" | "hat" | "glasses" | "scarf";
+export type Accessory = "none" | "apron" | "hat" | "glasses" | "scarf" | "chef";
 
 export interface CharacterSpec {
   skin: string;
@@ -44,6 +44,21 @@ const VILLAGER_SPECS: Record<string, CharacterSpec> = {
   shop: { skin: "#efc9a6", hair: "#3a2a20", hairStyle: "cap", top: "#e0a860", bottom: "#4f6a86", accessory: "hat", accent: "#b8573f" },
   hall: { skin: "#f4d6bc", hair: "#8a8a92", hairStyle: "short", top: "#7f9a82", bottom: "#4a5a50", accessory: "glasses", accent: "#6b5a4a" },
 };
+// 방 안의 직원·손님·학생 모습 (RoomNpc.look). 같은 방 사람들이 서로 구분되도록 색과 머리를 다르게 준다.
+const NPC_SPECS: Record<string, CharacterSpec> = {
+  "cafe-owner2": { skin: "#efc9a6", hair: "#2f2a36", hairStyle: "short", top: "#fffaf0", bottom: "#6f5a48", accessory: "chef", accent: "#fffdf8" },
+  "shop-clerk": { skin: "#f6d3b6", hair: "#8a5a3a", hairStyle: "bob", top: "#e8b9a8", bottom: "#5a6a86", accessory: "apron", accent: "#d9604c" },
+  "shop-stocker": { skin: "#e8bf9c", hair: "#3a2a20", hairStyle: "spiky", top: "#9ec0c6", bottom: "#4a5a70", accessory: "none" },
+  "hall-clerk": { skin: "#f4d6bc", hair: "#3a3a46", hairStyle: "short", top: "#a8b99a", bottom: "#4a5a50", accessory: "glasses", accent: "#5a4a3a" },
+  "hall-clerk2": { skin: "#f6d9c0", hair: "#9a6a4a", hairStyle: "bun", top: "#c9bfa8", bottom: "#5a5a50", accessory: "scarf", accent: "#7f9a82" },
+  "student-a": { skin: "#f6d3b6", hair: "#2f2a36", hairStyle: "short", top: "#b9d4e8", bottom: "#4a5a86", accessory: "none" },
+  "student-b": { skin: "#efc9a6", hair: "#8a5a3a", hairStyle: "bob", top: "#f3dc9c", bottom: "#6f5a86", accessory: "none" },
+  "student-c": { skin: "#f6d9c0", hair: "#c9a06a", hairStyle: "bun", top: "#ecb8b8", bottom: "#5a6a50", accessory: "none" },
+  "guest-a": { skin: "#f6d3b6", hair: "#6a4a3a", hairStyle: "bob", top: "#c9a0b8", bottom: "#5a5a6a", accessory: "scarf", accent: "#f3dc9c" },
+  "guest-b": { skin: "#e8bf9c", hair: "#2f2a36", hairStyle: "spiky", top: "#8a9ec0", bottom: "#4a4a56", accessory: "none" },
+  "guest-c": { skin: "#f6d9c0", hair: "#c98f6a", hairStyle: "short", top: "#a9ca97", bottom: "#6a5a4a", accessory: "glasses", accent: "#6b5a4a" },
+};
+
 const FALLBACK: CharacterSpec[] = [
   { skin: "#f6d3b6", hair: "#c9a06a", hairStyle: "bob", top: "#b9aec9", bottom: "#6f6a86", accessory: "scarf", accent: "#f3dc9c" },
   { skin: "#efc9a6", hair: "#2f2a36", hairStyle: "spiky", top: "#a9ca97", bottom: "#5a6a50", accessory: "none" },
@@ -52,6 +67,7 @@ const FALLBACK: CharacterSpec[] = [
 
 export function specForVillager(id: string): CharacterSpec {
   if (VILLAGER_SPECS[id]) return VILLAGER_SPECS[id];
+  if (NPC_SPECS[id]) return NPC_SPECS[id];
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return FALLBACK[h % FALLBACK.length];
@@ -203,6 +219,12 @@ export function createCharacter(spec: CharacterSpec): CharacterRig {
     const brim = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(11.6, 11.6, 0.9, 28), accent));
     brim.position.set(0, 7.9, 0);
     head.add(hat, brim);
+  } else if (acc === "chef") {
+    const band = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(7.2, 7.4, 2.6, 24), mat("#fffdf8")));
+    band.position.set(0, 9.2, 0);
+    const puff = sphere(7.2, mat("#fffdf8"), 1, 0.9, 1);
+    puff.position.set(0, 14, 0);
+    head.add(band, puff);
   } else if (acc === "glasses") {
     const gm = mat(spec.accent ?? "#6b5a4a", 0.4);
     [-3.9, 3.9].forEach((x) => {
@@ -225,6 +247,7 @@ export function createCharacter(spec: CharacterSpec): CharacterRig {
 
   // 애니메이션 상태
   let phase = 0;
+  let idleT = Math.random() * 6;
   let amp = 0;
   let heading = 0;
   const ownGeoms: THREE.BufferGeometry[] = [];
@@ -243,6 +266,12 @@ export function createCharacter(spec: CharacterSpec): CharacterRig {
     update(dt, moving) {
       amp += ((moving ? 1 : 0) - amp) * Math.min(1, dt * 12);
       if (moving) phase += dt * 11;
+      idleT += dt;
+      // 서 있을 때: 숨 쉬듯 몸이 아주 조금 오르내리고 고개가 살짝 움직인다
+      const idle = 1 - amp;
+      torso.scale.y = 1 + Math.sin(idleT * 2.2) * 0.025 * idle;
+      head.rotation.z = Math.sin(idleT * 0.9) * 0.05 * idle;
+      head.rotation.y = Math.sin(idleT * 0.6) * 0.18 * idle;
       const s = Math.sin(phase) * amp;
       legL.rotation.x = s * 0.75;
       legR.rotation.x = -s * 0.75;
