@@ -7,8 +7,7 @@ import AuthStatus from "@/components/AuthStatus";
 import ChatPanel from "@/components/ChatPanel";
 import townStyles from "../../town.module.css";
 import styles from "./room.module.css";
-import RoomScene from "./RoomScene";
-import { makeRoomIso } from "../../roomIso";
+import dynamic from "next/dynamic";
 import { BUILDINGS, withThemeResident, type Building, type PlacedBuilding } from "../../buildings";
 import { getRoomObstacles, getRoomTemplate, type Furniture, type Room } from "../../interiors";
 import {
@@ -27,6 +26,9 @@ import {
   setTownReturnBuilding,
   PLACED_BUILDINGS_STORAGE_KEY,
 } from "@/lib/storage";
+
+// 3D 방은 건물 안 화면에서만 필요하므로 따로 내려받는다(마을 등 다른 화면 로딩에는 영향이 없다).
+const RoomCanvas = dynamic(() => import("./room3d/RoomCanvas"), { ssr: false });
 
 const INTERACTION_MARGIN = 28; // 주민 테두리 밖으로 이 거리 안에 들어오면 "대화 가능"
 
@@ -71,8 +73,6 @@ function RoomView({ building }: { building: Building }) {
     const template = getRoomTemplate(building);
     return homeFurniture ? { ...template, furniture: homeFurniture.placed } : template;
   }, [building, homeFurniture]);
-
-  const iso = useMemo(() => makeRoomIso(room), [room]);
 
   const residentId = building.residentId ?? (building.hasResident ? building.id : null);
   const resident = residentId ? getVillager(residentId) : null;
@@ -146,16 +146,9 @@ function RoomView({ building }: { building: Building }) {
     saveHomeFurniture(next);
   }
 
-  // 화면(비스듬한 시점) 클릭 위치 -> 방의 평면 좌표. 무대가 화면에 맞게 축소돼 있으므로 배율로 나눈다.
-  function roomPoint(e: React.MouseEvent<HTMLDivElement>) {
-    const r = e.currentTarget.getBoundingClientRect();
-    const scale = r.width / iso.stageWidth;
-    return iso.unproject((e.clientX - r.left) / scale, (e.clientY - r.top) / scale);
-  }
-
-  function handleRoomClick(e: React.MouseEvent<HTMLDivElement>) {
+  // 3D 방에서 바닥을 클릭한 지점(방의 평면 좌표)으로 가구를 선택/이동한다.
+  function handleRoomClick(pt: { x: number; y: number }) {
     if (!decorating || !homeFurniture) return;
-    const pt = roomPoint(e);
     // 선택한 가구 말고 다른 가구를 클릭하면 그 가구를 선택한다.
     const hit = homeFurniture.placed.find(
       (f) =>
@@ -236,69 +229,24 @@ function RoomView({ building }: { building: Building }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 방 무대를 화면 가운데에 맞춰 놓는다(작은 화면에서는 축소).
-  const [view, setView] = useState({ w: 1280, h: 800 });
-  const viewportRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const measure = () => setView({ w: el.clientWidth, h: el.clientHeight });
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const fit = Math.min(1.7, (view.w - 16) / iso.stageWidth, (view.h - 110) / iso.stageHeight);
-  const stageLeft = (view.w - iso.stageWidth * fit) / 2;
-  const stageTop = Math.max(52, (view.h - iso.stageHeight * fit) / 2 - 8);
-
   const ghostRect = decorating && selectedItem && hover ? targetRect(selectedItem, hover) : null;
-  const [resPx, resPy] = resident ? iso.project(residentRect.x + CHAR_SIZE / 2, residentRect.y + CHAR_SIZE / 2, 0) : [0, 0];
-  const [doorX, doorY] = iso.project(room.door.x + room.door.width / 2, room.height - 6, 0);
 
   return (
     <div className={`${townStyles.townRoot} ${styles.roomRoot}`}>
-      <div ref={viewportRef} className={townStyles.viewport}>
-        <div
-          className={styles.stage}
-          style={{
-            width: iso.stageWidth,
-            height: iso.stageHeight,
-            transform: `translate(${stageLeft}px, ${stageTop}px) scale(${fit})`,
-            cursor: decorating ? "crosshair" : undefined,
-          }}
-          onClick={handleRoomClick}
-          onMouseMove={(e) => decorating && setHover(roomPoint(e))}
-          onMouseLeave={() => setHover(null)}
-        >
-          <svg width={iso.stageWidth} height={iso.stageHeight} viewBox={`0 0 ${iso.stageWidth} ${iso.stageHeight}`} aria-hidden="true" className={townStyles.stageSvg}>
-            <RoomScene
-              room={room}
-              iso={iso}
-              furniture={room.furniture}
-              selectedId={selected}
-              ghost={ghostRect ? { ...ghostRect, round: selectedItem?.shape === "round", bad: !!hoverFailure } : null}
-              residentRect={resident ? residentRect : null}
-              residentEmoji={resident ? resident.avatar : null}
-              position={position}
-            />
-          </svg>
-          {resident && (
-            <>
-              <div className={styles.nameTag} style={{ left: resPx, top: resPy + 6 }}>
-                {resident.name}
-              </div>
-              {isNearResident && (
-                <div className={townStyles.interactionHint} style={{ left: resPx, top: resPy - 62 }}>
-                  💬
-                </div>
-              )}
-            </>
-          )}
-          <div className={styles.doorTag} style={{ left: doorX, top: doorY + 6 }}>
-            문
-          </div>
-        </div>
+      <div className={townStyles.viewport}>
+        <RoomCanvas
+          room={room}
+          furniture={room.furniture}
+          selectedId={selected}
+          ghost={ghostRect ? { ...ghostRect, round: selectedItem?.shape === "round", bad: !!hoverFailure } : null}
+          position={position}
+          residentRect={resident ? residentRect : null}
+          residentEmoji={resident ? resident.avatar : null}
+          residentName={resident ? resident.name : null}
+          nearResident={isNearResident}
+          decorating={decorating}
+          onFloorPoint={(pt, type) => (type === "click" ? pt && handleRoomClick(pt) : setHover(pt))}
+        />
         <div className={townStyles.vignette} />
       </div>
 
