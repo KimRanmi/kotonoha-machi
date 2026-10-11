@@ -53,19 +53,74 @@
   overflow: hidden;
 }
 
-/* 비스듬한 시점의 마을 무대: 월드를 project()로 그린 SVG + 그 위에 얹는 이름표/힌트(HTML) */
-.stageScroll {
-  max-width: 100%;
-  overflow-x: auto;
-  padding-bottom: 6px;
+/* 마을 화면: 화면 전체가 "세계"이고, 카메라가 캐릭터를 따라 무대를 움직인다. 헤더/안내는 그 위에 떠 있다. */
+.townRoot {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #aac78f;
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
 .stage {
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+/* 카메라 이동은 처음 크기를 잰 뒤부터 부드럽게 (처음 한 번 튀어 보이지 않게) */
+.cameraReady {
+  transition: transform 0.28s ease-out;
 }
 
 .stageSvg {
   display: block;
+}
+
+/* 가장자리에 살짝 어둡게 번지는 빛 + 위쪽 햇살: 그림이 아니라 "공간"처럼 느껴지게 */
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(255, 240, 180, 0.28), transparent 55%),
+    radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(40, 70, 40, 0.3) 100%);
+}
+
+.townHeader {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.townHeader > * {
+  pointer-events: auto;
+}
+
+.townFooter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  display: flex;
+  justify-content: center;
+  padding: 0 14px;
+  pointer-events: none;
+  z-index: 30;
 }
 
 /* 건물 영역(충돌·입장 판정에 쓰이는 rect). 그림은 안쪽 SVG가 맡고, 지붕/차양은 영역 밖으로 튀어나올 수 있다. */
@@ -83,7 +138,7 @@
   background: var(--white);
   box-shadow: 0 2px 0 var(--line), 0 4px 6px rgba(90, 64, 52, 0.2);
   color: var(--ink);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.4;
   white-space: nowrap;
@@ -205,5 +260,128 @@
 @media (max-width: 480px) {
   .page {
     padding: 14px 12px;
+  }
+}
+
+/* ───────── 마을이 "살아 있는" 느낌: 움직이는 요소들 ───────── */
+@media (prefers-reduced-motion: no-preference) {
+  .sway {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: sway 5s ease-in-out infinite;
+  }
+  .smoke {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: smoke 4s ease-out infinite;
+    opacity: 0;
+  }
+  .drift {
+    animation: drift 150s linear infinite;
+  }
+  .fly {
+    animation: fly 50s linear infinite;
+  }
+  .flap {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: flap 0.45s ease-in-out infinite alternate;
+  }
+  .flit {
+    animation: flit 8s ease-in-out infinite alternate;
+  }
+  .glow {
+    animation: glowPulse 3.2s ease-in-out infinite alternate;
+  }
+  .twinkle {
+    animation: twinkle 3.6s ease-in-out infinite;
+  }
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-1.6deg);
+  }
+  50% {
+    transform: rotate(1.6deg);
+  }
+}
+
+@keyframes smoke {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(14px, -46px) scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translate(-900px, -450px);
+  }
+  to {
+    transform: translate(3000px, 1500px);
+  }
+}
+
+@keyframes fly {
+  from {
+    transform: translate(-100px, 0);
+  }
+  to {
+    transform: translate(3000px, -220px);
+  }
+}
+
+@keyframes flap {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(0.35);
+  }
+}
+
+@keyframes flit {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(46px, -26px);
+  }
+  50% {
+    transform: translate(10px, -50px);
+  }
+  75% {
+    transform: translate(-40px, -20px);
+  }
+  100% {
+    transform: translate(-18px, 14px);
+  }
+}
+
+@keyframes glowPulse {
+  from {
+    opacity: 0.14;
+  }
+  to {
+    opacity: 0.34;
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.8;
   }
 }

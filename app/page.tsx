@@ -14,7 +14,7 @@ import {
   type PlacedBuilding,
 } from "./buildings";
 import { BuildingMarker, BuildingTag, buildingDepth } from "./BuildingMarker";
-import { PROPS, Prop, SceneGround } from "./TownScenery";
+import { Ambient, FrontFence, Prop, SceneGround, STATIC_PROPS } from "./TownScenery";
 import { MAP_HEIGHT, MAP_WIDTH, STAGE_HEIGHT, STAGE_WIDTH, project, unproject } from "./iso";
 import { makeHomeBuilding } from "./home";
 import { getNextOnboardingStep } from "./onboarding";
@@ -251,31 +251,87 @@ export default function TownPage() {
   }
 
   // 건물·소품·캐릭터를 "앞쪽(월드 x+y가 큰 쪽)일수록 나중에" 그려서 비스듬한 시점의 앞뒤 가림을 맞춘다.
+  // 움직이지 않는 것(소품·건물)은 정렬/요소를 메모해 두고, 매 프레임 바뀌는 캐릭터만 끼워 넣는다.
+  const staticItems = useMemo(
+    () =>
+      [
+        ...STATIC_PROPS.map((p, i) => ({ key: `prop-${i}`, depth: p.x + p.y, node: <Prop def={p} i={i} /> })),
+        ...allBuildings.map((b) => ({
+          key: `b-${b.id}`,
+          depth: buildingDepth(b),
+          node: <BuildingMarker building={b} isConstructing={justPlacedId === b.id} />,
+        })),
+      ].sort((a, b) => a.depth - b.depth),
+    [allBuildings, justPlacedId]
+  );
+  const ground = useMemo(() => <SceneGround />, []);
+  const frontFence = useMemo(() => <FrontFence />, []);
+  const ambient = useMemo(() => <Ambient />, []);
+
   const [charX, charY] = project(position.x + CHAR_SIZE / 2, position.y + CHAR_SIZE / 2, 0);
-  const sceneItems = [
-    ...PROPS.map((p, i) => ({ key: `prop-${i}`, depth: p.x + p.y, node: <Prop def={p} /> })),
-    ...allBuildings.map((b) => ({
-      key: `b-${b.id}`,
-      depth: buildingDepth(b),
-      node: <BuildingMarker building={b} isConstructing={justPlacedId === b.id} />,
-    })),
-    {
-      key: "character",
-      depth: position.x + position.y + CHAR_SIZE,
-      node: (
-        <g>
-          <ellipse cx={charX} cy={charY} rx={11} ry={4.5} fill="rgba(60,70,40,0.28)" />
-          <text x={charX} y={charY - 3} textAnchor="middle" fontSize={24}>
-            🧑
-          </text>
-        </g>
-      ),
-    },
-  ].sort((a, b) => a.depth - b.depth);
+  const charDepth = position.x + position.y + CHAR_SIZE;
+  let charIndex = staticItems.findIndex((it) => it.depth > charDepth);
+  if (charIndex < 0) charIndex = staticItems.length;
+  const characterNode = (
+    <g key="character">
+      <ellipse cx={charX} cy={charY} rx={17} ry={6.5} fill="rgba(60,70,40,0.3)" />
+      <text x={charX} y={charY - 4} textAnchor="middle" fontSize={38}>
+        🧑
+      </text>
+    </g>
+  );
+
+  // 카메라: 캐릭터가 화면 가운데(약간 아래)에 오도록 무대를 옮긴다. 무대 가장자리 밖은 보이지 않게 막는다.
+  const [view, setView] = useState({ w: 1280, h: 800 });
+  const [cameraReady, setCameraReady] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => {
+      setView({ w: el.clientWidth, h: el.clientHeight });
+      setCameraReady(true);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const camX = STAGE_WIDTH <= view.w ? (STAGE_WIDTH - view.w) / 2 : clamp(charX - view.w / 2, 0, STAGE_WIDTH - view.w);
+  const camY = STAGE_HEIGHT <= view.h ? (STAGE_HEIGHT - view.h) / 2 : clamp(charY - view.h * 0.55, 0, STAGE_HEIGHT - view.h);
 
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
+    <div className={styles.townRoot}>
+      <div ref={viewportRef} className={styles.viewport}>
+        <main
+          className={[styles.stage, onboardingStep || pendingBuilding ? styles.placementMode : "", cameraReady ? styles.cameraReady : ""].join(" ")}
+          style={{ width: STAGE_WIDTH, height: STAGE_HEIGHT, transform: `translate3d(${-camX}px, ${-camY}px, 0)` }}
+          onClick={handleMapClick}
+        >
+          <svg className={styles.stageSvg} width={STAGE_WIDTH} height={STAGE_HEIGHT} viewBox={`0 0 ${STAGE_WIDTH} ${STAGE_HEIGHT}`} aria-hidden="true">
+            {ground}
+            {staticItems.slice(0, charIndex).map((it) => (
+              <g key={it.key}>{it.node}</g>
+            ))}
+            {characterNode}
+            {staticItems.slice(charIndex).map((it) => (
+              <g key={it.key}>{it.node}</g>
+            ))}
+            {/* 건물 뒤로 가려졌을 때도 위치를 알 수 있게 옅은 실루엣을 맨 위에 한 번 더 그린다 */}
+            <text x={charX} y={charY - 4} textAnchor="middle" fontSize={38} opacity={0.3}>
+              🧑
+            </text>
+            {frontFence}
+            {ambient}
+          </svg>
+          {allBuildings.map((b) => (
+            <BuildingTag key={b.id} building={b} isNear={nearBuildingId === b.id} isConstructing={justPlacedId === b.id} />
+          ))}
+        </main>
+        <div className={styles.vignette} />
+      </div>
+
+      <header className={styles.townHeader}>
         <div className={styles.title}>ことばのまち — 마을 지도</div>
         <div className={styles.headerLinks}>
           <Link href="/theme-learning" className="pill">
@@ -291,38 +347,21 @@ export default function TownPage() {
         </div>
       </header>
 
-      <div className={styles.stageScroll}>
-        <main
-          className={onboardingStep || pendingBuilding ? `${styles.stage} ${styles.placementMode}` : styles.stage}
-          style={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
-          onClick={handleMapClick}
-        >
-          <svg className={styles.stageSvg} width={STAGE_WIDTH} height={STAGE_HEIGHT} viewBox={`0 0 ${STAGE_WIDTH} ${STAGE_HEIGHT}`} aria-hidden="true">
-            <SceneGround />
-            {sceneItems.map((it) => (
-              <g key={it.key}>{it.node}</g>
-            ))}
-          </svg>
-          {allBuildings.map((b) => (
-            <BuildingTag key={b.id} building={b} isNear={nearBuildingId === b.id} isConstructing={justPlacedId === b.id} />
-          ))}
-        </main>
+      <div className={styles.townFooter}>
+        {onboardingStep === "place-home" ? (
+          <p className={styles.interactionBanner}>
+            환영합니다! 빈 자리를 클릭/탭해서 &quot;내 집&quot;을 지어보세요. 한 번 지으면 옮길 수 없어요.
+          </p>
+        ) : pendingBuilding ? (
+          <p className={styles.interactionBanner}>
+            빈 자리를 클릭/탭해서 &quot;{pendingBuilding.themeTitle}&quot; 건물을 지어보세요!
+          </p>
+        ) : nearBuildingId ? (
+          <p className={styles.interactionBanner}>Enter 또는 Space로 들어가기</p>
+        ) : (
+          <p className={styles.hint}>방향키 또는 WASD로 캐릭터를 움직여보세요.</p>
+        )}
       </div>
-
-      {onboardingStep === "place-home" ? (
-        <p className={styles.interactionBanner}>
-          환영합니다! 빈 자리를 클릭/탭해서 &quot;내 집&quot;을 지어보세요. 한 번 지으면 옮길 수 없어요.
-        </p>
-      ) : pendingBuilding ? (
-        <p className={styles.interactionBanner}>
-          빈 자리를 클릭/탭해서 &quot;{pendingBuilding.themeTitle}&quot; 건물을 지어보세요!
-        </p>
-      ) : nearBuildingId ? (
-        <p className={styles.interactionBanner}>Enter 또는 Space로 들어가기</p>
-      ) : (
-        <p className={styles.hint}>방향키 또는 WASD로 캐릭터를 움직여보세요.</p>
-      )}
-
     </div>
   );
 }
