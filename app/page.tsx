@@ -13,8 +13,9 @@ import {
   withThemeResident,
   type PlacedBuilding,
 } from "./buildings";
-import { BuildingMarker } from "./BuildingMarker";
-import TownScenery from "./TownScenery";
+import { BuildingMarker, BuildingTag, buildingDepth } from "./BuildingMarker";
+import { PROPS, Prop, SceneGround } from "./TownScenery";
+import { MAP_HEIGHT, MAP_WIDTH, STAGE_HEIGHT, STAGE_WIDTH, project, unproject } from "./iso";
 import { makeHomeBuilding } from "./home";
 import { getNextOnboardingStep } from "./onboarding";
 import {
@@ -45,8 +46,7 @@ import type { PendingBuilding } from "@/lib/types";
 // 실제 아트 에셋, 건물 기능, 대화 연동 등은 이후 단계에서 다룬다.
 // 건물 목록/타입은 ./buildings, 건물 한 채의 렌더링은 ./BuildingMarker 에 분리해뒀다 —
 // 건물별 기능을 추가할 때 이동/충돌을 다루는 이 파일을 건드릴 필요가 없도록 하기 위함이다.
-const MAP_WIDTH = 960;
-const MAP_HEIGHT = 640;
+// (MAP_WIDTH/MAP_HEIGHT와 비스듬한 시점 투영은 ./iso 에 있다. 이동·충돌·배치 판정은 월드 좌표 그대로다.)
 
 // 건물 안으로 "들어갈 수 있는" 거리: 건물 테두리 밖으로 이 거리 안.
 const INTERACTION_MARGIN = 28;
@@ -110,6 +110,7 @@ export default function TownPage() {
     width: MAP_WIDTH,
     height: MAP_HEIGHT,
     obstacles: allBuildings,
+    isometric: true, // 방향키는 화면 기준(위 = 화면 위쪽)으로 움직인다
     initial: {
       x: MAP_WIDTH / 2 - CHAR_SIZE / 2,
       y: MAP_HEIGHT / 2 - CHAR_SIZE / 2,
@@ -196,9 +197,10 @@ export default function TownPage() {
   function handleMapClick(e: MouseEvent<HTMLDivElement>) {
     if (!onboardingStep && !pendingBuilding) return;
 
+    // 화면(비스듬한 시점) 클릭 위치를 월드 좌표로 되돌린다. 땅 밖을 누르면 무시한다.
     const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const { x: clickX, y: clickY } = unproject(e.clientX - rect.left, e.clientY - rect.top);
+    if (clickX < 0 || clickY < 0 || clickX > MAP_WIDTH || clickY > MAP_HEIGHT) return;
 
     const { width, height } = NEW_BUILDING_SIZE;
     const x = clamp(clickX - width / 2, 0, MAP_WIDTH - width);
@@ -248,6 +250,29 @@ export default function TownPage() {
     }, 1300);
   }
 
+  // 건물·소품·캐릭터를 "앞쪽(월드 x+y가 큰 쪽)일수록 나중에" 그려서 비스듬한 시점의 앞뒤 가림을 맞춘다.
+  const [charX, charY] = project(position.x + CHAR_SIZE / 2, position.y + CHAR_SIZE / 2, 0);
+  const sceneItems = [
+    ...PROPS.map((p, i) => ({ key: `prop-${i}`, depth: p.x + p.y, node: <Prop def={p} /> })),
+    ...allBuildings.map((b) => ({
+      key: `b-${b.id}`,
+      depth: buildingDepth(b),
+      node: <BuildingMarker building={b} isConstructing={justPlacedId === b.id} />,
+    })),
+    {
+      key: "character",
+      depth: position.x + position.y + CHAR_SIZE,
+      node: (
+        <g>
+          <ellipse cx={charX} cy={charY} rx={11} ry={4.5} fill="rgba(60,70,40,0.28)" />
+          <text x={charX} y={charY - 3} textAnchor="middle" fontSize={24}>
+            🧑
+          </text>
+        </g>
+      ),
+    },
+  ].sort((a, b) => a.depth - b.depth);
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -266,37 +291,23 @@ export default function TownPage() {
         </div>
       </header>
 
-      <main
-        className={styles.mapWrapper}
-        style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
-      >
-        <div
-          className={
-            onboardingStep || pendingBuilding ? `${styles.map} ${styles.placementMode}` : styles.map
-          }
-          style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
+      <div className={styles.stageScroll}>
+        <main
+          className={onboardingStep || pendingBuilding ? `${styles.stage} ${styles.placementMode}` : styles.stage}
+          style={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
           onClick={handleMapClick}
         >
-          <TownScenery width={MAP_WIDTH} height={MAP_HEIGHT} />
-
+          <svg className={styles.stageSvg} width={STAGE_WIDTH} height={STAGE_HEIGHT} viewBox={`0 0 ${STAGE_WIDTH} ${STAGE_HEIGHT}`} aria-hidden="true">
+            <SceneGround />
+            {sceneItems.map((it) => (
+              <g key={it.key}>{it.node}</g>
+            ))}
+          </svg>
           {allBuildings.map((b) => (
-            <BuildingMarker
-              key={b.id}
-              building={b}
-              isNear={nearBuildingId === b.id}
-              isConstructing={justPlacedId === b.id}
-              mapHeight={MAP_HEIGHT}
-            />
+            <BuildingTag key={b.id} building={b} isNear={nearBuildingId === b.id} isConstructing={justPlacedId === b.id} />
           ))}
-
-          <div
-            className={styles.character}
-            style={{ left: position.x, top: position.y, width: CHAR_SIZE, height: CHAR_SIZE }}
-          >
-            🧑
-          </div>
-        </div>
-      </main>
+        </main>
+      </div>
 
       {onboardingStep === "place-home" ? (
         <p className={styles.interactionBanner}>
