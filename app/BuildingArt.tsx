@@ -1,5 +1,6 @@
 import type { Building } from "./buildings";
-import { ISO_K, project, pts, type P2 } from "./iso";
+import { ISO_K, ISO_SCALE as S, project, pts, type P2 } from "./iso";
+import styles from "./town.module.css";
 
 // 마을 맵의 건물 그림 (아이소메트릭 파스텔 미니어처). 윤곽선 없이 면 색(밝은 면/어두운 면)만 쓰고,
 // 월드 좌표의 건물 영역(x, y, width, height)을 그대로 밑면으로 삼아 위로 쌓아 올린 블록 + 박공지붕으로 그린다.
@@ -21,14 +22,14 @@ const SILL = "#fffaf0";
 
 // 벽 높이 / 지붕 높이
 export function buildingHeights(kind?: string) {
-  const wall = kind === "hall" ? 40 : kind === "shop" ? 38 : 40;
-  return { wall, roof: kind === "hall" ? 28 : 24 };
+  const wall = (kind === "hall" ? 40 : kind === "shop" ? 38 : 40) * S;
+  return { wall, roof: (kind === "hall" ? 28 : 24) * S };
 }
 
 // 앞쪽(왼쪽) 벽면 위의 글자/도형을 벽면에 맞춰 기울이는 변환 (가로 = 월드 x축 방향)
 const faceL = (x: number, y: number, z: number) => {
   const [e, f] = project(x, y, z);
-  return `matrix(${ISO_K} ${ISO_K / 2} 0 1 ${e} ${f})`;
+  return `matrix(${ISO_K} ${ISO_K / 2} 0 ${S} ${e} ${f})`;
 };
 
 export function BuildingArt({ b }: { b: Building }) {
@@ -58,8 +59,8 @@ export function BuildingArt({ b }: { b: Building }) {
       <ellipse cx={P(x + W / 2 + 10, y + D / 2 + 10, 0)[0]} cy={P(x + W / 2 + 10, y + D / 2 + 10, 0)[1]} rx={(W + D) * ISO_K * 0.46} ry={(W + D) * ISO_K * 0.22} fill="rgba(90,110,70,0.13)" />
       {quad(P(x, y + D, 0), P(x + W, y + D, 0), P(x + W, y + D, H), P(x, y + D, H), t.wl)}
       {quad(P(x + W, y, 0), P(x + W, y + D, 0), P(x + W, y + D, H), P(x + W, y, H), t.wr)}
-      {front(0.02, 0.98, 0, 7, "rgba(0,0,0,0.05)")}
-      {front(0.03, 0.4, H - 10, H - 7, "#fff")}
+      {front(0.02, 0.98, 0, 7 * S, "rgba(0,0,0,0.05)")}
+      {front(0.03, 0.4, H - 10 * S, H - 7 * S, "#fff")}
 
       {/* 문 + 창 */}
       {front(doorU0 - 0.025, doorU1 + 0.025, 0, doorH + 3, SILL)}
@@ -116,17 +117,22 @@ export function BuildingArt({ b }: { b: Building }) {
       {quad(P(x - o, y + D + o, H - 1), P(x + W + o, y + D + o, H - 1), P(x + W + o, y + D + o, H + 3), P(x - o, y + D + o, H + 3), "rgba(0,0,0,0.07)")}
       <polygon points={pts([P(x + W + o, y - o, H - 1), P(x + W + o, y + D + o, H - 1), P(x + W + o, ym, H + RH)])} fill={t.roofS} />
       {quad(P(x - o, ym + 3, H + RH - 3), P(x + W + o, ym + 3, H + RH - 3), P(x + W + o, ym, H + RH), P(x - o, ym, H + RH), "rgba(255,255,255,0.45)")}
-      {kind === "home" && (() => {
-        const cx = x + W * 0.66;
+      {(kind === "home" || kind === "cafe") && (() => {
+        const home = kind === "home";
+        const cx = x + W * (home ? 0.66 : 0.22);
         const cy = ym - 8;
-        const s = 12;
-        const zb = H + RH * 0.55;
-        const zt = H + RH + 14;
+        const sz = 12;
+        const zb = H + RH * 0.5;
+        const zt = H + RH + 14 * S;
+        const [tx, ty] = project(cx + sz / 2, cy + sz / 2, zt);
         return (
           <g>
-            {quad(P(cx, cy + s, zb), P(cx + s, cy + s, zb), P(cx + s, cy + s, zt), P(cx, cy + s, zt), "#ecc3c4")}
-            {quad(P(cx + s, cy, zb), P(cx + s, cy + s, zb), P(cx + s, cy + s, zt), P(cx + s, cy, zt), "#dc9ea0")}
-            {quad(P(cx, cy, zt), P(cx + s, cy, zt), P(cx + s, cy + s, zt), P(cx, cy + s, zt), "#f4d0d2")}
+            {quad(P(cx, cy + sz, zb), P(cx + sz, cy + sz, zb), P(cx + sz, cy + sz, zt), P(cx, cy + sz, zt), home ? "#ecc3c4" : "#d9cdb8")}
+            {quad(P(cx + sz, cy, zb), P(cx + sz, cy + sz, zb), P(cx + sz, cy + sz, zt), P(cx + sz, cy, zt), home ? "#dc9ea0" : "#bfb29b")}
+            {quad(P(cx, cy, zt), P(cx + sz, cy, zt), P(cx + sz, cy + sz, zt), P(cx, cy + sz, zt), home ? "#f4d0d2" : "#e9dfcb")}
+            {[0, 1, 2].map((i) => (
+              <circle key={i} className={styles.smoke} style={{ animationDelay: `${i * 1.3}s` }} cx={tx} cy={ty - 4} r={5 + i} fill="#fffaf0" />
+            ))}
           </g>
         );
       })()}
