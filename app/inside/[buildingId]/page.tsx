@@ -8,6 +8,7 @@ import ChatPanel from "@/components/ChatPanel";
 import townStyles from "../../town.module.css";
 import styles from "./room.module.css";
 import dynamic from "next/dynamic";
+import { initialNpcStates, useRoomNpcs, type NpcState } from "./useRoomNpcs";
 import { BUILDINGS, withThemeResident, type Building, type PlacedBuilding } from "../../buildings";
 import { getRoomObstacles, getRoomTemplate, type Furniture, type Room } from "../../interiors";
 import {
@@ -83,7 +84,14 @@ function RoomView({ building }: { building: Building }) {
 
   // 벽·가구에 주민이 서 있는 자리를 더해, 주민도 통과할 수 없게 한다.
   // 방 안의 다른 사람들(직원·손님 등)도 통과할 수 없다.
-  const npcRects = useMemo(() => room.npcs.map((n) => ({ x: n.x, y: n.y, width: CHAR_SIZE, height: CHAR_SIZE })), [room]);
+  // 방 안 사람들의 현재 위치(앉기/돌아다니기는 useRoomNpcs가 갱신한다)
+  const [npcStates, setNpcStates] = useState<NpcState[]>(() => initialNpcStates(room));
+  const npcRects = useMemo(() => npcStates.map((n) => ({ x: n.x, y: n.y, width: CHAR_SIZE, height: CHAR_SIZE })), [npcStates]);
+  // 사람들이 피해 다닐 고정 장애물: 벽·가구·건물 담당 주민
+  const staticObstacles = useMemo(
+    () => [...getRoomObstacles(room), ...(resident ? [residentRect] : [])],
+    [room, resident, residentRect]
+  );
   const obstacles = useMemo(
     () => [...getRoomObstacles(room), ...(resident ? [residentRect] : []), ...npcRects],
     [room, resident, residentRect, npcRects]
@@ -93,12 +101,12 @@ function RoomView({ building }: { building: Building }) {
   const talkables = useMemo(() => {
     const list: { id: string; name: string; x: number; y: number }[] = [];
     if (resident && residentId) list.push({ id: residentId, name: resident.name, x: residentRect.x, y: residentRect.y });
-    room.npcs.forEach((n) => {
+    npcStates.forEach((n) => {
       const v = VILLAGERS[n.id];
       if (v) list.push({ id: n.id, name: v.name, x: n.x, y: n.y });
     });
     return list;
-  }, [resident, residentId, residentRect, room]);
+  }, [resident, residentId, residentRect, npcStates]);
   // 지금 대화 중인 주민 id (없으면 대화창 닫힘)
   const [chatWith, setChatWith] = useState<string | null>(null);
   const chatOpen = chatWith !== null;
@@ -107,7 +115,7 @@ function RoomView({ building }: { building: Building }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const [decorMessage, setDecorMessage] = useState<string | null>(null);
-  const { position } = useWalker({
+  const { position, positionRef } = useWalker({
     width: room.width,
     height: room.height,
     obstacles,
@@ -120,6 +128,7 @@ function RoomView({ building }: { building: Building }) {
     talkables
       .filter((t) => isNearRect(position.x, position.y, { x: t.x, y: t.y, width: CHAR_SIZE, height: CHAR_SIZE }, INTERACTION_MARGIN))
       .sort((a, b) => Math.hypot(a.x - position.x, a.y - position.y) - Math.hypot(b.x - position.x, b.y - position.y))[0] ?? null;
+  useRoomNpcs({ room, staticObstacles, playerRef: positionRef, paused: decorating, talkingTo: chatWith, onStates: setNpcStates });
   const nearTalkRef = useRef<string | null>(null);
   const chatOpenRef = useRef(false);
   const leavingRef = useRef(false);
@@ -260,6 +269,7 @@ function RoomView({ building }: { building: Building }) {
           residentRect={resident ? residentRect : null}
           residentId={resident ? residentId : null}
           residentName={resident ? resident.name : null}
+          npcStates={npcStates}
           npcNames={Object.fromEntries(room.npcs.filter((n) => VILLAGERS[n.id]).map((n) => [n.id, VILLAGERS[n.id].name]))}
           hintAt={nearTalk ? { x: nearTalk.x + CHAR_SIZE / 2, z: nearTalk.y + CHAR_SIZE / 2 } : null}
           decorating={decorating}

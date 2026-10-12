@@ -33,6 +33,10 @@ export interface RoomNpc {
   y: number;
   facing?: number; // 라디안, 0 = 화면 아래쪽(+Y) 방향
   label?: string; // 머리 위 이름표(없으면 표시하지 않음)
+  // 행동: stand = 제자리에 서 있기(기본), sit = (x, y)에 있는 의자에 앉아 facing 쪽(테이블)을 본다,
+  // wander = area 안을 천천히 돌아다니다 쉬기를 반복한다(가구·사람·플레이어를 피해서 걷는다).
+  behavior?: "stand" | "sit" | "wander";
+  area?: { x0: number; y0: number; x1: number; y1: number }; // wander의 활동 범위
 }
 
 export interface Room {
@@ -83,7 +87,12 @@ function baseRoom(
     spawn: { x: ROOM_W / 2 - 16, y: ROOM_H - 120 },
     residentSpot: { x: residentSpot.x * ROOM_SCALE, y: residentSpot.y * ROOM_SCALE },
     furniture: scaleFurniture(furniture),
-    npcs: npcs.map((n) => ({ ...n, x: n.x * ROOM_SCALE, y: n.y * ROOM_SCALE })),
+    npcs: npcs.map((n) => ({
+      ...n,
+      x: n.x * ROOM_SCALE,
+      y: n.y * ROOM_SCALE,
+      area: n.area && { x0: n.area.x0 * ROOM_SCALE, y0: n.area.y0 * ROOM_SCALE, x1: n.area.x1 * ROOM_SCALE, y1: n.area.y1 * ROOM_SCALE },
+    })),
   };
 }
 
@@ -97,9 +106,10 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
     { id: "table3", x: 110, y: 300, width: 64, height: 64, shape: "round", color: "#b98a5a", ...fixed },
   ], [
     // 사장님이 두 분: 한 분은 건물 담당 주민(residentSpot), 다른 한 분은 카운터 안쪽에서 일한다.
-    { id: "cafe-owner2", look: "cafe-owner2", x: 130, y: 82, facing: 0, label: "공동 사장님" },
-    { id: "cafe-guest1", look: "guest-a", x: 340, y: 215, facing: Math.PI / 2 },
-    { id: "cafe-guest2", look: "guest-b", x: 80, y: 318, facing: -Math.PI / 2 },
+    { id: "cafe-owner2", look: "cafe-owner2", x: 130, y: 82, facing: 0, label: "공동 사장님", behavior: "wander", area: { x0: 55, y0: 82, x1: 235, y1: 100 } },
+    // 의자에 앉은 손님: 테이블 옆 의자 자리에 앉는다 (좌표는 의자 위치 기준)
+    { id: "cafe-guest1", look: "guest-a", x: 360.8, y: 219.2, facing: Math.PI / 2, behavior: "sit" },
+    { id: "cafe-guest2", look: "guest-b", x: 128.8, y: 280.8, facing: 0, behavior: "sit" },
   ]),
   shop: baseRoom("shop", "#d9dfe8", "#4a638a", { x: 304, y: 112 }, [
     { id: "shelf1", label: "선반", x: 50, y: 100, width: 170, height: 40, shape: "rect", color: "#8a6a45", emoji: "🥫", ...fixed },
@@ -109,8 +119,8 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
     { id: "register", label: "계산대", x: 420, y: 280, width: 150, height: 44, shape: "rect", color: "#5b4636", emoji: "💴", ...fixed },
   ], [
     { id: "shop-clerk", look: "shop-clerk", x: 475, y: 238, facing: 0, label: "점원" },
-    { id: "shop-stocker", look: "shop-stocker", x: 130, y: 150, facing: Math.PI, label: "점원" },
-    { id: "shop-guest", look: "guest-c", x: 230, y: 330, facing: Math.PI },
+    { id: "shop-stocker", look: "shop-stocker", x: 130, y: 150, facing: Math.PI, label: "점원", behavior: "wander", area: { x0: 100, y0: 146, x1: 400, y1: 205 } },
+    { id: "shop-guest", look: "guest-c", x: 230, y: 330, facing: Math.PI, behavior: "wander", area: { x0: 30, y0: 170, x1: 600, y1: 440 } },
   ]),
   hall: baseRoom("hall", "#dde5cf", "#5f7f45", { x: 304, y: 112 }, [
     { id: "desk1", label: "책상", x: 70, y: 110, width: 150, height: 50, shape: "rect", color: "#8a7350", emoji: "📋", ...fixed },
@@ -120,7 +130,7 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
   ], [
     { id: "hall-clerk1", look: "hall-clerk", x: 130, y: 82, facing: 0, label: "직원" },
     { id: "hall-clerk2", look: "hall-clerk2", x: 480, y: 82, facing: 0, label: "직원" },
-    { id: "hall-guest", look: "guest-a", x: 130, y: 268, facing: Math.PI / 2 },
+    { id: "hall-guest", look: "guest-a", x: 130, y: 268, facing: Math.PI / 2, behavior: "wander", area: { x0: 40, y0: 175, x1: 600, y1: 440 } },
   ]),
   // 내 집: 가구는 비어 있고, 실제 가구는 저장소(HomeFurnitureState)에서 읽어 채운다(app/home.ts).
   home: baseRoom("home", "#f0dfc8", "#b5566b", { x: 0, y: 0 }, []),
@@ -133,9 +143,10 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
     { id: "desk4", label: "책상", x: 90, y: 330, width: 90, height: 40, shape: "rect", color: "#a07a4c", ...fixed },
     { id: "desk5", label: "책상", x: 460, y: 330, width: 90, height: 40, shape: "rect", color: "#a07a4c", ...fixed },
   ], [
-    { id: "student1", look: "student-a", x: 110, y: 292, facing: Math.PI },
-    { id: "student2", look: "student-b", x: 295, y: 292, facing: Math.PI },
-    { id: "student3", look: "student-c", x: 480, y: 292, facing: Math.PI },
+    // 책상 앞 의자에 앉아 칠판 쪽을 보는 학생들
+    { id: "student1", look: "student-a", x: 122.2, y: 280, facing: Math.PI, behavior: "sit" },
+    { id: "student2", look: "student-b", x: 307.2, y: 280, facing: Math.PI, behavior: "sit" },
+    { id: "student3", look: "student-c", x: 492.2, y: 280, facing: Math.PI, behavior: "sit" },
   ]),
 };
 
