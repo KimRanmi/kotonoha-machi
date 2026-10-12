@@ -17,14 +17,20 @@ import {
   defaultHomeFurniture,
   makeHomeBuilding,
 } from "../../home";
-import { CHAR_SIZE, collidesWithRects, isNearRect, rectsOverlap, useWalker } from "@/lib/walk";
+import { CHAR_SIZE, collidesWithRects, isNearRect, nearestFreeSpot, rectsOverlap, useWalker, type Point } from "@/lib/walk";
+import { usePositionSaver } from "@/lib/usePositionSaver";
 import { VILLAGERS, getVillager } from "@/lib/villager";
 import { LINE_ACCEPT, LINE_BUSY, LINE_ENJOY, ROOM_MENUS, getOrderItem, isOrderAccepted, lineServe, menuItemsFor, parseOrderFromJapanese, type OrderItem } from "../../orders";
 import { speakJapanese } from "@/lib/tts";
 import { addLearnedWords } from "@/lib/words";
 import {
+  clearRoomRestore,
+  consumeRestore,
   fetchHomeFurniture,
   fetchHomePosition,
+  fetchLastPosition,
+  isRestorePending,
+  peekRoomRestore,
   fetchPlacedBuildings,
   saveHomeFurniture,
   setTownReturnBuilding,
@@ -43,14 +49,24 @@ export default function InsidePage() {
   const [state, setState] = useState<{
     building: Building | null;
     furniture: HomeFurnitureState | null;
+    // 마지막 위치 복원으로 열린 경우 저장된 좌표(아니면 null → 문 앞 기본 위치).
+    restore: Point | null;
   } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchPlacedBuildings(), fetchHomePosition()])
-      .then(async ([stored, home]) => {
+    // 마을에서 복원 이동으로 넘어왔으면 그 좌표를 쓰고, 이 주소로 전체 페이지를 새로 불러온 경우(새로고침)에는
+    // 서버에서 마지막 위치를 읽는다. 앱 안에서 입장한 경우에는 복원하지 않는다.
+    const handoff = peekRoomRestore(buildingId);
+    const wantRestore = !handoff && isRestorePending();
+    Promise.all([
+      fetchPlacedBuildings(),
+      fetchHomePosition(),
+      wantRestore ? fetchLastPosition().catch(() => null) : Promise.resolve(handoff),
+    ])
+      .then(async ([stored, home, last]) => {
         const placed = stored.map(withThemeResident);
         const found =
           [...BUILDINGS, ...(home ? [makeHomeBuilding(home)] : []), ...placed].find((b) => b.id === buildingId) ??
@@ -59,7 +75,11 @@ export default function InsidePage() {
         const furniture = found?.isHome ? await fetchHomeFurniture() : null;
         if (cancelled) return;
         setLoadError(null);
-        setState({ building: found, furniture });
+        if (wantRestore) consumeRestore();
+        clearRoomRestore();
+        // 주소가 우선이라, 저장된 장소가 이 건물일 때만 좌표를 쓴다.
+        const restore = found && last?.place === found.id ? { x: last.x, y: last.y } : null;
+        setState({ building: found, furniture, restore });
       })
       .catch((err) => {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : "방 정보를 불러오지 못했습니다.");
@@ -101,15 +121,17 @@ export default function InsidePage() {
       </div>
     );
   }
-  return <RoomView building={state.building} initialFurniture={state.furniture} />;
+  return <RoomView building={state.building} initialFurniture={state.furniture} restore={state.restore} />;
 }
 
 function RoomView({
   building,
   initialFurniture,
+  restore,
 }: {
   building: Building;
   initialFurniture: HomeFurnitureState | null;
+  restore: Point | null;
 }) {
   const router = useRouter();
   const isHome = !!building.isHome;
@@ -170,13 +192,28 @@ function RoomView({
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const [decorMessage, setDecorMessage] = useState<string | null>(null);
+  // 마지막 위치로 시작할 자리. 가구·벽·문·방 안 사람과 겹치거나 범위 밖이면 가까운 빈 자리, 없으면 기본 위치(문 앞).
+  // 앉아 있던 상태는 복원하지 않으므로 좌표만 쓰고 서 있는 상태로 시작한다.
+  const [startSpot] = useState<Point>(() => {
+    if (!restore) return room.spawn;
+    const blockers = [
+      ...getRoomObstacles(room),
+      ...(resident ? [residentRect] : []),
+      ...initialNpcStates(room).map((n) => ({ x: n.x, y: n.y, width: CHAR_SIZE, height: CHAR_SIZE })),
+      room.door,
+    ];
+    return nearestFreeSpot(restore, room, blockers, room.spawn);
+  });
   const { position, positionRef, teleport } = useWalker({
     width: room.width,
     height: room.height,
     obstacles,
-    initial: room.spawn,
+    initial: startSpot,
     paused: chatOpen || decorating || !!seated,
   });
+
+  // 마지막 위치 저장(들어왔을 때 한 번, 걷는 동안 몇 초에 한 번, 멈췄을 때, 탭을 닫을 때)
+  usePositionSaver(building.id, positionRef, true);
 
   // 가장 가까운 대화 가능한 사람
   const nearTalk =
