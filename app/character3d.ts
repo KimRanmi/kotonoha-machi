@@ -24,6 +24,9 @@ export interface CharacterRig {
   update(dt: number, moving: boolean): void;
   /** 앉은 자세로 부드럽게 바꾼다(엉덩이가 root 기준 SIT_HIP_Y 높이에 오도록 호출한 쪽에서 root를 내려 준다). */
   setSitting(sitting: boolean): void;
+  /** 쟁반 등을 손에 든다: true면 팔을 앞으로 올리고, carryAnchor에 붙인 물체가 가슴 앞에 놓인다. */
+  setCarrying(carrying: boolean): void;
+  readonly carryAnchor: THREE.Group;
   /** 엉덩이 높이(root 기준, 배율 적용 전). 앉을 때 의자 위로 맞추는 데 쓴다. */
   readonly hipY: number;
   /** 바라볼 방향(라디안, +Z 기준)으로 부드럽게 돌아선다. */
@@ -249,7 +252,14 @@ export function createCharacter(spec: CharacterSpec): CharacterRig {
     body.add(tail);
   }
 
+  // 쟁반을 올려 두는 자리(가슴 앞)
+  const carryAnchor = new THREE.Group();
+  carryAnchor.position.set(0, 20.5, 11);
+  body.add(carryAnchor);
+
   // 애니메이션 상태
+  let carryTarget = 0;
+  let carryAmt = 0;
   let sitTarget = 0;
   let sitAmt = 0;
   let phase = 0;
@@ -284,12 +294,20 @@ export function createCharacter(spec: CharacterSpec): CharacterRig {
       // 앉으면 다리를 앞으로 뻗고 팔은 무릎 쪽으로 모은다
       legL.rotation.x = s * 0.75 * walkK - sitAmt * 1.45;
       legR.rotation.x = -s * 0.75 * walkK - sitAmt * 1.45;
-      armL.rotation.x = -s * 0.7 * walkK - sitAmt * 0.7;
-      armR.rotation.x = s * 0.7 * walkK - sitAmt * 0.7;
+      carryAmt += (carryTarget - carryAmt) * Math.min(1, dt * 10);
+      // 쟁반을 들면 두 팔을 앞으로 모아 올린다
+      armL.rotation.x = (-s * 0.7 * walkK - sitAmt * 0.7) * (1 - carryAmt) - carryAmt * 1.25;
+      armR.rotation.x = (s * 0.7 * walkK - sitAmt * 0.7) * (1 - carryAmt) - carryAmt * 1.25;
+      armL.rotation.z = -1 * 0.18 * (1 - carryAmt) + carryAmt * 0.32;
+      armR.rotation.z = 0.18 * (1 - carryAmt) - carryAmt * 0.32;
       body.position.y = Math.abs(Math.sin(phase)) * 1.5 * amp * walkK;
       body.position.z = -sitAmt * 2.2;
       body.rotation.z = Math.sin(phase * 0.5) * 0.04 * amp;
     },
+    setCarrying(c) {
+      carryTarget = c ? 1 : 0;
+    },
+    carryAnchor,
     setSitting(sitting) {
       sitTarget = sitting ? 1 : 0;
     },

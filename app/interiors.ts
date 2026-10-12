@@ -99,8 +99,9 @@ function baseRoom(
 const fixed = { movable: false } as const;
 
 export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
-  cafe: baseRoom("cafe", "#e8d5b5", "#a8683a", { x: 290, y: 112 }, [
+  cafe: baseRoom("cafe", "#e8d5b5", "#a8683a", { x: 330, y: 120 }, [
     { id: "counter", label: "카운터", x: 40, y: 110, width: 220, height: 44, shape: "rect", color: "#7a4a28", emoji: "☕", ...fixed },
+    { id: "showcase", label: "케이크 쇼케이스", x: 262, y: 110, width: 64, height: 44, shape: "rect", color: "#e9dcc4", ...fixed },
     { id: "table1", x: 380, y: 200, width: 64, height: 64, shape: "round", color: "#b98a5a", ...fixed },
     { id: "table2", x: 500, y: 310, width: 64, height: 64, shape: "round", color: "#b98a5a", ...fixed },
     { id: "table3", x: 110, y: 300, width: 64, height: 64, shape: "round", color: "#b98a5a", ...fixed },
@@ -116,6 +117,7 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
     { id: "shelf2", label: "선반", x: 420, y: 100, width: 170, height: 40, shape: "rect", color: "#8a6a45", emoji: "🧺", ...fixed },
     { id: "display1", x: 90, y: 230, width: 60, height: 100, shape: "rect", color: "#a88b63", ...fixed },
     { id: "display2", x: 200, y: 230, width: 60, height: 100, shape: "rect", color: "#a88b63", ...fixed },
+    { id: "cooler", label: "냉장 쇼케이스", x: 12, y: 150, width: 46, height: 46, shape: "rect", color: "#e9eef0", ...fixed },
     { id: "register", label: "계산대", x: 420, y: 280, width: 150, height: 44, shape: "rect", color: "#5b4636", emoji: "💴", ...fixed },
   ], [
     { id: "shop-clerk", look: "shop-clerk", x: 475, y: 238, facing: 0, label: "점원" },

@@ -6,6 +6,7 @@ import type { Furniture, Room } from "../../../interiors";
 import { CHAR_SIZE } from "@/lib/walk";
 import type { NpcState } from "../useRoomNpcs";
 import { buildFurniture, buildShell, shadowBlob } from "./build";
+import { buildOrderItem } from "./items3d";
 import { PLAYER_SPEC, createCharacter, specForVillager, type CharacterRig } from "../../../character3d";
 
 // 건물 내부 방을 진짜 3D(three.js)로 보여주는 컴포넌트.
@@ -34,6 +35,7 @@ export default function RoomCanvas({
   residentId,
   residentName,
   npcStates,
+  playerCarry,
   npcNames,
   hintAt,
   decorating,
@@ -48,6 +50,7 @@ export default function RoomCanvas({
   residentId: string | null;
   residentName: string | null;
   npcStates: NpcState[];
+  playerCarry: string | null;
   npcNames: Record<string, string>;
   hintAt: { x: number; z: number } | null;
   decorating: boolean;
@@ -59,10 +62,10 @@ export default function RoomCanvas({
   const doorRef = useRef<HTMLDivElement>(null);
 
   // 최신 props를 렌더 루프/이벤트에서 읽기 위한 ref
-  const live = useRef({ position, hintAt, npcStates, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture });
+  const live = useRef({ position, hintAt, npcStates, playerCarry, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture });
   const apiRef = useRef<{ dirty: () => void; rebuildFurniture: () => void; updateOverlay: () => void } | null>(null);
   useEffect(() => {
-    live.current = { position, hintAt, npcStates, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture };
+    live.current = { position, hintAt, npcStates, playerCarry, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture };
     apiRef.current?.updateOverlay();
     apiRef.current?.dirty();
   });
@@ -153,7 +156,20 @@ export default function RoomCanvas({
     }
     // 방 안의 다른 사람들(직원·손님 등): 서 있거나, 의자에 앉거나, 돌아다닌다.
     // 위치와 동작은 부모의 시뮬레이션(useRoomNpcs)이 주고, 여기서는 그대로 그리기만 한다.
-    const npcObjs = new Map<string, { group: THREE.Group; rig: CharacterRig; label: HTMLDivElement | null }>();
+    const npcObjs = new Map<string, { group: THREE.Group; rig: CharacterRig; label: HTMLDivElement | null; carried: string | null }>();
+    // 쟁반을 들고 있는 물건을 바꾼다(주문한 음식)
+    const applyCarry = (rig: CharacterRig, current: string | null, next: string | null): string | null => {
+      if (current === next) return current;
+      [...rig.carryAnchor.children].forEach((c) => {
+        rig.carryAnchor.remove(c);
+        disposeGroup(c);
+      });
+      if (next) rig.carryAnchor.add(buildOrderItem(next));
+      rig.setCarrying(!!next);
+      needs = true;
+      return next;
+    };
+    let playerCarried: string | null = null;
     room.npcs.forEach((n) => {
       const rig = createCharacter(specForVillager(n.look));
       rig.root.scale.setScalar(1.3);
@@ -171,7 +187,7 @@ export default function RoomCanvas({
         label.textContent = text;
         host.appendChild(label);
       }
-      npcObjs.set(n.id, { group, rig, label });
+      npcObjs.set(n.id, { group, rig, label, carried: null });
     });
     let idleAcc = 0;
     let prevX = position.x;
@@ -297,6 +313,7 @@ export default function RoomCanvas({
         prevZ = l.position.y;
       } else movingFor += dt;
       const walking = movingFor < 0.12;
+      playerCarried = applyCarry(playerRig, playerCarried, l.playerCarry);
       playerRig.update(dt, walking);
       // 주민은 가까이 온 플레이어 쪽을 바라본다
       if (residentRig && resident) {
@@ -313,6 +330,7 @@ export default function RoomCanvas({
         // 앉으면 엉덩이가 의자(앉는 면 높이 ≈ 25) 위에 오도록 내린다
         o.group.position.set(st.x + CHAR_SIZE / 2, 0, st.y + CHAR_SIZE / 2);
         o.rig.root.position.y = st.sitting ? 25 - o.rig.hipY * 1.3 : 0; // 그림자는 바닥에 두고 몸만 내린다
+        o.carried = applyCarry(o.rig, o.carried, st.carry);
         o.rig.setSitting(st.sitting);
         o.rig.face(st.facing, dt);
         o.rig.update(dt, st.walking);
