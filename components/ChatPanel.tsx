@@ -4,13 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as wanakana from "wanakana";
 import { ChatMessage, LearnedWord } from "@/lib/types";
-import {
-  WORDS_STORAGE_KEY,
-  fetchChatHistory,
-  loadFromStorage,
-  saveToStorage,
-  sendChat,
-} from "@/lib/storage";
+import { addWord, fetchChatHistory, fetchWords, sendChat } from "@/lib/storage";
 import { DEFAULT_VILLAGER_ID, getVillager } from "@/lib/villager";
 import VillagerFace from "@/components/VillagerFace";
 import VillagerMessage from "@/components/VillagerMessage";
@@ -85,7 +79,11 @@ export default function ChatPanel({
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   // 다른 곳(주문 등)에서 단어 목록이 바뀌면 다시 읽어 와서, 아래의 저장이 새 단어를 덮어쓰지 않게 한다.
   useEffect(() => {
-    const reload = () => setWords(loadFromStorage<LearnedWord[]>(WORDS_STORAGE_KEY, []));
+    const reload = () => {
+      fetchWords()
+        .then(setWords)
+        .catch(() => undefined);
+    };
     window.addEventListener(WORDS_CHANGED_EVENT, reload);
     return () => window.removeEventListener(WORDS_CHANGED_EVENT, reload);
   }, []);
@@ -112,11 +110,17 @@ export default function ChatPanel({
   }, [kanaEnabled]);
 
   useEffect(() => {
-    // 대화 기록은 서버(DB)에서, 학습 단어는 localStorage에서(4단계 전까지) 마운트 후 한 번 불러온다.
+    // 대화 기록과 학습 단어를 서버(DB)에서 마운트 후 한 번 불러온다.
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setHydrated(false);
-    setWords(loadFromStorage<LearnedWord[]>(WORDS_STORAGE_KEY, []));
+    fetchWords()
+      .then((loaded) => {
+        if (!cancelled) setWords(loaded);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "학습 단어를 불러오지 못했습니다.");
+      });
     fetchChatHistory(villager.id)
       .then((history) => {
         if (!cancelled) setMessages(history);
@@ -131,10 +135,6 @@ export default function ChatPanel({
       cancelled = true;
     };
   }, [villager.id]);
-
-  useEffect(() => {
-    if (hydrated) saveToStorage(WORDS_STORAGE_KEY, words);
-  }, [words, hydrated]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -262,11 +262,17 @@ export default function ChatPanel({
     setPopup({ word, x, y, alreadyAdded });
   }
 
-  function handleAddWord(word: string) {
-    setWords((prev) => {
-      if (prev.some((w) => w.word === word)) return prev;
-      return [...prev, { word, addedAt: Date.now() }];
-    });
+  // 목록에는 바로 반영하고 서버에 저장한다. 실패하면 되돌리고 에러를 보여준다.
+  async function handleAddWord(word: string) {
+    if (words.some((w) => w.word === word)) return;
+    setWords((prev) => [...prev, { word, addedAt: Date.now() }]);
+    try {
+      const saved = await addWord(word);
+      setWords((prev) => prev.map((w) => (w.word === word ? saved : w)));
+    } catch (err) {
+      setWords((prev) => prev.filter((w) => w.word !== word));
+      setError(err instanceof Error ? err.message : "단어를 저장하지 못했습니다.");
+    }
   }
 
   return (
