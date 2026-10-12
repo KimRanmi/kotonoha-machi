@@ -23,12 +23,19 @@ import {
   clamp,
   collidesWithRects,
   isNearRect,
+  nearestFreeSpot,
   rectsOverlap,
   useWalker,
   type Point,
 } from "@/lib/walk";
+import { usePositionSaver } from "@/lib/usePositionSaver";
 import {
+  TOWN_PLACE,
+  consumeRestore,
   fetchHomePosition,
+  fetchLastPosition,
+  isRestorePending,
+  setRoomRestore,
   fetchOnboardingDone,
   fetchPendingBuilding,
   fetchPlacedBuildings,
@@ -48,6 +55,12 @@ import type { PendingBuilding } from "@/lib/types";
 
 // 건물 안으로 "들어갈 수 있는" 거리: 건물 테두리 밖으로 이 거리 안.
 const INTERACTION_MARGIN = 28;
+
+// 마을에 처음 들어왔을 때(저장된 위치가 없거나 쓸 수 없을 때) 서는 기본 시작 위치.
+const DEFAULT_START: Point = {
+  x: MAP_WIDTH / 2 - CHAR_SIZE / 2,
+  y: MAP_HEIGHT / 2 - CHAR_SIZE / 2,
+};
 
 // 건물 내부에서 나왔을 때 캐릭터를 세울 자리: 건물 입구(아래쪽 가운데) 앞을 우선하고,
 // 막혀 있으면(맵 가장자리, 다른 건물 등) 위/오른쪽/왼쪽 순으로 비어 있는 곳을 찾는다.
@@ -108,10 +121,7 @@ export default function TownPage() {
     height: MAP_HEIGHT,
     obstacles: allBuildings,
     isometric: true, // 방향키는 화면 기준(위 = 화면 위쪽)으로 움직인다
-    initial: {
-      x: MAP_WIDTH / 2 - CHAR_SIZE / 2,
-      y: MAP_HEIGHT / 2 - CHAR_SIZE / 2,
-    },
+    initial: DEFAULT_START,
   });
 
   // 서버에서 마을 데이터를 불러오는 중인지, 실패했는지. 불러오기 전에는 배치 모드를 켜지 않는다.
@@ -125,13 +135,18 @@ export default function TownPage() {
 
   useEffect(() => {
     let cancelled = false;
+    // 건물 안으로 복원 이동하는 중이면 마을을 보여주지 않고 로딩 상태로 둔다.
+    let redirecting = false;
+    // 마지막 위치 복원은 전체 페이지를 새로 불러온 경우에만 한다. 불러오기에 실패해도 마을은 기본 위치로 연다.
+    const wantRestore = isRestorePending();
     Promise.all([
       fetchPlacedBuildings(),
       fetchHomePosition(),
       fetchOnboardingDone(),
       fetchPendingBuilding(),
+      wantRestore ? fetchLastPosition().catch(() => null) : Promise.resolve(null),
     ])
-      .then(([stored, home, done, pending]) => {
+      .then(([stored, home, done, pending, last]) => {
         if (cancelled) return;
         // 주민 연결이 생기기 전에 저장된 건물에는 테마 주민을 소급해서 붙여준다.
         const placed = stored.map(withThemeResident);
@@ -139,10 +154,30 @@ export default function TownPage() {
         setHomePosition(home);
         setOnboardingDone(done);
 
-        // 건물 내부에서 나온 경우, 그 건물 입구 앞에 캐릭터를 세운다.
+        const all = [...BUILDINGS, ...(home ? [makeHomeBuilding(home)] : []), ...placed];
+
+        // 마지막 위치 복원. 온보딩(내 집 배치)이 끝나지 않았거나 배치 대기 건물이 있으면 그 흐름이 먼저라서 복원하지 않는다.
+        let restored = false;
+        if (wantRestore && isRestorePending()) {
+          consumeRestore();
+          if (last && !getNextOnboardingStep(done) && !pending) {
+            if (last.place === TOWN_PLACE) {
+              teleport(nearestFreeSpot(last, { width: MAP_WIDTH, height: MAP_HEIGHT }, all, DEFAULT_START));
+              restored = true;
+            } else if (all.some((b) => b.id === last.place)) {
+              // 건물 안에 있었다면 그 건물 안에서 시작한다. 좌표는 내부 화면에 넘긴다.
+              setRoomRestore(last);
+              redirecting = true;
+              router.replace(`/inside/${encodeURIComponent(last.place)}`);
+              restored = true;
+            }
+            // 건물이 없어졌으면 마을의 기본 시작 위치에 그대로 둔다.
+          }
+        }
+
+        // 건물 내부에서 나온 경우, 그 건물 입구 앞에 캐릭터를 세운다(복원 위치가 있으면 그쪽이 우선).
         const returnId = takeTownReturnBuilding();
-        if (returnId) {
-          const all = [...BUILDINGS, ...(home ? [makeHomeBuilding(home)] : []), ...placed];
+        if (returnId && !restored) {
           const from = all.find((b) => b.id === returnId);
           if (from) teleport(findExitSpot(from, all));
         }
@@ -156,12 +191,15 @@ export default function TownPage() {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : "마을 정보를 불러오지 못했습니다.");
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !redirecting) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [teleport, reloadKey]);
+  }, [teleport, reloadKey, router]);
+
+  // 마지막 위치 저장: 불러오기와 복원이 끝난 뒤부터(그 전의 기본 위치로 덮어쓰지 않도록).
+  usePositionSaver(TOWN_PLACE, positionRef, !loading && !loadError);
 
   // 방금 배치된 건물 id. 짧은 건설 연출 클래스를 붙이는 동안만 값을 들고 있는다.
   const [justPlacedId, setJustPlacedId] = useState<string | null>(null);
@@ -323,7 +361,12 @@ export default function TownPage() {
 
   return (
     <div className={styles.townRoot}>
-      <div ref={viewportRef} className={styles.viewport}>
+      {/* 불러오는 동안(복원할 위치로 옮기기 전)에는 마을을 숨겨서 기본 위치가 잠깐 보였다가 이동하지 않게 한다. */}
+      <div
+        ref={viewportRef}
+        className={styles.viewport}
+        style={loading && !loadError ? { visibility: "hidden" } : undefined}
+      >
         <main
           className={[styles.stage, onboardingStep || pendingBuilding ? styles.placementMode : "", cameraReady ? styles.cameraReady : ""].join(" ")}
           style={{ width: STAGE_WIDTH, height: STAGE_HEIGHT, transform: `translate3d(${-camX}px, ${-camY}px, 0)` }}
