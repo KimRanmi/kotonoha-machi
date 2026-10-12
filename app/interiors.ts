@@ -162,6 +162,33 @@ export function getRoomTemplate(building: Building): Room {
   return ROOM_TEMPLATES[getInteriorKind(building)];
 }
 
+// 앉을 수 있는 자리. 둥근 테이블(id가 table로 시작) 가장자리의 의자 3개(북·동·서)와, 단독 의자(id "chair").
+// 3D 모델(room3d/build.ts)에서 의자를 놓는 위치와 같은 규칙이라, 그림과 자리가 맞는다.
+export interface Seat {
+  id: string;
+  x: number; // 의자 중심 (월드 좌표)
+  y: number;
+  facing: number; // 앉았을 때 바라보는 방향(테이블 쪽), 라디안, 0 = +Y
+  table: { x: number; y: number; r: number } | null;
+}
+
+export function getSeats(room: Room): Seat[] {
+  const seats: Seat[] = [];
+  for (const f of room.furniture) {
+    if (f.shape === "round" && f.id.startsWith("table")) {
+      const r = f.width / 2;
+      const cx = f.x + r;
+      const cy = f.y + r;
+      ([[0, -1], [1, 0], [-1, 0]] as [number, number][]).forEach(([bx, bz], i) => {
+        seats.push({ id: `${f.id}-${i}`, x: cx + bx * (r + 8), y: cy + bz * (r + 8), facing: Math.atan2(-bx, -bz), table: { x: cx, y: cy, r } });
+      });
+    } else if (f.id === "chair") {
+      seats.push({ id: f.id, x: f.x + f.width / 2, y: f.y + f.height / 2, facing: 0, table: null });
+    }
+  }
+  return seats;
+}
+
 // 방에서 캐릭터가 통과할 수 없는 영역들: 위쪽 벽 + solid 가구(+ 주민이 서 있는 자리).
 export function getRoomObstacles(room: Room): { x: number; y: number; width: number; height: number }[] {
   return [

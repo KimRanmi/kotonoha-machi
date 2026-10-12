@@ -9,11 +9,11 @@ const shade = <T extends THREE.Mesh>(m: T): T => {
 };
 const cyl = (rt: number, rb: number, h: number, m: THREE.Material, seg = 24) => shade(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m));
 
-export function buildOrderItem(id: string): THREE.Group {
+export function buildOrderItem(id: string, opts: { tray?: boolean } = {}): THREE.Group {
   const g = new THREE.Group();
   const tray = shade(new THREE.Mesh(new THREE.BoxGeometry(18, 1.2, 13), std("#8a6a50", 0.7)));
   tray.position.y = 0.6;
-  g.add(tray);
+  if (opts.tray ?? true) g.add(tray);
   if (id === "coffee" || id === "tea") {
     const col = id === "coffee" ? "#6b3f22" : "#c98a3a";
     const saucer = cyl(5.6, 5, 0.7, std("#efe7d8", 0.4));
