@@ -19,9 +19,12 @@ import {
 } from "../../home";
 import { CHAR_SIZE, collidesWithRects, isNearRect, rectsOverlap, useWalker } from "@/lib/walk";
 import { VILLAGERS, getVillager } from "@/lib/villager";
-import { LINE_ACCEPT, LINE_BUSY, LINE_ENJOY, LINE_SERVE, ORDER_CHAT_HINT, ORDER_ITEMS, getOrderItem, isOrderAccepted, parseOrderFromJapanese, type OrderItem } from "../../orders";
+import { LINE_ACCEPT, LINE_BUSY, LINE_ENJOY, ROOM_MENUS, getOrderItem, isOrderAccepted, lineServe, menuItemsFor, parseOrderFromJapanese, type OrderItem } from "../../orders";
+import { speakJapanese } from "@/lib/tts";
+import { addLearnedWords } from "@/lib/words";
 import {
   loadFromStorage,
+  saveToStorage,
   loadHomeFurniture,
   loadHomePosition,
   saveHomeFurniture,
@@ -176,9 +179,25 @@ function RoomView({ building }: { building: Building }) {
     sitRef.current = { sitDown, standUp };
   });
 
-  // ── 카페 주문: 주문하면 직원이 준비해서 플레이어 쪽으로 서빙해 주고, 받은 음식은 손에 들고 먹을 수 있다 ──
-  const canOrder = room.id === "cafe";
-  const SERVER_ID = "cafe-owner2";
+  // ── 주문/구매(카페·상점): 일본어로 말해서 주문하면 직원이 준비해서 플레이어 쪽으로 서빙해 주고,
+  //    받은 음식은 손에 들거나(앉아 있으면 테이블 위) 먹을 수 있다. 주문에 쓴 단어는 단어 목록에 담긴다. ──
+  const menu = ROOM_MENUS[room.id] ?? null;
+  const canOrder = !!menu;
+  const SERVER_ID = menu?.server ?? "";
+  const menuItems = menu ? menuItemsFor(menu.kind) : [];
+  // 듣기 모드: 직원의 말을 음성으로만 들려주고 글자는 가린다(눌러서 확인)
+  const [listening, setListening] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setListening(loadFromStorage<boolean>("kotonoha:listening-mode", false));
+  }, []);
+  function toggleListening() {
+    setListening((v) => {
+      saveToStorage("kotonoha:listening-mode", !v);
+      return !v;
+    });
+  }
+  const [revealSpeech, setRevealSpeech] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
   const [orderBusy, setOrderBusy] = useState(false);
   const [held, setHeld] = useState<string | null>(null); // 플레이어가 들고 있는 품목 id
@@ -191,8 +210,10 @@ function RoomView({ building }: { building: Building }) {
   useEffect(() => {
     heldRef.current = held;
   }, [held]);
-  function say(who: string, line: { ja: string; ko: string }, ms = 4500) {
+  function say(who: string, line: { ja: string; ko: string }, ms = 4500, speak = true) {
     setSpeech({ who, ...line });
+    setRevealSpeech(false);
+    if (speak && who !== "나") speakJapanese(line.ja);
     if (speechTimer.current !== null) window.clearTimeout(speechTimer.current);
     speechTimer.current = window.setTimeout(() => setSpeech(null), ms);
   }
@@ -203,13 +224,17 @@ function RoomView({ building }: { building: Building }) {
       say(serverName, LINE_BUSY);
       return;
     }
-    const counter = room.furniture.find((f) => f.id === "counter");
-    const showcase = room.furniture.find((f) => f.id === "showcase");
+    // 직원이 가서 준비하는/가져오는 자리: 카운터 뒤(커피 머신), 쇼케이스 뒤, 선반 앞, 냉장 쇼케이스 옆
+    const find = (id: string) => room.furniture.find((f) => f.id === id);
+    const counter = find("counter");
+    const showcase = find("showcase");
+    const shelf = find("shelf2");
+    const cooler = find("cooler");
     const y = room.wallHeight + 4;
-    const station =
-      item.station === "showcase" && showcase
-        ? { x: showcase.x + showcase.width / 2 - CHAR_SIZE / 2, y }
-        : { x: (counter?.x ?? 60) + 28, y };
+    let station = { x: (counter?.x ?? 60) + 28, y };
+    if (item.station === "showcase" && showcase) station = { x: showcase.x + showcase.width / 2 - CHAR_SIZE / 2, y };
+    else if (item.station === "shelf" && shelf) station = { x: shelf.x + shelf.width / 2 - CHAR_SIZE / 2, y: shelf.y + shelf.height + 6 };
+    else if (item.station === "cooler" && cooler) station = { x: cooler.x + cooler.width + 8, y: cooler.y + cooler.height / 2 - CHAR_SIZE / 2 };
     const ok = serve(SERVER_ID, item.id, {
       station,
       prepareSeconds: 3,
@@ -224,7 +249,7 @@ function RoomView({ building }: { building: Building }) {
         } else {
           setHeld(item.id);
         }
-        say(serverName, LINE_SERVE, 5000);
+        say(serverName, lineServe(item), 6000);
       },
       onDone: () => setOrderBusy(false),
     });
@@ -233,13 +258,21 @@ function RoomView({ building }: { building: Building }) {
       return;
     }
     setOrderBusy(true);
+    // 주문에 쓴 단어를 단어 목록에 담는다(이미 있으면 건너뜀)
+    const fresh = addLearnedWords(item.words);
+    const learned = fresh.length ? ` · 📚 단어장에 추가: ${fresh.join(", ")}` : "";
     if (fromChat) {
       // 대화에서 주문한 경우: 직원의 대답은 대화창에 이미 있으니, 접수 알림만 띄운다
-      setOrderToast(`🧾 ${item.ja} 주문 접수 · 곧 ${serverName}에게서 받아요`);
+      setOrderToast(`🧾 ${item.ja} 접수 · 곧 ${serverName}에게서 받아요${learned}`);
       if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
       toastTimer.current = window.setTimeout(() => setOrderToast(null), 6000);
     } else {
       say(serverName, LINE_ACCEPT, 5000);
+      if (fresh.length) {
+        setOrderToast(`📚 단어장에 추가: ${fresh.join(", ")}`);
+        if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+        toastTimer.current = window.setTimeout(() => setOrderToast(null), 4000);
+      }
     }
   }
   // 먹을 수 있는 음식: 손에 든 것, 또는 (앉아 있거나 가까이 있는) 테이블 위의 것
@@ -268,12 +301,12 @@ function RoomView({ building }: { building: Building }) {
     placeOrderRef.current = placeOrder;
   });
   const handleChatOrder = useCallback((userText: string, reply: string) => {
-    const id = parseOrderFromJapanese(userText);
-    if (!id || !isOrderAccepted(reply)) return;
-    const item = getOrderItem(id);
-    if (item) placeOrderRef.current(item, true);
-  }, []);
-  const cafeStaffChat = canOrder && (chatWith === "cafe" || chatWith === SERVER_ID);
+    if (!menu) return;
+    const item = parseOrderFromJapanese(userText, menu.kind);
+    if (!item || !isOrderAccepted(reply)) return;
+    placeOrderRef.current(item, true);
+  }, [menu]);
+  const cafeStaffChat = !!menu && !!chatWith && menu.chatIds.includes(chatWith);
   const nearTalkRef = useRef<string | null>(null);
   const chatOpenRef = useRef(false);
   const leavingRef = useRef(false);
@@ -452,7 +485,12 @@ function RoomView({ building }: { building: Building }) {
           ) : null}
           {canOrder && (
             <button type="button" className="pill pillPrimary" onClick={() => setOrderOpen(true)} disabled={chatOpen}>
-              주문하기
+              {menu?.button}
+            </button>
+          )}
+          {canOrder && (
+            <button type="button" className={listening ? "pill pillPrimary" : "pill"} onClick={toggleListening} title="직원의 말을 음성으로만 듣고 글자는 가려요">
+              🎧 듣기 모드 {listening ? "켬" : "끔"}
             </button>
           )}
           {isHome && (
@@ -475,8 +513,26 @@ function RoomView({ building }: { building: Building }) {
         {speech ? (
           <div className={styles.speech}>
             <div className={styles.speechWho}>{speech.who}</div>
-            <div className={styles.speechJa}>{speech.ja}</div>
-            <div className={styles.speechKo}>{speech.ko}</div>
+            {listening && !revealSpeech && speech.who !== "나" ? (
+              <div className={styles.speechJa}>🔊 (듣기 모드) 직원의 말을 듣고 이해해 보세요</div>
+            ) : (
+              <>
+                <div className={styles.speechJa}>{speech.ja}</div>
+                <div className={styles.speechKo}>{speech.ko}</div>
+              </>
+            )}
+            {speech.who !== "나" && (
+              <div className={styles.speechActions}>
+                <button type="button" className="pill" onClick={() => speakJapanese(speech.ja)}>
+                  🔊 다시 듣기
+                </button>
+                {listening && !revealSpeech && (
+                  <button type="button" className="pill" onClick={() => setRevealSpeech(true)}>
+                    문장 보기
+                  </button>
+                )}
+              </div>
+            )}
             {eatableId && (
               <button type="button" className="pill pillPrimary" onClick={eatHeld}>
                 {getOrderItem(eatableId)?.verb === "drink" ? "마시기 (E)" : "먹기 (E)"}
@@ -541,7 +597,7 @@ function RoomView({ building }: { building: Building }) {
           <div className={styles.orderPanel} onClick={(e) => e.stopPropagation()}>
             <div className={styles.orderHead}>
               <div>
-                <div className={styles.orderTitle}>メニュー · 메뉴</div>
+                <div className={styles.orderTitle}>{menu?.title}</div>
                 <div className={styles.orderSub}>일본어로 주문해 보세요. 선택하면 직원이 준비해서 가져다줘요.</div>
               </div>
               <button type="button" className="closeButton" onClick={() => setOrderOpen(false)} aria-label="닫기">
@@ -557,18 +613,21 @@ function RoomView({ building }: { building: Building }) {
                   setChatWith(SERVER_ID);
                 }}
               >
-                🗣 일본어로 직접 주문하기 (추천)
+                {menu?.chatButton}
               </button>
-              <span className={styles.orderModeHint}>켄타와 일본어로 대화해서 주문해요. 어려우면 아래 메뉴를 눌러도 돼요.</span>
+              <span className={styles.orderModeHint}>{serverName}와 일본어로 대화해서 말해요. 어려우면 아래 목록을 눌러도 돼요.</span>
             </div>
             <ul className={styles.orderList}>
-              {ORDER_ITEMS.map((it) => (
+              {menuItems.map((it) => (
                 <li key={it.id}>
                   <button type="button" className={styles.orderItem} onClick={() => placeOrder(it)}>
                     <span className={styles.orderEmoji}>{it.emoji}</span>
                     <span className={styles.orderText}>
                       <span className={styles.orderJa}>{it.ja}</span>
-                      <span className={styles.orderKo}>{it.ko}</span>
+                      <span className={styles.orderKo}>
+                        {it.ko}
+                        {it.price ? ` · ${it.price}円` : ""}
+                      </span>
                       <span className={styles.orderPhrase}>「{it.phrase}」</span>
                       <span className={styles.orderPhraseKo}>{it.phraseKo}</span>
                     </span>
@@ -582,7 +641,7 @@ function RoomView({ building }: { building: Building }) {
 
       {chatWith && (
         <div className={townStyles.chatOverlay}>
-          <ChatPanel villagerId={chatWith} onClose={() => setChatWith(null)} onExchange={cafeStaffChat ? handleChatOrder : undefined} hint={cafeStaffChat ? ORDER_CHAT_HINT : undefined} />
+          <ChatPanel villagerId={chatWith} onClose={() => setChatWith(null)} onExchange={cafeStaffChat ? handleChatOrder : undefined} hint={cafeStaffChat ? menu?.hint : undefined} blurReplies={listening} />
         </div>
       )}
     </div>

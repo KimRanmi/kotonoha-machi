@@ -15,6 +15,7 @@ import { DEFAULT_VILLAGER_ID, getVillager } from "@/lib/villager";
 import VillagerFace from "@/components/VillagerFace";
 import VillagerMessage from "@/components/VillagerMessage";
 import AddWordPopup, { WordPopupState } from "@/components/AddWordPopup";
+import { WORDS_CHANGED_EVENT } from "@/lib/words";
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -61,6 +62,7 @@ export default function ChatPanel({
   onClose,
   onExchange,
   hint,
+  blurReplies = false,
 }: {
   villagerId?: string;
   onClose?: () => void;
@@ -68,6 +70,8 @@ export default function ChatPanel({
   onExchange?: (userText: string, reply: string) => void;
   // 입력줄 위에 보여줄 작은 안내 문구
   hint?: string;
+  // 듣기 연습: 주민의 말을 음성으로만 들려주고 글자는 가려 둔다(눌러서 확인)
+  blurReplies?: boolean;
 }) {
   const villager = getVillager(villagerId);
 
@@ -78,6 +82,13 @@ export default function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [popup, setPopup] = useState<WordPopupState | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  // 다른 곳(주문 등)에서 단어 목록이 바뀌면 다시 읽어 와서, 아래의 저장이 새 단어를 덮어쓰지 않게 한다.
+  useEffect(() => {
+    const reload = () => setWords(loadFromStorage<LearnedWord[]>(WORDS_STORAGE_KEY, []));
+    window.addEventListener(WORDS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(WORDS_CHANGED_EVENT, reload);
+  }, []);
   const [kanaEnabled, setKanaEnabled] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
@@ -297,7 +308,22 @@ export default function ChatPanel({
         {messages.map((m) => (
           <div
             key={m.id}
-            className={m.role === "user" ? "bubbleUser" : "bubbleVillager"}
+            className={
+              m.role === "user"
+                ? "bubbleUser"
+                : blurReplies && !revealed.has(m.id)
+                  ? "bubbleVillager bubbleBlurred"
+                  : "bubbleVillager"
+            }
+            title={m.role !== "user" && blurReplies && !revealed.has(m.id) ? "눌러서 문장 보기" : undefined}
+            onClickCapture={(e) => {
+              // 듣기 연습 중 가려진 말은 먼저 눌러서 보이게 한다(단어 탭은 그다음)
+              if (m.role !== "user" && blurReplies && !revealed.has(m.id)) {
+                e.stopPropagation();
+                e.preventDefault();
+                setRevealed((prev) => new Set(prev).add(m.id));
+              }
+            }}
           >
             {m.role === "assistant" ? (
               <>
