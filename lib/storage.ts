@@ -495,6 +495,17 @@ export function clearRoomRestore(): void {
   roomRestore = null;
 }
 
+// 마을에서 다른 화면(단어 목록 등)으로 나갈 때의 자리. 링크로 마을에 돌아오면 그 자리에서 이어간다(메모리에만 둔다).
+let townResume: { x: number; y: number } | null = null;
+
+export function setTownResume(p: { x: number; y: number }): void {
+  townResume = p;
+}
+
+export function getTownResume(): { x: number; y: number } | null {
+  return townResume;
+}
+
 let lastSentKey: string | null = null;
 let positionSaveChain: Promise<unknown> = Promise.resolve();
 let positionProvider: (() => LastPosition | null) | null = null;
@@ -507,6 +518,7 @@ function positionKey(p: LastPosition): string {
 function resetPositionState(): void {
   lastSentKey = null;
   roomRestore = null;
+  townResume = null;
   positionProvider = null;
 }
 
