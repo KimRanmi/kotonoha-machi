@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import * as wanakana from "wanakana";
 import styles from "./theme-learning.module.css";
-import { travelTheme } from "./data";
-import { completeTheme } from "@/lib/storage";
+import type { Theme } from "./types";
+import { getThemeById, isThemeUnlocked } from "./themes";
+import { completeTheme, fetchCompletedThemes } from "@/lib/storage";
 
 const MAX_WRONG_BEFORE_HINT = 3;
 // "테마 완료!" 화면을 잠깐 보여준 뒤 마을로 자동 전환하기까지의 대기 시간.
@@ -19,8 +20,76 @@ function normalize(text: string): string {
   return text.replace(/\s+/g, "");
 }
 
-export default function ThemeLearning() {
-  const theme = travelTheme;
+// 잠긴 테마는 주소로 직접 들어와도 시작할 수 없다. 서버의 완료 목록을 읽어 확인한 뒤에만 학습을 보여준다.
+export default function ThemeLearning({ themeId }: { themeId: string }) {
+  const theme = getThemeById(themeId);
+  const [gate, setGate] = useState<"checking" | "open" | "locked" | "error">("checking");
+  const [gateError, setGateError] = useState<string | null>(null);
+  const [gateAttempt, setGateAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!theme) return;
+    let cancelled = false;
+    fetchCompletedThemes()
+      .then((titles) => {
+        if (cancelled) return;
+        setGate(isThemeUnlocked(theme, new Set(titles)) ? "open" : "locked");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setGateError(err instanceof Error ? err.message : "완료한 테마를 불러오지 못했습니다.");
+        setGate("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [theme, gateAttempt]);
+
+  if (!theme) return null;
+  if (gate === "open") return <ThemeSession theme={theme} />;
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.header}>
+        <div className={styles.headerTop}>
+          <div className={styles.themeTitle}>테마: {theme.title}</div>
+          <Link href="/theme-learning" className="pill">
+            ← 테마 목록
+          </Link>
+        </div>
+      </div>
+      <div className={styles.completeScreen}>
+        {gate === "checking" && <div>불러오는 중…</div>}
+        {gate === "locked" && (
+          <>
+            <div className={styles.completeTitle}>아직 잠겨 있어요</div>
+            <div>이 테마는 앞선 테마를 먼저 완료해야 시작할 수 있어요.</div>
+            <Link href="/theme-learning" className={styles.nextButton}>
+              테마 목록으로
+            </Link>
+          </>
+        )}
+        {gate === "error" && (
+          <>
+            <div role="alert">{gateError}</div>
+            <button
+              type="button"
+              className={styles.nextButton}
+              onClick={() => {
+                setGate("checking");
+                setGateAttempt((n) => n + 1);
+              }}
+            >
+              다시 시도
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ThemeSession({ theme }: { theme: Theme }) {
   const router = useRouter();
 
   const [stage, setStage] = useState<Stage>("rounds");
@@ -177,8 +246,8 @@ export default function ThemeLearning() {
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.themeTitle}>테마: {theme.title}</div>
-          <Link href="/" className="pill">
-            ← 마을로 돌아가기
+          <Link href="/theme-learning" className="pill">
+            ← 테마 목록
           </Link>
         </div>
         <div className={styles.subtitle}>{roundProgressLabel}</div>

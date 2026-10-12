@@ -255,6 +255,12 @@ export const VILLAGERS: Record<string, VillagerProfile> = { ...CORE_VILLAGERS, .
 // 같은 테마 건물을 여러 채 지어도 같은 주민(대화 기록/친밀도 공유)이 담당한다.
 export const THEME_RESIDENTS: Record<string, string> = {
   여행: "travel",
+  // 새 주민을 만들지 않고 기존 학습관 사람들(유이=student1, 료=student2, 아오이=student3)을 연결한다.
+  "음식·식사": "student2",
+  "쇼핑·가게": "student1",
+  "직장·업무": "student1",
+  "날씨·계절": "student3",
+  "감정·인간관계": "student3",
 };
 
 export const DEFAULT_VILLAGER_ID = "cafe";

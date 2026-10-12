@@ -349,6 +349,14 @@ export function completeTheme(themeTitle: string): Promise<boolean> {
   }, "테마 완료를 저장하지 못했습니다.");
 }
 
+// 지금까지 완료한 테마 제목 목록(서버가 제목을 키로 기록한다).
+export function fetchCompletedThemes(): Promise<string[]> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/themes/completed");
+    return readJson<string[]>(res, "완료한 테마를 불러오지 못했습니다.");
+  }, "완료한 테마를 불러오지 못했습니다.");
+}
+
 // 배치 대기 건물. 없으면 null. 배치할 때까지 서버에 남는다.
 export function fetchPendingBuilding(): Promise<PendingBuilding | null> {
   return guarded(async () => {
