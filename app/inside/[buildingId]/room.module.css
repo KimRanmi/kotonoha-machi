@@ -190,3 +190,31 @@
   color: var(--ink-soft);
   margin-bottom: 4px;
 }
+
+.orderModes {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 12px 0;
+}
+
+.orderModeHint {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.orderToast {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 130;
+  padding: 8px 18px;
+  background: var(--matcha-soft);
+  border: var(--border-w-thin) solid var(--matcha-deep);
+  color: var(--on-matcha);
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: var(--shadow-soft);
+}

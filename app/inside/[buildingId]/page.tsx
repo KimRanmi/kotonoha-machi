@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthStatus from "@/components/AuthStatus";
@@ -19,7 +19,7 @@ import {
 } from "../../home";
 import { CHAR_SIZE, collidesWithRects, isNearRect, rectsOverlap, useWalker } from "@/lib/walk";
 import { VILLAGERS, getVillager } from "@/lib/villager";
-import { LINE_ACCEPT, LINE_BUSY, LINE_ENJOY, LINE_SERVE, ORDER_ITEMS, getOrderItem, type OrderItem } from "../../orders";
+import { LINE_ACCEPT, LINE_BUSY, LINE_ENJOY, LINE_SERVE, ORDER_CHAT_HINT, ORDER_ITEMS, getOrderItem, isOrderAccepted, parseOrderFromJapanese, type OrderItem } from "../../orders";
 import {
   loadFromStorage,
   loadHomeFurniture,
@@ -185,6 +185,8 @@ function RoomView({ building }: { building: Building }) {
   const [tableItem, setTableItem] = useState<{ id: string; x: number; z: number } | null>(null); // 테이블 위에 놓인 음식
   const [speech, setSpeech] = useState<{ who: string; ja: string; ko: string } | null>(null);
   const speechTimer = useRef<number | null>(null);
+  const [orderToast, setOrderToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
   const heldRef = useRef<string | null>(null);
   useEffect(() => {
     heldRef.current = held;
@@ -195,7 +197,7 @@ function RoomView({ building }: { building: Building }) {
     speechTimer.current = window.setTimeout(() => setSpeech(null), ms);
   }
   const serverName = VILLAGERS[SERVER_ID]?.name ?? "직원";
-  function placeOrder(item: OrderItem) {
+  function placeOrder(item: OrderItem, fromChat = false) {
     setOrderOpen(false);
     if (orderBusy || held || tableItem) {
       say(serverName, LINE_BUSY);
@@ -231,7 +233,14 @@ function RoomView({ building }: { building: Building }) {
       return;
     }
     setOrderBusy(true);
-    say(serverName, LINE_ACCEPT, 5000);
+    if (fromChat) {
+      // 대화에서 주문한 경우: 직원의 대답은 대화창에 이미 있으니, 접수 알림만 띄운다
+      setOrderToast(`🧾 ${item.ja} 주문 접수 · 곧 ${serverName}에게서 받아요`);
+      if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+      toastTimer.current = window.setTimeout(() => setOrderToast(null), 6000);
+    } else {
+      say(serverName, LINE_ACCEPT, 5000);
+    }
   }
   // 먹을 수 있는 음식: 손에 든 것, 또는 (앉아 있거나 가까이 있는) 테이블 위의 것
   const nearTableItem =
@@ -253,6 +262,18 @@ function RoomView({ building }: { building: Building }) {
   useEffect(() => {
     eatRef.current = eatHeld;
   });
+  // 카페 직원(미유·켄타)과의 일본어 대화에서 주문을 알아들으면 서빙을 시작한다.
+  const placeOrderRef = useRef(placeOrder);
+  useEffect(() => {
+    placeOrderRef.current = placeOrder;
+  });
+  const handleChatOrder = useCallback((userText: string, reply: string) => {
+    const id = parseOrderFromJapanese(userText);
+    if (!id || !isOrderAccepted(reply)) return;
+    const item = getOrderItem(id);
+    if (item) placeOrderRef.current(item, true);
+  }, []);
+  const cafeStaffChat = canOrder && (chatWith === "cafe" || chatWith === SERVER_ID);
   const nearTalkRef = useRef<string | null>(null);
   const chatOpenRef = useRef(false);
   const leavingRef = useRef(false);
@@ -513,6 +534,8 @@ function RoomView({ building }: { building: Building }) {
       )}
       </div>
 
+      {orderToast && <div className={styles.orderToast}>{orderToast}</div>}
+
       {orderOpen && (
         <div className={townStyles.chatOverlay} onClick={() => setOrderOpen(false)}>
           <div className={styles.orderPanel} onClick={(e) => e.stopPropagation()}>
@@ -524,6 +547,19 @@ function RoomView({ building }: { building: Building }) {
               <button type="button" className="closeButton" onClick={() => setOrderOpen(false)} aria-label="닫기">
                 ✕
               </button>
+            </div>
+            <div className={styles.orderModes}>
+              <button
+                type="button"
+                className="pill pillPrimary"
+                onClick={() => {
+                  setOrderOpen(false);
+                  setChatWith(SERVER_ID);
+                }}
+              >
+                🗣 일본어로 직접 주문하기 (추천)
+              </button>
+              <span className={styles.orderModeHint}>켄타와 일본어로 대화해서 주문해요. 어려우면 아래 메뉴를 눌러도 돼요.</span>
             </div>
             <ul className={styles.orderList}>
               {ORDER_ITEMS.map((it) => (
@@ -546,7 +582,7 @@ function RoomView({ building }: { building: Building }) {
 
       {chatWith && (
         <div className={townStyles.chatOverlay}>
-          <ChatPanel villagerId={chatWith} onClose={() => setChatWith(null)} />
+          <ChatPanel villagerId={chatWith} onClose={() => setChatWith(null)} onExchange={cafeStaffChat ? handleChatOrder : undefined} hint={cafeStaffChat ? ORDER_CHAT_HINT : undefined} />
         </div>
       )}
     </div>

@@ -59,9 +59,15 @@ function isSpeechSynthesisSupported(): boolean {
 export default function ChatPanel({
   villagerId = DEFAULT_VILLAGER_ID,
   onClose,
+  onExchange,
+  hint,
 }: {
   villagerId?: string;
   onClose?: () => void;
+  // 주민의 답을 받을 때마다 (사용자가 보낸 말, 주민의 답) 알려준다. 카페 주문 등 대화로 뭔가를 시작할 때 쓴다.
+  onExchange?: (userText: string, reply: string) => void;
+  // 입력줄 위에 보여줄 작은 안내 문구
+  hint?: string;
 }) {
   const villager = getVillager(villagerId);
 
@@ -153,6 +159,7 @@ export default function ChatPanel({
         createdAt: Date.now(),
       };
       setMessages((prev) => [...prev, villagerMessage]);
+      onExchange?.(userMessage.content, data.reply);
       if (isSpeechSynthesisSupported()) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(villagerMessage.content);
@@ -164,7 +171,7 @@ export default function ChatPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, hydrated, messages, villager.id]);
+  }, [input, isLoading, hydrated, messages, villager.id, onExchange]);
 
   useEffect(() => {
     sendMessageRef.current = sendMessage;
@@ -333,6 +340,8 @@ export default function ChatPanel({
             : "이 브라우저는 음성 대화를 지원하지 않아요. 아래 텍스트로 계속 대화할 수 있어요."}
         </p>
       )}
+
+      {hint && <p className="voiceHint chatHint">{hint}</p>}
 
       <label className="kanaToggle">
         <input

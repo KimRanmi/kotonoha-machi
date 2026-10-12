@@ -745,3 +745,8 @@ a {
   border-radius: var(--radius-sm);
   font-size: 12px;
 }
+
+.chatHint {
+  padding-bottom: 6px;
+  color: var(--on-matcha);
+}
