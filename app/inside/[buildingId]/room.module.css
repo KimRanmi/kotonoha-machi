@@ -218,3 +218,9 @@
   font-size: 14px;
   box-shadow: var(--shadow-soft);
 }
+
+.speechActions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}

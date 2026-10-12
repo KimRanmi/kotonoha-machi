@@ -750,3 +750,23 @@ a {
   padding-bottom: 6px;
   color: var(--on-matcha);
 }
+
+/* 듣기 연습: 가려진 주민의 말 (눌러서 보기) */
+.bubbleBlurred {
+  cursor: pointer;
+}
+
+.bubbleBlurred > span,
+.bubbleBlurred .translationToggle {
+  filter: blur(7px);
+  user-select: none;
+  pointer-events: none;
+}
+
+.bubbleBlurred::after {
+  content: "🔊 눌러서 문장 보기";
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
