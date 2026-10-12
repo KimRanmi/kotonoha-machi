@@ -337,6 +337,53 @@ export function buildFurniture(f: Furniture, kind: string): THREE.Group {
     return g;
   }
 
+  if (id === "showcase") {
+    // 케이크 쇼케이스: 나무 하부장 + 유리 케이스(2단) + 조명 + 케이크들
+    const baseH = 26;
+    g.add(put(rbox(w, baseH, d, 2, darkM), 0, baseH / 2, 0));
+    g.add(put(rbox(w + 4, 3, d + 4, 1, std("#f1e6d2", 0.4)), 0, baseH + 1.5, 0));
+    const glassM = new THREE.MeshPhysicalMaterial({ color: 0xdff0f6, transparent: true, opacity: 0.2, roughness: 0.04, side: THREE.DoubleSide, depthWrite: false });
+    const caseH = 40;
+    const cy0 = baseH + 3;
+    g.add(put(new THREE.Mesh(new THREE.BoxGeometry(w - 2, caseH, d - 2), glassM), 0, cy0 + caseH / 2, 0));
+    const frame = std("#cfcac0", 0.3, 0.6);
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => g.add(put(cyl(1, 1, caseH, frame, 8), (sx * (w - 3)) / 2, cy0 + caseH / 2, (sz * (d - 3)) / 2)));
+    g.add(put(rbox(w, 2.4, d, 0.8, std("#f1ece2", 0.4)), 0, cy0 + caseH + 1.2, 0));
+    // 안쪽 조명(발광)
+    g.add(put(new THREE.Mesh(new THREE.BoxGeometry(w - 10, 0.8, 5), new THREE.MeshStandardMaterial({ color: 0xfff2d0, emissive: 0xffe9b0, emissiveIntensity: 1.4 })), 0, cy0 + caseH - 1, -d / 2 + 8));
+    // 유리 선반 + 케이크
+    for (let lv = 0; lv < 2; lv++) {
+      const sy = cy0 + 1 + lv * 18;
+      g.add(put(rbox(w - 6, 1.2, d - 6, 0.4, std("#e6f1f5", 0.2)), 0, sy, 0));
+      const cakeDefs: [number, string, string][] = [[-w / 3, "#fff3df", "#d9304a"], [0, "#f3d98c", "#a8794a"], [w / 3, "#f4d4dc", "#f6e8c8"]];
+      cakeDefs.forEach(([cx, body, top], i) => {
+        const cake = new THREE.Group();
+        cake.add(put(cyl(8, 8, 7, std(body, 0.7), 24), 0, 4.1, 0));
+        cake.add(put(cyl(8.1, 8.1, 1.4, std(top, 0.6), 24), 0, 7.9, 0));
+        if (i === 0) [[-3, 1], [3, -1], [0, 4]].forEach(([bx, bz]) => cake.add(put(new THREE.Mesh(new THREE.SphereGeometry(1.5, 10, 8), std("#d9304a", 0.5)), bx, 9.6, bz)));
+        cake.position.set(cx, sy + 0.6, lv ? -4 : 3);
+        cake.traverse((o) => ((o as THREE.Mesh).isMesh ? (((o as THREE.Mesh).castShadow = true), ((o as THREE.Mesh).receiveShadow = true)) : 0));
+        g.add(cake);
+      });
+    }
+    return g;
+  }
+
+  if (id === "cooler") {
+    // 음료 냉장 쇼케이스: 흰 본체 + 유리문 + 음료 병 + 조명
+    const Hh = 100;
+    g.add(put(rbox(w, Hh, d, 2, std("#f1f3f4", 0.4)), 0, Hh / 2, 0));
+    g.add(put(new THREE.Mesh(new THREE.BoxGeometry(w - 10, Hh - 16, 1), new THREE.MeshStandardMaterial({ color: 0x1f2b33, emissive: 0x9fd4e6, emissiveIntensity: 0.35, roughness: 0.4 })), 0, Hh / 2 - 2, d / 2 + 0.2));
+    for (let lv = 0; lv < 4; lv++) {
+      for (let j = 0; j < 4; j++) {
+        const col = ["#d9604c", "#e0b84a", "#5f8f6a", "#5f8fb0"][(lv + j) % 4];
+        g.add(put(cyl(2.6, 2.6, 10, std(col, 0.4), 12), -w / 2 + 11 + j * ((w - 22) / 3), 14 + lv * 20, d / 2 + 1.4));
+      }
+    }
+    g.add(put(new THREE.Mesh(new THREE.BoxGeometry(w - 8, 4, 1.2), new THREE.MeshStandardMaterial({ color: 0xfff2d0, emissive: 0xffe9b0, emissiveIntensity: 1.1 })), 0, Hh - 5, d / 2 + 0.4));
+    return g;
+  }
+
   if (id.startsWith("display")) {
     g.add(put(rbox(w, 26, d, 2, darkM), 0, 13, 0));
     const glass = new THREE.Mesh(new THREE.BoxGeometry(w - 4, 28, d - 4), new THREE.MeshPhysicalMaterial({ color: 0xcfe8f0, transparent: true, opacity: 0.28, roughness: 0.05, transmission: 0.0 }));
