@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { Furniture, Room } from "../../../interiors";
 import { CHAR_SIZE } from "@/lib/walk";
+import type { NpcState } from "../useRoomNpcs";
 import { buildFurniture, buildShell, shadowBlob } from "./build";
 import { PLAYER_SPEC, createCharacter, specForVillager, type CharacterRig } from "../../../character3d";
 
@@ -32,6 +33,7 @@ export default function RoomCanvas({
   residentRect,
   residentId,
   residentName,
+  npcStates,
   npcNames,
   hintAt,
   decorating,
@@ -45,6 +47,7 @@ export default function RoomCanvas({
   residentRect: { x: number; y: number } | null;
   residentId: string | null;
   residentName: string | null;
+  npcStates: NpcState[];
   npcNames: Record<string, string>;
   hintAt: { x: number; z: number } | null;
   decorating: boolean;
@@ -56,10 +59,10 @@ export default function RoomCanvas({
   const doorRef = useRef<HTMLDivElement>(null);
 
   // 최신 props를 렌더 루프/이벤트에서 읽기 위한 ref
-  const live = useRef({ position, hintAt, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture });
+  const live = useRef({ position, hintAt, npcStates, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture });
   const apiRef = useRef<{ dirty: () => void; rebuildFurniture: () => void; updateOverlay: () => void } | null>(null);
   useEffect(() => {
-    live.current = { position, hintAt, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture };
+    live.current = { position, hintAt, npcStates, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture };
     apiRef.current?.updateOverlay();
     apiRef.current?.dirty();
   });
@@ -148,27 +151,27 @@ export default function RoomCanvas({
       resident.position.set(residentRect.x + CHAR_SIZE / 2, 0, residentRect.y + CHAR_SIZE / 2);
       scene.add(resident);
     }
-    // 방 안의 다른 사람들(직원·손님 등): 제자리에서 숨 쉬듯 서 있고, 이름표가 있으면 달아 준다.
-    const npcRigs: CharacterRig[] = [];
-    const npcLabels: { el: HTMLDivElement; x: number; z: number }[] = [];
+    // 방 안의 다른 사람들(직원·손님 등): 서 있거나, 의자에 앉거나, 돌아다닌다.
+    // 위치와 동작은 부모의 시뮬레이션(useRoomNpcs)이 주고, 여기서는 그대로 그리기만 한다.
+    const npcObjs = new Map<string, { group: THREE.Group; rig: CharacterRig; label: HTMLDivElement | null }>();
     room.npcs.forEach((n) => {
       const rig = createCharacter(specForVillager(n.look));
       rig.root.scale.setScalar(1.3);
       rig.face(n.facing ?? 0, 1);
-      npcRigs.push(rig);
       rigs.push(rig);
-      const grp = new THREE.Group();
-      grp.add(shadowBlob(), rig.root);
-      grp.position.set(n.x + CHAR_SIZE / 2, 0, n.y + CHAR_SIZE / 2);
-      scene.add(grp);
+      const group = new THREE.Group();
+      group.add(shadowBlob(), rig.root);
+      group.position.set(n.x + CHAR_SIZE / 2, 0, n.y + CHAR_SIZE / 2);
+      scene.add(group);
       const text = npcNames[n.id] ?? n.label;
+      let label: HTMLDivElement | null = null;
       if (text) {
-        const el = document.createElement("div");
-        el.className = "roomLabel";
-        el.textContent = text;
-        host.appendChild(el);
-        npcLabels.push({ el, x: n.x + CHAR_SIZE / 2, z: n.y + CHAR_SIZE / 2 });
+        label = document.createElement("div");
+        label.className = "roomLabel";
+        label.textContent = text;
+        host.appendChild(label);
       }
+      npcObjs.set(n.id, { group, rig, label });
     });
     let idleAcc = 0;
     let prevX = position.x;
@@ -232,7 +235,10 @@ export default function RoomCanvas({
         if (h) place(hintRef.current, h.x, 80, h.z, true);
         else hintRef.current.style.display = "none";
       }
-      npcLabels.forEach((l) => place(l.el, l.x, -2, l.z, true));
+      l.npcStates.forEach((st) => {
+        const o = npcObjs.get(st.id);
+        if (o?.label) place(o.label, st.x + CHAR_SIZE / 2, st.sitting ? 4 : -2, st.y + CHAR_SIZE / 2, true);
+      });
       place(doorRef.current, room.door.x + room.door.width / 2, 2, H - 6, true);
     };
 
@@ -300,10 +306,22 @@ export default function RoomCanvas({
         else residentRig.face(0, dt);
         residentRig.update(dt, false);
       }
-      npcRigs.forEach((r) => r.update(dt, false));
+      let anyWalking = false;
+      l.npcStates.forEach((st) => {
+        const o = npcObjs.get(st.id);
+        if (!o) return;
+        // 앉으면 엉덩이가 의자(앉는 면 높이 ≈ 25) 위에 오도록 내린다
+        o.group.position.set(st.x + CHAR_SIZE / 2, 0, st.y + CHAR_SIZE / 2);
+        o.rig.root.position.y = st.sitting ? 25 - o.rig.hipY * 1.3 : 0; // 그림자는 바닥에 두고 몸만 내린다
+        o.rig.setSitting(st.sitting);
+        o.rig.face(st.facing, dt);
+        o.rig.update(dt, st.walking);
+        if (st.walking) anyWalking = true;
+      });
+      if (anyWalking) needs = true;
       // 서 있는 사람들이 숨 쉬는 모습은 초당 10번만 다시 그려서 부하를 줄인다
       idleAcc += dt;
-      if (idleAcc > 0.1 && (npcRigs.length > 0 || residentRig)) {
+      if (idleAcc > 0.1 && (npcObjs.size > 0 || residentRig)) {
         idleAcc = 0;
         needs = true;
       }
@@ -359,7 +377,7 @@ export default function RoomCanvas({
         else if (mat) kill(mat);
       });
       rigs.forEach((r) => r.dispose());
-      npcLabels.forEach((l) => l.el.remove());
+      npcObjs.forEach((o) => o.label?.remove());
       renderer.dispose();
       renderer.domElement.remove();
     };

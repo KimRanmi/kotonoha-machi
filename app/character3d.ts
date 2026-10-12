@@ -22,6 +22,10 @@ export interface CharacterRig {
   root: THREE.Group;
   /** 매 프레임 호출. moving이면 걷는 동작, 아니면 서서 천천히 멈춘다. */
   update(dt: number, moving: boolean): void;
+  /** 앉은 자세로 부드럽게 바꾼다(엉덩이가 root 기준 SIT_HIP_Y 높이에 오도록 호출한 쪽에서 root를 내려 준다). */
+  setSitting(sitting: boolean): void;
+  /** 엉덩이 높이(root 기준, 배율 적용 전). 앉을 때 의자 위로 맞추는 데 쓴다. */
+  readonly hipY: number;
   /** 바라볼 방향(라디안, +Z 기준)으로 부드럽게 돌아선다. */
   face(angle: number, dt: number): void;
   dispose(): void;
@@ -246,6 +250,8 @@ export function createCharacter(spec: CharacterSpec): CharacterRig {
   }
 
   // 애니메이션 상태
+  let sitTarget = 0;
+  let sitAmt = 0;
   let phase = 0;
   let idleT = Math.random() * 6;
   let amp = 0;
@@ -273,13 +279,21 @@ export function createCharacter(spec: CharacterSpec): CharacterRig {
       head.rotation.z = Math.sin(idleT * 0.9) * 0.05 * idle;
       head.rotation.y = Math.sin(idleT * 0.6) * 0.18 * idle;
       const s = Math.sin(phase) * amp;
-      legL.rotation.x = s * 0.75;
-      legR.rotation.x = -s * 0.75;
-      armL.rotation.x = -s * 0.7;
-      armR.rotation.x = s * 0.7;
-      body.position.y = Math.abs(Math.sin(phase)) * 1.5 * amp;
+      sitAmt += (sitTarget - sitAmt) * Math.min(1, dt * 10);
+      const walkK = 1 - sitAmt;
+      // 앉으면 다리를 앞으로 뻗고 팔은 무릎 쪽으로 모은다
+      legL.rotation.x = s * 0.75 * walkK - sitAmt * 1.45;
+      legR.rotation.x = -s * 0.75 * walkK - sitAmt * 1.45;
+      armL.rotation.x = -s * 0.7 * walkK - sitAmt * 0.7;
+      armR.rotation.x = s * 0.7 * walkK - sitAmt * 0.7;
+      body.position.y = Math.abs(Math.sin(phase)) * 1.5 * amp * walkK;
+      body.position.z = -sitAmt * 2.2;
       body.rotation.z = Math.sin(phase * 0.5) * 0.04 * amp;
     },
+    setSitting(sitting) {
+      sitTarget = sitting ? 1 : 0;
+    },
+    hipY: 12,
     face(angle, dt) {
       let d = angle - heading;
       d = Math.atan2(Math.sin(d), Math.cos(d));
