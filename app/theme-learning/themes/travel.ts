@@ -1,7 +1,11 @@
-import { Theme } from "./types";
+import type { Theme } from "../types";
 
 export const travelTheme: Theme = {
+  id: "travel",
   title: "여행",
+  level: "N3",
+  // 첫 테마라 항상 열려 있다.
+  requires: [],
   rounds: [
     {
       id: "kanji",
@@ -11,9 +15,9 @@ export const travelTheme: Theme = {
           id: "k-eki",
           prompt: "駅",
           choices: [
-            "えき / 역",
             "たび / 여행",
             "そら / 하늘",
+            "えき / 역",
             "みせ / 가게",
           ],
           correct: "えき / 역",
@@ -53,10 +57,10 @@ export const travelTheme: Theme = {
           id: "w-ryokou",
           prompt: "旅行",
           choices: [
-            "りょこう / 여행",
             "えきいん / 역무원",
             "くうこう / 공항",
             "よやく / 예약",
+            "りょこう / 여행",
           ],
           correct: "りょこう / 여행",
           hint: "旅行 = りょこう (여행)",
@@ -95,13 +99,13 @@ export const travelTheme: Theme = {
           id: "e-yuki",
           prompt: "〜行きの電車",
           choices: [
-            "~로 가는 전철",
             "~에서 오는 전철",
+            "~로 가는 전철",
             "~를 위한 예약",
             "~에 있는 역",
           ],
           correct: "~로 가는 전철",
-          hint: "〜行きの電車 = ~로 가는(행) 전철",
+          hint: "〜行きの電車 = ~로 가는 전철 (行き = ~행)",
         },
         {
           id: "e-yoyaku",

@@ -1,5 +1,5 @@
-import ThemeLearning from "./ThemeLearning";
+import ThemeList from "./ThemeList";
 
-export default function ThemeLearningPage() {
-  return <ThemeLearning />;
+export default function ThemeListPage() {
+  return <ThemeList />;
 }
