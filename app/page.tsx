@@ -38,6 +38,8 @@ import {
   setRoomRestore,
   fetchOnboardingDone,
   fetchPendingBuilding,
+  getTownResume,
+  setTownResume,
   fetchPlacedBuildings,
   markOnboardingStepDone,
   placePendingBuilding,
@@ -180,6 +182,10 @@ export default function TownPage() {
         if (returnId && !restored) {
           const from = all.find((b) => b.id === returnId);
           if (from) teleport(findExitSpot(from, all));
+        } else if (!restored) {
+          // 다른 화면(단어 목록 등)에 갔다가 링크로 돌아온 경우, 나갔던 자리에서 이어간다.
+          const resume = getTownResume();
+          if (resume) teleport(nearestFreeSpot(resume, { width: MAP_WIDTH, height: MAP_HEIGHT }, all, DEFAULT_START));
         }
 
         // 배치 대기 건물은 실제로 배치할 때까지 서버에 남아 있다. 배치 전에 나가도 건물이 사라지지 않고,
@@ -200,6 +206,18 @@ export default function TownPage() {
 
   // 마지막 위치 저장: 불러오기와 복원이 끝난 뒤부터(그 전의 기본 위치로 덮어쓰지 않도록).
   usePositionSaver(TOWN_PLACE, positionRef, !loading && !loadError);
+
+  // 마을을 떠날 때의 자리를 기억해 둔다(불러오기가 끝난 뒤에만: 기본 위치로 덮어쓰지 않도록).
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    loadedRef.current = !loading && !loadError;
+  }, [loading, loadError]);
+  useEffect(() => {
+    const ref = positionRef;
+    return () => {
+      if (loadedRef.current) setTownResume({ ...ref.current });
+    };
+  }, [positionRef]);
 
   // 방금 배치된 건물 id. 짧은 건설 연출 클래스를 붙이는 동안만 값을 들고 있는다.
   const [justPlacedId, setJustPlacedId] = useState<string | null>(null);
