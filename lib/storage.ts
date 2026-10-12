@@ -156,6 +156,9 @@ export async function restoreSession(): Promise<boolean> {
 }
 
 export async function logout(): Promise<void> {
+  // 로그아웃하면 토큰이 사라져 저장할 수 없으니, 그 전에 마지막 위치를 한 번 저장한다(오래 걸리면 기다리지 않는다).
+  await flushLastPosition();
+  resetPositionState();
   // 서버에서 refresh 토큰을 폐기하고 쿠키를 지운다. 네트워크가 실패해도 이 브라우저의 로그인 정보는 지운다.
   await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
   clearSession();
@@ -168,6 +171,9 @@ async function authenticate(mode: "login" | "signup", body: Record<string, strin
     body: JSON.stringify(body),
   });
   applySession(await readJson<AuthResponse>(res, "로그인에 실패했습니다."));
+  // 방금 로그인했으니 마을에 들어갈 때 이 계정의 마지막 위치에서 시작한다.
+  resetPositionState();
+  restorePending = true;
 }
 
 export function login(email: string, password: string): Promise<void> {
@@ -444,4 +450,130 @@ export function saveHomeFurniture(state: HomeFurnitureState): Promise<void> {
   const result = furnitureSaveChain.then(run, run);
   furnitureSaveChain = result.catch(() => undefined);
   return result;
+}
+
+// ---- 마지막 위치 이어하기 ----
+// 장소는 "town" 또는 건물 id. 좌표는 그 장소 안의 월드 좌표(캐릭터 좌상단).
+export interface LastPosition {
+  place: string;
+  x: number;
+  y: number;
+}
+
+export const TOWN_PLACE = "town";
+// 로그아웃 때 마지막 위치 저장을 기다려주는 최대 시간.
+const LOGOUT_SAVE_WAIT_MS = 1500;
+
+// 복원은 "전체 페이지를 새로 불러온 경우"(또는 방금 로그인한 경우)에만 한 번 한다. 앱 안의 이동(건물 입장/퇴장,
+// 링크)은 복원하지 않는다. 마을("/")이나 건물 내부로 열렸을 때만 복원 대상이고, 다른 화면으로 열린 뒤
+// 앱 안에서 마을로 오는 경우는 대상이 아니다. 모듈 변수라서 새로고침하면 다시 켜지고, 화면 전환으로는 유지된다.
+let restorePending =
+  typeof window !== "undefined" &&
+  (window.location.pathname === "/" || window.location.pathname.startsWith("/inside/"));
+
+export function isRestorePending(): boolean {
+  return restorePending;
+}
+
+// 복원 결과를 반영한 뒤에 호출한다(반영 전에 부르면 개발 모드의 effect 재실행에서 복원이 사라진다).
+export function consumeRestore(): void {
+  restorePending = false;
+}
+
+// 마을에서 건물 내부로 복원 이동할 때, 좌표를 내부 화면에 넘겨주는 값.
+let roomRestore: LastPosition | null = null;
+
+export function setRoomRestore(position: LastPosition): void {
+  roomRestore = position;
+}
+
+export function peekRoomRestore(buildingId: string): LastPosition | null {
+  return roomRestore?.place === buildingId ? roomRestore : null;
+}
+
+export function clearRoomRestore(): void {
+  roomRestore = null;
+}
+
+// 마을에서 다른 화면(단어 목록 등)으로 나갈 때의 자리. 링크로 마을에 돌아오면 그 자리에서 이어간다(메모리에만 둔다).
+let townResume: { x: number; y: number } | null = null;
+
+export function setTownResume(p: { x: number; y: number }): void {
+  townResume = p;
+}
+
+export function getTownResume(): { x: number; y: number } | null {
+  return townResume;
+}
+
+let lastSentKey: string | null = null;
+let positionSaveChain: Promise<unknown> = Promise.resolve();
+let positionProvider: (() => LastPosition | null) | null = null;
+
+function positionKey(p: LastPosition): string {
+  return `${p.place}|${p.x}|${p.y}`;
+}
+
+// 계정이 바뀔 수 있는 시점(로그인/로그아웃)에 이전 계정의 저장 상태를 버린다.
+function resetPositionState(): void {
+  lastSentKey = null;
+  roomRestore = null;
+  townResume = null;
+  positionProvider = null;
+}
+
+// 저장된 마지막 위치. 없으면 null.
+export function fetchLastPosition(): Promise<LastPosition | null> {
+  return guarded(async () => {
+    const res = await apiFetch("/api/position");
+    return readJsonOrNull<LastPosition>(res, "마지막 위치를 불러오지 못했습니다.");
+  }, "마지막 위치를 불러오지 못했습니다.");
+}
+
+// 마지막 위치를 저장한다. 걷는 도중에 자주 부르는 보조 기능이라 실패해도 조용히 넘어간다
+// (에러를 던지거나 로그인 화면으로 보내지 않고, 재시도도 하지 않는다). 요청은 순서대로 이어서 보낸다.
+export function saveLastPosition(position: LastPosition): Promise<void> {
+  const key = positionKey(position);
+  if (key === lastSentKey) return Promise.resolve();
+  lastSentKey = key; // 같은 값이 연달아 들어와도 한 번만 보내도록 미리 표시하고, 실패하면 되돌린다.
+  const run = async () => {
+    try {
+      if (!(await restoreSession())) throw new Error("not signed in");
+      let res = await send("/api/position", { method: "PUT", body: JSON.stringify(position) });
+      if (res.status === 401 && (await refreshSession())) {
+        res = await send("/api/position", { method: "PUT", body: JSON.stringify(position) });
+      }
+      if (!res.ok) throw new Error("save failed");
+    } catch {
+      if (lastSentKey === key) lastSentKey = null;
+    }
+  };
+  const result = positionSaveChain.then(run, run);
+  positionSaveChain = result;
+  return result;
+}
+
+// 탭을 닫거나 숨길 때 쓰는 저장. keepalive 요청은 페이지가 닫힌 뒤에도 전송된다
+// (sendBeacon은 Authorization 헤더를 보낼 수 없어 쓰지 않는다). 토큰 갱신을 기다릴 수 없으므로 메모리의 토큰을 그대로 쓴다.
+export function saveLastPositionOnExit(position: LastPosition): void {
+  const key = positionKey(position);
+  if (key === lastSentKey || !accessToken) return;
+  lastSentKey = key;
+  send("/api/position", { method: "PUT", body: JSON.stringify(position), keepalive: true }).catch(() => {
+    if (lastSentKey === key) lastSentKey = null;
+  });
+}
+
+// 지금 화면이 현재 위치를 알려주는 함수를 등록한다(로그아웃 직전 저장용). 화면이 사라지면 null로 해제한다.
+export function setLastPositionProvider(provider: (() => LastPosition | null) | null): void {
+  positionProvider = provider;
+}
+
+async function flushLastPosition(): Promise<void> {
+  const current = positionProvider?.();
+  if (!current || !accessToken) return;
+  await Promise.race([
+    saveLastPosition(current),
+    new Promise<void>((resolve) => setTimeout(resolve, LOGOUT_SAVE_WAIT_MS)),
+  ]);
 }
