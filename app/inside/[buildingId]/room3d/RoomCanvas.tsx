@@ -36,6 +36,8 @@ export default function RoomCanvas({
   residentName,
   npcStates,
   playerCarry,
+  playerSeat,
+  tableItem,
   npcNames,
   hintAt,
   decorating,
@@ -51,6 +53,8 @@ export default function RoomCanvas({
   residentName: string | null;
   npcStates: NpcState[];
   playerCarry: string | null;
+  playerSeat: { x: number; y: number; facing: number } | null;
+  tableItem: { id: string; x: number; z: number } | null;
   npcNames: Record<string, string>;
   hintAt: { x: number; z: number } | null;
   decorating: boolean;
@@ -62,10 +66,10 @@ export default function RoomCanvas({
   const doorRef = useRef<HTMLDivElement>(null);
 
   // 최신 props를 렌더 루프/이벤트에서 읽기 위한 ref
-  const live = useRef({ position, hintAt, npcStates, playerCarry, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture });
+  const live = useRef({ position, hintAt, npcStates, playerCarry, playerSeat, tableItem, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture });
   const apiRef = useRef<{ dirty: () => void; rebuildFurniture: () => void; updateOverlay: () => void } | null>(null);
   useEffect(() => {
-    live.current = { position, hintAt, npcStates, playerCarry, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture };
+    live.current = { position, hintAt, npcStates, playerCarry, playerSeat, tableItem, decorating, onFloorPoint, residentRect, ghost, selectedId, furniture };
     apiRef.current?.updateOverlay();
     apiRef.current?.dirty();
   });
@@ -170,6 +174,26 @@ export default function RoomCanvas({
       return next;
     };
     let playerCarried: string | null = null;
+    // 테이블 위에 놓인 주문 음식
+    let tableObj: THREE.Group | null = null;
+    let tableKey = "";
+    const syncTableItem = (it: { id: string; x: number; z: number } | null) => {
+      const key = it ? `${it.id}:${Math.round(it.x)}:${Math.round(it.z)}` : "";
+      if (key === tableKey) return;
+      tableKey = key;
+      if (tableObj) {
+        scene.remove(tableObj);
+        disposeGroup(tableObj);
+        tableObj = null;
+      }
+      if (it) {
+        tableObj = buildOrderItem(it.id, { tray: false });
+        tableObj.position.set(it.x, 40.2, it.z);
+        tableObj.scale.setScalar(1.15);
+        scene.add(tableObj);
+      }
+      needs = true;
+    };
     room.npcs.forEach((n) => {
       const rig = createCharacter(specForVillager(n.look));
       rig.root.scale.setScalar(1.3);
@@ -312,8 +336,19 @@ export default function RoomCanvas({
         prevX = l.position.x;
         prevZ = l.position.y;
       } else movingFor += dt;
-      const walking = movingFor < 0.12;
+      const walking = movingFor < 0.12 && !l.playerSeat;
       playerCarried = applyCarry(playerRig, playerCarried, l.playerCarry);
+      syncTableItem(l.tableItem);
+      // 앉아 있으면 의자 위에 앉은 자세로, 테이블 쪽을 본다
+      if (l.playerSeat) {
+        playerRig.setSitting(true);
+        playerRig.root.position.y = 25 - playerRig.hipY * 1.3;
+        playerRig.face(l.playerSeat.facing, dt);
+        needs = true;
+      } else {
+        playerRig.setSitting(false);
+        playerRig.root.position.y = 0;
+      }
       playerRig.update(dt, walking);
       // 주민은 가까이 온 플레이어 쪽을 바라본다
       if (residentRig && resident) {

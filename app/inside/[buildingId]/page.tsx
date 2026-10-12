@@ -10,14 +10,14 @@ import styles from "./room.module.css";
 import dynamic from "next/dynamic";
 import { initialNpcStates, useRoomNpcs, type NpcState } from "./useRoomNpcs";
 import { BUILDINGS, withThemeResident, type Building, type PlacedBuilding } from "../../buildings";
-import { getRoomObstacles, getRoomTemplate, type Furniture, type Room } from "../../interiors";
+import { getRoomObstacles, getRoomTemplate, getSeats, type Furniture, type Room, type Seat } from "../../interiors";
 import {
   PLACE_FAILURE_MESSAGE,
   checkFurniturePlacement,
   defaultHomeFurniture,
   makeHomeBuilding,
 } from "../../home";
-import { CHAR_SIZE, isNearRect, rectsOverlap, useWalker } from "@/lib/walk";
+import { CHAR_SIZE, collidesWithRects, isNearRect, rectsOverlap, useWalker } from "@/lib/walk";
 import { VILLAGERS, getVillager } from "@/lib/villager";
 import { LINE_ACCEPT, LINE_BUSY, LINE_ENJOY, LINE_SERVE, ORDER_ITEMS, getOrderItem, type OrderItem } from "../../orders";
 import {
@@ -111,17 +111,19 @@ function RoomView({ building }: { building: Building }) {
   // 지금 대화 중인 주민 id (없으면 대화창 닫힘)
   const [chatWith, setChatWith] = useState<string | null>(null);
   const chatOpen = chatWith !== null;
+  // 앉아 있는 자리(없으면 서 있음). 앉으면 이동이 멈추고, 이동 키를 누르거나 F로 일어난다.
+  const [seated, setSeated] = useState<Seat | null>(null);
   // 꾸미기 모드(내 집만). 켜져 있으면 캐릭터 이동을 멈추고 클릭으로 가구를 옮긴다.
   const [decorating, setDecorating] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const [decorMessage, setDecorMessage] = useState<string | null>(null);
-  const { position, positionRef } = useWalker({
+  const { position, positionRef, teleport } = useWalker({
     width: room.width,
     height: room.height,
     obstacles,
     initial: room.spawn,
-    paused: chatOpen || decorating,
+    paused: chatOpen || decorating || !!seated,
   });
 
   // 가장 가까운 대화 가능한 사람
@@ -131,12 +133,56 @@ function RoomView({ building }: { building: Building }) {
       .sort((a, b) => Math.hypot(a.x - position.x, a.y - position.y) - Math.hypot(b.x - position.x, b.y - position.y))[0] ?? null;
   const { serve } = useRoomNpcs({ room, staticObstacles, playerRef: positionRef, paused: decorating, talkingTo: chatWith, onStates: setNpcStates });
 
+  // ── 앉기: 의자 가까이에서 F로 앉고, 앉은 채로 주문하면 음식이 테이블 위로 서빙된다 ──
+  const seats = useMemo(() => getSeats(room), [room]);
+  const seatedRef = useRef<Seat | null>(null);
+  useEffect(() => {
+    seatedRef.current = seated;
+  }, [seated]);
+  // 비어 있는 자리 중 가장 가까운 자리(다른 사람이 앉아 있거나 플레이어가 앉아 있으면 제외)
+  const freeSeat = useMemo(() => {
+    if (seated) return null;
+    const cx = position.x + CHAR_SIZE / 2;
+    const cy = position.y + CHAR_SIZE / 2;
+    return (
+      seats
+        .filter((st) => !npcStates.some((n) => n.sitting && Math.hypot(n.x + CHAR_SIZE / 2 - st.x, n.y + CHAR_SIZE / 2 - st.y) < 24))
+        .map((st) => ({ st, d: Math.hypot(st.x - cx, st.y - cy) }))
+        .filter((o) => o.d < 58)
+        .sort((a, b) => a.d - b.d)[0]?.st ?? null
+    );
+  }, [seats, npcStates, position, seated]);
+  const freeSeatRef = useRef<Seat | null>(null);
+  useEffect(() => {
+    freeSeatRef.current = freeSeat;
+  }, [freeSeat]);
+  function sitDown(seat: Seat) {
+    setSeated(seat);
+    teleport({ x: seat.x - CHAR_SIZE / 2, y: seat.y - CHAR_SIZE / 2 });
+  }
+  function standUp() {
+    const seat = seatedRef.current;
+    if (!seat) return;
+    // 테이블 반대쪽(등받이 쪽)으로 한 걸음 물러나 선다. 막히면 의자 자리에 그대로 선다.
+    const ox = -Math.sin(seat.facing);
+    const oy = -Math.cos(seat.facing);
+    const spot = { x: seat.x + ox * 46 - CHAR_SIZE / 2, y: seat.y + oy * 46 - CHAR_SIZE / 2 };
+    const blocked = collidesWithRects(spot.x, spot.y, obstacles) || spot.x < 0 || spot.y < room.wallHeight || spot.x > room.width - CHAR_SIZE || spot.y > room.height - CHAR_SIZE;
+    teleport(blocked ? { x: seat.x - CHAR_SIZE / 2, y: seat.y - CHAR_SIZE / 2 } : spot);
+    setSeated(null);
+  }
+  const sitRef = useRef({ sitDown, standUp });
+  useEffect(() => {
+    sitRef.current = { sitDown, standUp };
+  });
+
   // ── 카페 주문: 주문하면 직원이 준비해서 플레이어 쪽으로 서빙해 주고, 받은 음식은 손에 들고 먹을 수 있다 ──
   const canOrder = room.id === "cafe";
   const SERVER_ID = "cafe-owner2";
   const [orderOpen, setOrderOpen] = useState(false);
   const [orderBusy, setOrderBusy] = useState(false);
   const [held, setHeld] = useState<string | null>(null); // 플레이어가 들고 있는 품목 id
+  const [tableItem, setTableItem] = useState<{ id: string; x: number; z: number } | null>(null); // 테이블 위에 놓인 음식
   const [speech, setSpeech] = useState<{ who: string; ja: string; ko: string } | null>(null);
   const speechTimer = useRef<number | null>(null);
   const heldRef = useRef<string | null>(null);
@@ -151,7 +197,7 @@ function RoomView({ building }: { building: Building }) {
   const serverName = VILLAGERS[SERVER_ID]?.name ?? "직원";
   function placeOrder(item: OrderItem) {
     setOrderOpen(false);
-    if (orderBusy || held) {
+    if (orderBusy || held || tableItem) {
       say(serverName, LINE_BUSY);
       return;
     }
@@ -166,7 +212,16 @@ function RoomView({ building }: { building: Building }) {
       station,
       prepareSeconds: 3,
       onHandover: () => {
-        setHeld(item.id);
+        const seat = seatedRef.current;
+        if (seat?.table) {
+          // 앉아 있으면 내 앞 테이블 위에 놓아 준다
+          const dx = seat.x - seat.table.x;
+          const dy = seat.y - seat.table.y;
+          const len = Math.hypot(dx, dy) || 1;
+          setTableItem({ id: item.id, x: seat.table.x + (dx / len) * seat.table.r * 0.45, z: seat.table.y + (dy / len) * seat.table.r * 0.45 });
+        } else {
+          setHeld(item.id);
+        }
         say(serverName, LINE_SERVE, 5000);
       },
       onDone: () => setOrderBusy(false),
@@ -178,10 +233,20 @@ function RoomView({ building }: { building: Building }) {
     setOrderBusy(true);
     say(serverName, LINE_ACCEPT, 5000);
   }
+  // 먹을 수 있는 음식: 손에 든 것, 또는 (앉아 있거나 가까이 있는) 테이블 위의 것
+  const nearTableItem =
+    tableItem && (seated || Math.hypot(position.x + CHAR_SIZE / 2 - tableItem.x, position.y + CHAR_SIZE / 2 - tableItem.z) < 90);
+  const eatableId = held ?? (tableItem && nearTableItem ? tableItem.id : null);
+  const eatableRef = useRef<string | null>(null);
+  useEffect(() => {
+    eatableRef.current = eatableId;
+  }, [eatableId]);
   function eatHeld() {
-    const item = heldRef.current ? getOrderItem(heldRef.current) : null;
+    const id = heldRef.current ?? eatableRef.current;
+    const item = id ? getOrderItem(id) : null;
     if (!item) return;
-    setHeld(null);
+    if (heldRef.current) setHeld(null);
+    else setTableItem(null);
     say("나", LINE_ENJOY[item.verb], 4500);
   }
   const eatRef = useRef(eatHeld);
@@ -303,9 +368,18 @@ function RoomView({ building }: { building: Building }) {
       if ((key === "enter" || key === " ") && nearTalkRef.current) {
         e.preventDefault();
         setChatWith(nearTalkRef.current);
-      } else if (key === "e" && heldRef.current) {
+      } else if (key === "e" && eatableRef.current) {
         e.preventDefault();
         eatRef.current();
+      } else if (key === "f") {
+        // 앉기/일어나기
+        e.preventDefault();
+        if (seatedRef.current) sitRef.current.standUp();
+        else if (freeSeatRef.current) sitRef.current.sitDown(freeSeatRef.current);
+      } else if (seatedRef.current && ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+        // 앉은 채로 이동 키를 누르면 일어난다
+        e.preventDefault();
+        sitRef.current.standUp();
       } else if (key === "escape") {
         // 꾸미기 중 Esc는 방을 나가지 않고 꾸미기만 끈다.
         if (decoratingRef.current) stopDecorating();
@@ -333,6 +407,8 @@ function RoomView({ building }: { building: Building }) {
           residentName={resident ? resident.name : null}
           npcStates={npcStates}
           playerCarry={held}
+          playerSeat={seated ? { x: seated.x, y: seated.y, facing: seated.facing } : null}
+          tableItem={tableItem}
           npcNames={Object.fromEntries(room.npcs.filter((n) => VILLAGERS[n.id]).map((n) => [n.id, VILLAGERS[n.id].name]))}
           hintAt={nearTalk ? { x: nearTalk.x + CHAR_SIZE / 2, z: nearTalk.y + CHAR_SIZE / 2 } : null}
           decorating={decorating}
@@ -344,6 +420,15 @@ function RoomView({ building }: { building: Building }) {
       <header className={townStyles.townHeader}>
         <div className={townStyles.title}>ことばのまち — {building.label} 내부</div>
         <div className={townStyles.headerLinks}>
+          {seated ? (
+            <button type="button" className="pill" onClick={standUp}>
+              일어나기 (F)
+            </button>
+          ) : freeSeat ? (
+            <button type="button" className="pill pillPrimary" onClick={() => sitDown(freeSeat)}>
+              앉기 (F)
+            </button>
+          ) : null}
           {canOrder && (
             <button type="button" className="pill pillPrimary" onClick={() => setOrderOpen(true)} disabled={chatOpen}>
               주문하기
@@ -371,17 +456,17 @@ function RoomView({ building }: { building: Building }) {
             <div className={styles.speechWho}>{speech.who}</div>
             <div className={styles.speechJa}>{speech.ja}</div>
             <div className={styles.speechKo}>{speech.ko}</div>
-            {held && (
+            {eatableId && (
               <button type="button" className="pill pillPrimary" onClick={eatHeld}>
-                {getOrderItem(held)?.verb === "drink" ? "마시기 (E)" : "먹기 (E)"}
+                {getOrderItem(eatableId)?.verb === "drink" ? "마시기 (E)" : "먹기 (E)"}
               </button>
             )}
           </div>
-        ) : held ? (
+        ) : eatableId ? (
           <p className={townStyles.interactionBanner}>
-            {getOrderItem(held)?.emoji} {getOrderItem(held)?.ja}を持っています ·{" "}
+            {getOrderItem(eatableId)?.emoji} {getOrderItem(eatableId)?.ja}{held ? "を持っています" : "が届いています"} ·{" "}
             <button type="button" className="pill pillPrimary" onClick={eatHeld}>
-              {getOrderItem(held)?.verb === "drink" ? "마시기 (E)" : "먹기 (E)"}
+              {getOrderItem(eatableId)?.verb === "drink" ? "마시기 (E)" : "먹기 (E)"}
             </button>
           </p>
         ) : decorating && homeFurniture ? (
