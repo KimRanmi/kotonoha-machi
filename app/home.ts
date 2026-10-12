@@ -1,5 +1,5 @@
 import { NEW_BUILDING_SIZE, type Building } from "./buildings";
-import type { Furniture, Room } from "./interiors";
+import { scaleFurniture, type Furniture, type Room } from "./interiors";
 import { CHAR_SIZE, rectsOverlap, type Point, type Rect } from "@/lib/walk";
 import type { HomeFurnitureState, HomePosition } from "@/lib/storage";
 
@@ -30,7 +30,7 @@ const DEFAULT_PLACED: Furniture[] = [
 ];
 
 export function defaultHomeFurniture(): HomeFurnitureState {
-  return { placed: DEFAULT_PLACED.map((f) => ({ ...f })), stored: [] };
+  return { placed: scaleFurniture(DEFAULT_PLACED), stored: [] };
 }
 
 // 문 앞 통로: 문 폭 그대로 문에서 스폰 지점 위까지. 여기에는 가구를 놓을 수 없다.
