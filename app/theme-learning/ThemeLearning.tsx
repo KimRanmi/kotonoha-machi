@@ -177,7 +177,7 @@ export default function ThemeLearning() {
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.themeTitle}>테마: {theme.title}</div>
-          <Link href="/" className={styles.navLink}>
+          <Link href="/" className="pill">
             ← 마을로 돌아가기
           </Link>
         </div>

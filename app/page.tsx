@@ -13,7 +13,9 @@ import {
   withThemeResident,
   type PlacedBuilding,
 } from "./buildings";
-import { BuildingMarker } from "./BuildingMarker";
+import { BuildingMarker, BuildingTag, buildingDepth } from "./BuildingMarker";
+import { Ambient, FrontFence, Prop, SceneGround, STATIC_PROPS } from "./TownScenery";
+import { MAP_HEIGHT, MAP_WIDTH, STAGE_HEIGHT, STAGE_WIDTH, project, unproject } from "./iso";
 import { makeHomeBuilding } from "./home";
 import { getNextOnboardingStep } from "./onboarding";
 import {
@@ -42,8 +44,7 @@ import type { PendingBuilding } from "@/lib/types";
 // 실제 아트 에셋, 건물 기능, 대화 연동 등은 이후 단계에서 다룬다.
 // 건물 목록/타입은 ./buildings, 건물 한 채의 렌더링은 ./BuildingMarker 에 분리해뒀다 —
 // 건물별 기능을 추가할 때 이동/충돌을 다루는 이 파일을 건드릴 필요가 없도록 하기 위함이다.
-const MAP_WIDTH = 960;
-const MAP_HEIGHT = 640;
+// (MAP_WIDTH/MAP_HEIGHT와 비스듬한 시점 투영은 ./iso 에 있다. 이동·충돌·배치 판정은 월드 좌표 그대로다.)
 
 // 건물 안으로 "들어갈 수 있는" 거리: 건물 테두리 밖으로 이 거리 안.
 const INTERACTION_MARGIN = 28;
@@ -106,6 +107,7 @@ export default function TownPage() {
     width: MAP_WIDTH,
     height: MAP_HEIGHT,
     obstacles: allBuildings,
+    isometric: true, // 방향키는 화면 기준(위 = 화면 위쪽)으로 움직인다
     initial: {
       x: MAP_WIDTH / 2 - CHAR_SIZE / 2,
       y: MAP_HEIGHT / 2 - CHAR_SIZE / 2,
@@ -213,9 +215,10 @@ export default function TownPage() {
     if (!onboardingStep && !pendingBuilding) return;
     if (placingRef.current) return;
 
+    // 화면(비스듬한 시점) 클릭 위치를 월드 좌표로 되돌린다. 땅 밖을 누르면 무시한다.
     const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const { x: clickX, y: clickY } = unproject(e.clientX - rect.left, e.clientY - rect.top);
+    if (clickX < 0 || clickY < 0 || clickX > MAP_WIDTH || clickY > MAP_HEIGHT) return;
 
     const { width, height } = NEW_BUILDING_SIZE;
     const x = clamp(clickX - width / 2, 0, MAP_WIDTH - width);
@@ -268,96 +271,138 @@ export default function TownPage() {
     }
   }
 
+  // 건물·소품·캐릭터를 "앞쪽(월드 x+y가 큰 쪽)일수록 나중에" 그려서 비스듬한 시점의 앞뒤 가림을 맞춘다.
+  // 움직이지 않는 것(소품·건물)은 정렬/요소를 메모해 두고, 매 프레임 바뀌는 캐릭터만 끼워 넣는다.
+  const staticItems = useMemo(
+    () =>
+      [
+        ...STATIC_PROPS.map((p, i) => ({ key: `prop-${i}`, depth: p.x + p.y, node: <Prop def={p} i={i} /> })),
+        ...allBuildings.map((b) => ({
+          key: `b-${b.id}`,
+          depth: buildingDepth(b),
+          node: <BuildingMarker building={b} isConstructing={justPlacedId === b.id} />,
+        })),
+      ].sort((a, b) => a.depth - b.depth),
+    [allBuildings, justPlacedId]
+  );
+  const ground = useMemo(() => <SceneGround />, []);
+  const frontFence = useMemo(() => <FrontFence />, []);
+  const ambient = useMemo(() => <Ambient />, []);
+
+  const [charX, charY] = project(position.x + CHAR_SIZE / 2, position.y + CHAR_SIZE / 2, 0);
+  const charDepth = position.x + position.y + CHAR_SIZE;
+  let charIndex = staticItems.findIndex((it) => it.depth > charDepth);
+  if (charIndex < 0) charIndex = staticItems.length;
+  const characterNode = (
+    <g key="character">
+      <ellipse cx={charX} cy={charY} rx={17} ry={6.5} fill="rgba(60,70,40,0.3)" />
+      <text x={charX} y={charY - 4} textAnchor="middle" fontSize={38}>
+        🧑
+      </text>
+    </g>
+  );
+
+  // 카메라: 캐릭터가 화면 가운데(약간 아래)에 오도록 무대를 옮긴다. 무대 가장자리 밖은 보이지 않게 막는다.
+  const [view, setView] = useState({ w: 1280, h: 800 });
+  const [cameraReady, setCameraReady] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => {
+      setView({ w: el.clientWidth, h: el.clientHeight });
+      setCameraReady(true);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const camX = STAGE_WIDTH <= view.w ? (STAGE_WIDTH - view.w) / 2 : clamp(charX - view.w / 2, 0, STAGE_WIDTH - view.w);
+  const camY = STAGE_HEIGHT <= view.h ? (STAGE_HEIGHT - view.h) / 2 : clamp(charY - view.h * 0.55, 0, STAGE_HEIGHT - view.h);
+
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
+    <div className={styles.townRoot}>
+      <div ref={viewportRef} className={styles.viewport}>
+        <main
+          className={[styles.stage, onboardingStep || pendingBuilding ? styles.placementMode : "", cameraReady ? styles.cameraReady : ""].join(" ")}
+          style={{ width: STAGE_WIDTH, height: STAGE_HEIGHT, transform: `translate3d(${-camX}px, ${-camY}px, 0)` }}
+          onClick={handleMapClick}
+        >
+          <svg className={styles.stageSvg} width={STAGE_WIDTH} height={STAGE_HEIGHT} viewBox={`0 0 ${STAGE_WIDTH} ${STAGE_HEIGHT}`} aria-hidden="true">
+            {ground}
+            {staticItems.slice(0, charIndex).map((it) => (
+              <g key={it.key}>{it.node}</g>
+            ))}
+            {characterNode}
+            {staticItems.slice(charIndex).map((it) => (
+              <g key={it.key}>{it.node}</g>
+            ))}
+            {/* 건물 뒤로 가려졌을 때도 위치를 알 수 있게 옅은 실루엣을 맨 위에 한 번 더 그린다 */}
+            <text x={charX} y={charY - 4} textAnchor="middle" fontSize={38} opacity={0.3}>
+              🧑
+            </text>
+            {frontFence}
+            {ambient}
+          </svg>
+          {allBuildings.map((b) => (
+            <BuildingTag key={b.id} building={b} isNear={nearBuildingId === b.id} isConstructing={justPlacedId === b.id} />
+          ))}
+        </main>
+        <div className={styles.vignette} />
+      </div>
+
+      <header className={styles.townHeader}>
         <div className={styles.title}>ことばのまち — 마을 지도</div>
         <div className={styles.headerLinks}>
-          <Link href="/theme-learning" className={styles.navLink}>
+          <Link href="/theme-learning" className="pill">
             학습하기
           </Link>
-          <Link href="/words" className={styles.navLink}>
+          <Link href="/words" className="pill">
             학습 단어 목록
           </Link>
-          <Link href="/villagers" className={styles.navLink}>
+          <Link href="/villagers" className="pill">
             주민 목록
           </Link>
-          <AuthStatus className={styles.navLink} />
+          <AuthStatus className="pill" />
         </div>
       </header>
 
-      <main
-        className={styles.mapWrapper}
-        style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
-      >
-        <div
-          className={
-            onboardingStep || pendingBuilding ? `${styles.map} ${styles.placementMode}` : styles.map
-          }
-          style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
-          onClick={handleMapClick}
-        >
-          <div
-            className={styles.path}
-            style={{ left: 0, top: MAP_HEIGHT / 2 - 30, width: MAP_WIDTH, height: 60 }}
-          />
-          <div
-            className={styles.path}
-            style={{ left: MAP_WIDTH / 2 - 30, top: 0, width: 60, height: MAP_HEIGHT }}
-          />
-
-          {allBuildings.map((b) => (
-            <BuildingMarker
-              key={b.id}
-              building={b}
-              isNear={nearBuildingId === b.id}
-              isConstructing={justPlacedId === b.id}
-            />
-          ))}
-
-          <div
-            className={styles.character}
-            style={{ left: position.x, top: position.y, width: CHAR_SIZE, height: CHAR_SIZE }}
-          >
-            🧑
-          </div>
-        </div>
-      </main>
-
-      {loadError ? (
-        <p className={styles.interactionBanner} role="alert">
-          {loadError}{" "}
-          <button
-            type="button"
-            className={styles.navLink}
-            onClick={() => {
-              setLoading(true);
-              setReloadKey((k) => k + 1);
-            }}
-          >
-            다시 시도
-          </button>
-        </p>
-      ) : loading ? (
-        <p className={styles.hint}>마을을 불러오는 중…</p>
-      ) : actionError ? (
-        <p className={styles.interactionBanner} role="alert">
-          {actionError}
-        </p>
-      ) : onboardingStep === "place-home" ? (
-        <p className={styles.interactionBanner}>
-          환영합니다! 빈 자리를 클릭/탭해서 &quot;내 집&quot;을 지어보세요. 한 번 지으면 옮길 수 없어요.
-        </p>
-      ) : pendingBuilding ? (
-        <p className={styles.interactionBanner}>
-          빈 자리를 클릭/탭해서 &quot;{pendingBuilding.themeTitle}&quot; 건물을 지어보세요!
-        </p>
-      ) : nearBuildingId ? (
-        <p className={styles.interactionBanner}>Enter 또는 Space로 들어가기</p>
-      ) : (
-        <p className={styles.hint}>방향키 또는 WASD로 캐릭터를 움직여보세요.</p>
-      )}
-
+      <div className={styles.townFooter}>
+        {loadError ? (
+          <p className={styles.interactionBanner} role="alert">
+            {loadError}{" "}
+            <button
+              type="button"
+              className="pill"
+              onClick={() => {
+                setLoading(true);
+                setReloadKey((k) => k + 1);
+              }}
+            >
+              다시 시도
+            </button>
+          </p>
+        ) : loading ? (
+          <p className={styles.hint}>마을을 불러오는 중…</p>
+        ) : actionError ? (
+          <p className={styles.interactionBanner} role="alert">
+            {actionError}
+          </p>
+        ) : onboardingStep === "place-home" ? (
+          <p className={styles.interactionBanner}>
+            환영합니다! 빈 자리를 클릭/탭해서 &quot;내 집&quot;을 지어보세요. 한 번 지으면 옮길 수 없어요.
+          </p>
+        ) : pendingBuilding ? (
+          <p className={styles.interactionBanner}>
+            빈 자리를 클릭/탭해서 &quot;{pendingBuilding.themeTitle}&quot; 건물을 지어보세요!
+          </p>
+        ) : nearBuildingId ? (
+          <p className={styles.interactionBanner}>Enter 또는 Space로 들어가기</p>
+        ) : (
+          <p className={styles.hint}>방향키 또는 WASD로 캐릭터를 움직여보세요.</p>
+        )}
+      </div>
     </div>
   );
 }

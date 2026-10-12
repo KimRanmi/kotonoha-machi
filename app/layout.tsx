@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
+import { Zen_Maru_Gothic } from "next/font/google";
 import "./globals.css";
 import AuthGuard from "@/components/AuthGuard";
+
+// 둥근 일본어 폰트. 폰트 패밀리는 globals.css의 --font-main 토큰으로 전역 적용한다.
+const zenMaru = Zen_Maru_Gothic({
+  weight: ["400", "500", "700", "900"],
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-zen-maru",
+});
 
 export const metadata: Metadata = {
   title: "ことばのまち",
@@ -9,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko">
+    <html lang="ko" className={zenMaru.variable}>
       <body>
         <AuthGuard>{children}</AuthGuard>
       </body>

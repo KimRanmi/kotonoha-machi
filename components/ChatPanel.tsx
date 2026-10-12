@@ -6,8 +6,10 @@ import * as wanakana from "wanakana";
 import { ChatMessage, LearnedWord } from "@/lib/types";
 import { addWord, fetchChatHistory, fetchWords, sendChat } from "@/lib/storage";
 import { DEFAULT_VILLAGER_ID, getVillager } from "@/lib/villager";
+import VillagerFace from "@/components/VillagerFace";
 import VillagerMessage from "@/components/VillagerMessage";
 import AddWordPopup, { WordPopupState } from "@/components/AddWordPopup";
+import { WORDS_CHANGED_EVENT } from "@/lib/words";
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -52,9 +54,18 @@ function isSpeechSynthesisSupported(): boolean {
 export default function ChatPanel({
   villagerId = DEFAULT_VILLAGER_ID,
   onClose,
+  onExchange,
+  hint,
+  blurReplies = false,
 }: {
   villagerId?: string;
   onClose?: () => void;
+  // 주민의 답을 받을 때마다 (사용자가 보낸 말, 주민의 답) 알려준다. 카페 주문 등 대화로 뭔가를 시작할 때 쓴다.
+  onExchange?: (userText: string, reply: string) => void;
+  // 입력줄 위에 보여줄 작은 안내 문구
+  hint?: string;
+  // 듣기 연습: 주민의 말을 음성으로만 들려주고 글자는 가려 둔다(눌러서 확인)
+  blurReplies?: boolean;
 }) {
   const villager = getVillager(villagerId);
 
@@ -65,6 +76,17 @@ export default function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [popup, setPopup] = useState<WordPopupState | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  // 다른 곳(주문 등)에서 단어 목록이 바뀌면 다시 읽어 와서, 아래의 저장이 새 단어를 덮어쓰지 않게 한다.
+  useEffect(() => {
+    const reload = () => {
+      fetchWords()
+        .then(setWords)
+        .catch(() => undefined);
+    };
+    window.addEventListener(WORDS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(WORDS_CHANGED_EVENT, reload);
+  }, []);
   const [kanaEnabled, setKanaEnabled] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
@@ -148,6 +170,7 @@ export default function ChatPanel({
         createdAt: Date.now(),
       };
       setMessages((prev) => [...prev, villagerMessage]);
+      onExchange?.(userMessage.content, data.reply);
       if (isSpeechSynthesisSupported()) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(villagerMessage.content);
@@ -159,7 +182,7 @@ export default function ChatPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, hydrated, messages, villager.id]);
+  }, [input, isLoading, hydrated, messages, villager.id, onExchange]);
 
   useEffect(() => {
     sendMessageRef.current = sendMessage;
@@ -256,17 +279,17 @@ export default function ChatPanel({
     <div className={onClose ? "page modalPage" : "page"}>
       <header className="header">
         <div className="villagerInfo">
-          <div className="villagerAvatar">{villager.avatar}</div>
+          <VillagerFace villagerId={villager.id} />
           <div>
             <div className="villagerName">{villager.name}</div>
             <div className="villagerDesc">{villager.description}</div>
           </div>
         </div>
         <div className="headerActions">
-          <Link href="/villagers" className="navLink">
+          <Link href="/villagers" className="pill">
             주민 목록
           </Link>
-          <Link href="/words" className="navLink">
+          <Link href="/words" className="pill">
             학습 목록 ({words.length})
           </Link>
           {onClose && (
@@ -291,7 +314,22 @@ export default function ChatPanel({
         {messages.map((m) => (
           <div
             key={m.id}
-            className={m.role === "user" ? "bubbleUser" : "bubbleVillager"}
+            className={
+              m.role === "user"
+                ? "bubbleUser"
+                : blurReplies && !revealed.has(m.id)
+                  ? "bubbleVillager bubbleBlurred"
+                  : "bubbleVillager"
+            }
+            title={m.role !== "user" && blurReplies && !revealed.has(m.id) ? "눌러서 문장 보기" : undefined}
+            onClickCapture={(e) => {
+              // 듣기 연습 중 가려진 말은 먼저 눌러서 보이게 한다(단어 탭은 그다음)
+              if (m.role !== "user" && blurReplies && !revealed.has(m.id)) {
+                e.stopPropagation();
+                e.preventDefault();
+                setRevealed((prev) => new Set(prev).add(m.id));
+              }
+            }}
           >
             {m.role === "assistant" ? (
               <>
@@ -334,6 +372,8 @@ export default function ChatPanel({
             : "이 브라우저는 음성 대화를 지원하지 않아요. 아래 텍스트로 계속 대화할 수 있어요."}
         </p>
       )}
+
+      {hint && <p className="voiceHint chatHint">{hint}</p>}
 
       <label className="kanaToggle">
         <input
