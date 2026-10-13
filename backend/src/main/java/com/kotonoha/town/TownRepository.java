@@ -120,6 +120,26 @@ public class TownRepository {
                 .update();
     }
 
+    // ---- 마지막 위치 ----
+
+    public Optional<LastPosition> lastPosition(long userId) {
+        return jdbc.sql("SELECT place, x, y FROM last_positions WHERE user_id = :userId")
+                .param("userId", userId)
+                .query((rs, i) -> new LastPosition(rs.getString("place"), rs.getDouble("x"), rs.getDouble("y")))
+                .optional();
+    }
+
+    public void saveLastPosition(long userId, LastPosition p) {
+        jdbc.sql("""
+                        INSERT INTO last_positions (user_id, place, x, y, updated_at) VALUES (:userId, :place, :x, :y, now())
+                        ON CONFLICT (user_id) DO UPDATE SET place = :place, x = :x, y = :y, updated_at = now()""")
+                .param("userId", userId)
+                .param("place", p.place())
+                .param("x", p.x())
+                .param("y", p.y())
+                .update();
+    }
+
     // 저장된 가구 배치(JSON 문자열). 내 집이 없거나 아직 꾸민 적이 없으면 비어 있다.
     public Optional<String> homeFurniture(long userId) {
         return jdbc.sql("SELECT furniture::text FROM homes WHERE user_id = :userId AND furniture IS NOT NULL")

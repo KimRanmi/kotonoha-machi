@@ -210,3 +210,42 @@ export function useWalker({
 
   return { position, positionRef, teleport };
 }
+
+// 저장해 둔 좌표를 다시 쓸 때, 그 자리가 범위 밖이거나 장애물과 겹치면 가장 가까운 빈 자리를 찾는다.
+// 반경을 조금씩 넓혀 가며 찾고, 끝내 못 찾으면 fallback(기본 시작 위치)을 돌려준다.
+export function nearestFreeSpot(
+  p: Point,
+  size: { width: number; height: number },
+  obstacles: Rect[],
+  fallback: Point
+): Point {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return fallback;
+  const maxX = size.width - CHAR_SIZE;
+  const maxY = size.height - CHAR_SIZE;
+  const isFree = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x <= maxX && y <= maxY && !collidesWithRects(x, y, obstacles);
+
+  const start = { x: clamp(p.x, 0, maxX), y: clamp(p.y, 0, maxY) };
+  if (isFree(start.x, start.y)) return start;
+
+  const STEP = 8;
+  const MAX_RADIUS = 240;
+  for (let r = STEP; r <= MAX_RADIUS; r += STEP) {
+    let best: Point | null = null;
+    let bestDist = Infinity;
+    for (let dx = -r; dx <= r; dx += STEP) {
+      for (let dy = -r; dy <= r; dy += STEP) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // 이번 반경의 테두리만 본다
+        const x = start.x + dx;
+        const y = start.y + dy;
+        const dist = Math.hypot(dx, dy);
+        if (dist < bestDist && isFree(x, y)) {
+          best = { x, y };
+          bestDist = dist;
+        }
+      }
+    }
+    if (best) return best;
+  }
+  return fallback;
+}
