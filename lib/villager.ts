@@ -1,7 +1,3 @@
-// 주민(villager)용 응답 생성 모델. 비용 효율적인 모델을 기본값으로 쓰되,
-// 필요하면 .env.local의 GEMINI_MODEL로 교체할 수 있게 분리해둔다.
-export const VILLAGER_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
-
 // 화면에 보여줄 주민 정보(이름/아바타/설명)만 둔다. 실제 대화용 페르소나 프롬프트는
 // 서버(backend/.../villager/Villagers.java)에만 있다 — 말투를 바꾸려면 그쪽을 수정한다.
 export interface VillagerProfile {
@@ -138,8 +134,3 @@ export function getVillager(id?: string | null): VillagerProfile {
   if (id && VILLAGERS[id]) return VILLAGERS[id];
   return VILLAGERS[DEFAULT_VILLAGER_ID];
 }
-
-// 주민의 일본어 응답을 학습자를 위해 한국어로 번역할 때 쓰는 시스템 프롬프트.
-// 대화 응답 생성과는 별도의 호출로 처리해 페르소나 응답 품질에 영향을 주지 않는다.
-export const TRANSLATOR_SYSTEM_PROMPT = `주어진 일본어 문장을 자연스러운 한국어로 번역하세요.
-번역문만 출력하고, 설명이나 원문, 따옴표는 덧붙이지 마세요.`;
