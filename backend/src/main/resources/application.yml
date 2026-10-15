@@ -17,6 +17,10 @@ gemini:
   api-key: ${GEMINI_API_KEY:}
   model: ${GEMINI_MODEL:}
   base-url: https://generativelanguage.googleapis.com
+  # 일시 장애(503/429/타임아웃/네트워크)일 때만 이 간격으로 재시도한다 (개수 = 재시도 횟수).
+  # 한 번의 호출 전체(대기 포함)는 total-timeout을 넘기지 않는다.
+  retry-delays: 1s,3s
+  total-timeout: 10s
 
 jwt:
   # HS256 서명 키(32바이트 이상). 비워두면 시작할 때마다 임의 키를 만들어 쓰므로 재시작하면 access 토큰이 모두 무효가 된다(개발용).

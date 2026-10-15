@@ -15,6 +15,7 @@ import com.kotonoha.AuthTestSupport;
 import com.kotonoha.TestcontainersConfig;
 import com.kotonoha.llm.GeminiClient;
 import com.kotonoha.llm.GeminiException;
+import com.kotonoha.llm.GeminiException.Kind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,8 +51,7 @@ class ChatPersistenceTest {
         email = AuthTestSupport.uniqueEmail();
         anon = AuthTestSupport.signupAndGetBearer(mvc, email);
         when(gemini.isConfigured()).thenReturn(true);
-        when(gemini.generateJson(any(), any()))
-                .thenReturn("{\"reply\":\"こんにちは\",\"translation\":\"안녕하세요\"}");
+        org.mockito.Mockito.doReturn("{\"reply\":\"こんにちは\",\"translation\":\"안녕하세요\"}").when(gemini).generateJson(any(), any());
     }
 
     ResultActions chat(String authHeader, String villagerId, String text, String extra) throws Exception {
@@ -147,15 +147,57 @@ class ChatPersistenceTest {
     }
 
     @Test
-    void Gemini가_실패하면_저장도_친밀도_증가도_없다() throws Exception {
-        when(gemini.generateJson(any(), any())).thenThrow(new GeminiException("fail", null));
-
-        chat(anon, "cafe", "やあ", "").andExpect(status().isBadGateway());
+    void Gemini가_실패하면_저장도_친밀도_증가도_없다_그리고_다시_시도하면_한_번만_남는다() throws Exception {
+        for (GeminiException failure : new GeminiException[] {
+                new GeminiException(Kind.TRANSIENT, 503, "busy", null),
+                new GeminiException(Kind.CONFIG, 401, "bad key", null),
+                new GeminiException(Kind.FORMAT, "bad json", null)}) {
+            org.mockito.Mockito.doThrow(failure).when(gemini).generateJson(any(), any());
+            chat(anon, "cafe", "やあ", "").andExpect(status().is5xxServerError());
+        }
 
         mvc.perform(get("/api/villagers/cafe/messages").header("Authorization", anon))
                 .andExpect(jsonPath("$.length()").value(0));
         mvc.perform(get("/api/intimacy").header("Authorization", anon))
                 .andExpect(jsonPath("$[?(@.villagerId=='cafe')].met").value(false));
+
+        // 같은 메시지로 다시 시도해 성공하면 기록에 한 번만 남고 친밀도도 1만 오른다.
+        org.mockito.Mockito.doReturn("{\"reply\":\"こんにちは\",\"translation\":\"안녕하세요\"}").when(gemini).generateJson(any(), any());
+        chat(anon, "cafe", "やあ", "").andExpect(status().isOk());
+
+        mvc.perform(get("/api/villagers/cafe/messages").header("Authorization", anon))
+                .andExpect(jsonPath("$.length()").value(2));
+        Integer count = jdbc.sql("""
+                        SELECT i.exchanges FROM intimacy i JOIN users u ON u.id = i.user_id
+                        WHERE u.email = :a AND i.villager_id = 'cafe'""")
+                .param("a", email).query(Integer.class).single();
+        assertThat(count).isEqualTo(1);
+    }
+
+    @Test
+    void 같은_주민에_대한_요청이_처리_중이면_두_번째는_409로_막고_한_턴만_저장된다() throws Exception {
+        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        when(gemini.generateJson(any(), any())).thenAnswer(inv -> {
+            entered.countDown();
+            release.await(5, java.util.concurrent.TimeUnit.SECONDS);
+            return "{\"reply\":\"こんにちは\",\"translation\":\"안녕하세요\"}";
+        });
+
+        var first = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                return chat(anon, "cafe", "やあ", "").andReturn().getResponse().getStatus();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        assertThat(entered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        chat(anon, "cafe", "やあ", "").andExpect(status().isConflict());
+        release.countDown();
+        assertThat(first.get(5, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(200);
+
+        mvc.perform(get("/api/villagers/cafe/messages").header("Authorization", anon))
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
