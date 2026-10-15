@@ -37,10 +37,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(new ErrorResponse("잘못된 요청입니다."));
     }
 
+    // 장애 유형별 안정적인 에러 코드. 사용자 문구는 짧게만 주고, 키/모델/HTTP 상태 같은 상세 원인은
+    // 응답에 싣지 않고 로그에만 남긴다 (대화 내용과 API 키는 로그에도 남기지 않는다).
+    public record GeminiErrorResponse(String error, String code) {}
+
     @ExceptionHandler(GeminiException.class)
-    public ResponseEntity<ErrorResponse> handleGemini(GeminiException e) {
-        log.error("Gemini API 호출 실패", e);
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(new ErrorResponse("주민의 응답을 가져오는 데 실패했습니다. 잠시 후 다시 시도해주세요."));
+    public ResponseEntity<GeminiErrorResponse> handleGemini(GeminiException e) {
+        return switch (e.kind()) {
+            case TRANSIENT -> {
+                log.warn("Gemini 호출 실패 kind=TRANSIENT upstreamStatus={} reason={}", e.upstreamStatus(), e.getMessage());
+                yield ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new GeminiErrorResponse(
+                        "지금 주민이 바빠서 응답하지 못했어요. 잠시 후 다시 시도해 주세요.", "GEMINI_TRANSIENT"));
+            }
+            case CONFIG -> {
+                log.error("Gemini 호출 실패 kind=CONFIG upstreamStatus={} reason={}", e.upstreamStatus(), e.getMessage());
+                yield ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new GeminiErrorResponse(
+                        "문제가 생겼어요. 잠시 후 다시 시도해 주세요.", "GEMINI_CONFIG"));
+            }
+            case FORMAT -> {
+                log.error("Gemini 호출 실패 kind=FORMAT reason={}", e.getMessage());
+                yield ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new GeminiErrorResponse(
+                        "문제가 생겼어요. 잠시 후 다시 시도해 주세요.", "GEMINI_FORMAT"));
+            }
+        };
     }
 }

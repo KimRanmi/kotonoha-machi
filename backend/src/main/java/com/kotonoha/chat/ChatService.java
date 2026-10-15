@@ -4,12 +4,14 @@ import com.kotonoha.common.ApiException;
 import com.kotonoha.intimacy.IntimacyLevel;
 import com.kotonoha.intimacy.IntimacyRepository;
 import com.kotonoha.llm.GeminiClient;
+import com.kotonoha.llm.GeminiException;
+import com.kotonoha.llm.GeminiException.Kind;
 import com.kotonoha.user.UserRepository;
 import com.kotonoha.villager.VillagerProfile;
 import com.kotonoha.villager.Villagers;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -20,8 +22,6 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class ChatService {
 
-    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
-
     private static final String OUTPUT_FORMAT_INSTRUCTIONS = """
 
 
@@ -29,6 +29,10 @@ public class ChatService {
             - 위 대화 원칙을 그대로 따라 생성한 일본어 응답을 "reply" 필드에 넣으세요.
             - reply를 자연스러운 한국어로 옮긴 번역문을 "translation" 필드에 넣으세요 (설명이나 따옴표 없이 번역문만).
             - 반드시 이 두 필드만 가진 JSON 객체로 응답하세요.""";
+
+    // 같은 사용자·주민에 대한 요청이 아직 처리 중이면 새 요청을 받지 않는다 (더블클릭/재시도 겹침으로
+    // 같은 턴이 두 번 저장되는 것을 막는다). 서버 한 대 기준의 보호다.
+    private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
 
     private final GeminiClient gemini;
     private final ObjectMapper objectMapper;
@@ -48,12 +52,33 @@ public class ChatService {
     }
 
     // Gemini 호출(느림)은 트랜잭션 밖에서 하고, 답변을 받은 뒤에만 대화 2건 저장 + 친밀도 +1을 한 트랜잭션으로 묶는다.
-    // 호출이 실패하면 아무것도 저장/증가하지 않는다.
+    // 호출이 실패(일시 장애/설정/형식 오류)하면 아무것도 저장/증가하지 않는다.
     public ChatResponse chat(long userId, ChatRequest request) {
         if (!"user".equals(request.messages().getLast().role())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "마지막 메시지는 사용자 메시지여야 합니다.");
         }
         VillagerProfile villager = Villagers.get(request.villagerId());
+        String key = userId + ":" + villager.id();
+        if (!inFlight.add(key)) {
+            throw new ApiException(HttpStatus.CONFLICT, "이전 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요.");
+        }
+        try {
+            return doChat(userId, villager, request);
+        } finally {
+            inFlight.remove(key);
+        }
+    }
+
+    // 번역만 다시 받는다 (저장 없음). 실패해도 본 대화에는 영향이 없다.
+    public String translate(String text) {
+        String translated = gemini.generateText(
+                "다음 일본어 문장을 자연스러운 한국어로 번역하세요. 설명이나 따옴표 없이 번역문만 출력하세요.",
+                List.of(new GeminiClient.Turn("user", text))).trim();
+        if (translated.isEmpty()) throw new GeminiException(Kind.FORMAT, "번역 응답이 비어 있음", null);
+        return translated;
+    }
+
+    private ChatResponse doChat(long userId, VillagerProfile villager, ChatRequest request) {
         int exchanges = intimacy.exchanges(userId, villager.id());
 
         String systemPrompt = villager.systemPrompt()
@@ -93,14 +118,18 @@ public class ChatService {
                 + "가까워지면 さん을 빼는 등 더 편하게).").orElse("");
     }
 
+    // reply가 없거나 JSON이 깨졌으면 형식 오류다 (재시도 없음, 아무것도 저장하지 않음).
+    // translation만 비어 있는 것은 본 응답을 막지 않는다 — 화면이 번역 자리에서 따로 다시 시도할 수 있다.
     private ChatResponse parse(String raw) {
+        JsonNode node;
         try {
-            JsonNode node = objectMapper.readTree(raw.isBlank() ? "{}" : raw);
-            return new ChatResponse(text(node, "reply"), text(node, "translation"));
+            node = objectMapper.readTree(raw);
         } catch (JacksonException e) {
-            log.warn("JSON 파싱 실패, 원문을 그대로 사용: {}", e.getMessage());
-            return new ChatResponse(raw.trim(), "");
+            throw new GeminiException(Kind.FORMAT, "응답 JSON 파싱 실패", e);
         }
+        String reply = text(node, "reply");
+        if (reply.isEmpty()) throw new GeminiException(Kind.FORMAT, "응답에 reply가 없음", null);
+        return new ChatResponse(reply, text(node, "translation"));
     }
 
     private static String text(JsonNode node, String field) {
