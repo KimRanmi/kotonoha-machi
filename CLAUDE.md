@@ -1,23 +1,69 @@
-@AGENTS.md
+# kotonoha-machi v2
 
-# Local dev setup: .env.local (API key)
+이 프로젝트는 v1(바이브코딩으로 만든 프로토타입)을 같은 게임 컨셉으로 다시 만드는
+작업이다. 목표는 기능 구현뿐 아니라 코드의 구조와 동작 원리를 이해하는 것이다.
+기술 결정의 배경과 대안은 `docs/decisions/`에 기록한다.
 
-This project reads `GEMINI_API_KEY` (and optional `GEMINI_MODEL`) from
-`.env.local` to power the resident chat feature. `.env.local` is gitignored
-on purpose (it holds a real secret) and is therefore **never present in a
-freshly created git worktree** — every new feature worktree starts without it.
+## 기술 스택
 
-Before running `npm run dev` (or anything that hits `/api/chat`) in a new
-worktree, copy `.env.local` from any sibling worktree that already has it
-filled in, e.g.:
+- **프런트엔드**: Vite + React + TypeScript + Three.js
+  - React: UI와 화면 상태 관리. Three.js: 3D 장면(건물 내부 등) 전담.
+  - Three.js는 `react-three-fiber` 없이 `useRef`/`useEffect`로 직접 관리한다.
+  - 라우팅: React Router. 테스트: Vitest. 패키지 매니저: npm.
+- **백엔드**: Java 25 + Spring Boot 4.x
+  - API와 비즈니스 로직 담당. 서블릿 컨테이너는 Tomcat(기본값).
+  - 빌드 도구: Gradle 8.14 이상. 테스트: JUnit + Testcontainers.
+- **데이터베이스**: PostgreSQL + Flyway (스키마 변경 이력 관리)
+- **AI**: Gemini API는 백엔드에서만 호출한다. API 키를 프런트엔드에 노출하지 않는다.
 
-    cp ../<a-worktree-that-already-has-it>/.env.local .env.local
+결정 이유와 비교한 대안은 [`docs/decisions/0001-tech-stack.md`](docs/decisions/0001-tech-stack.md)
+참고.
 
-(Sibling worktrees live under `.claude/worktrees/` at the repo root — list
-them with `git worktree list` to find one with a working `.env.local`.)
+### 기술 선택 원칙
 
-Do this as one of the first setup steps for any task that needs to actually
-run the app, regardless of what the task prompt says. If no sibling
-worktree has a filled-in `.env.local`, ask the user for their Gemini API
-key (https://aistudio.google.com/apikey) and have them fill it in
-themselves — never type, guess, or fabricate the key.
+- Java 25 / Spring Boot 4.x 및 관련 라이브러리의 호환성은 공식 문서와 실제 의존성
+  정보로 확인한다.
+- 기술적 문제가 발견되면 임의로 버전을 바꾸지 않고, 문제와 대안을 먼저 설명한다.
+- 추가 프레임워크나 라이브러리는 필요성이 확인되기 전까지 도입하지 않는다.
+
+## 개발 학습 원칙
+
+1. **설명 후 구현**: 코드를 작성/수정하기 전에 변경할 파일, 목적, 구현 방법을 설명한다.
+2. **작은 단위로 개발**: 기능을 작고 검증 가능한 단위로 나눈다.
+3. **임의 변경 금지**: 요청하지 않은 기능 추가나 기존 설계의 임의 변경을 하지 않는다.
+4. **의존성 관리**: 새 라이브러리/프레임워크 도입 전에 목적·대안·장단점을 설명하고
+   승인을 받는다.
+5. **과도한 추상화 금지**: 불필요한 디자인 패턴·계층·공통 모듈을 만들지 않고, 이해하기
+   쉬운 구조를 우선한다.
+6. **코드 이해 지원**: 구현 후 핵심 코드, 사용한 개념, 데이터 흐름, 그 방식을 선택한
+   이유를 설명한다.
+7. **역할 구분**: 프런트엔드/백엔드/데이터베이스/외부 AI API의 역할을 명확히 구분한다.
+8. **AI와 일반 로직 구분**: AI가 필요한 기능과 일반 코드로 처리할 기능을 구분한다.
+   명확한 게임 규칙과 데이터 정합성은 일반 코드로 검증한다.
+9. **테스트 검증**: 변경 사항에 맞는 테스트/빌드를 실행하고 결과를 보고한다. 실행하지
+   않은 테스트를 통과했다고 말하지 않는다.
+10. **안전한 변경**: 기존 작업과 사용자 변경 사항을 임의로 덮어쓰거나 삭제하지 않는다.
+    Git 작업 시 변경 사항을 확인하고, 위험한 작업은 사전에 설명한다.
+11. **포트폴리오 관점**: 구현 결과뿐 아니라 설계 이유, 검증 방법, 한계와 개선 방향을
+    기록한다.
+
+설명은 기술 용어를 나열하지 않고, 초보 개발자가 이해할 수 있도록 구체적으로 작성한다.
+이미 이해한 내용은 불필요하게 반복하지 않는다.
+
+## 문서 구조
+
+- `CLAUDE.md`: 공통 개발 규칙, 기술 스택, 작업 방식 (이 파일)
+- `docs/requirements/`: 기능 요구사항, 동작 조건, 완료 기준
+- `docs/decisions/`: 기술 선택 이유, 대안 비교, 설계 결정
+- `docs/progress.md`: 진행 상황, 테스트 결과, 학습한 개념, 다음 작업
+
+문서 간 내용을 불필요하게 중복하지 않는다. 요구사항/기술 설계가 아직 확정되지 않았으면
+확정된 것처럼 기록하지 않는다.
+
+## v1 → v2 전환 상태
+
+이 브랜치(`v2`)는 아직 v1의 Next.js 프런트엔드(`app/`, `components/`, 최상위 `lib/`)와
+기존 `backend/`(Spring Boot 3.x 기반)를 참고용으로 그대로 두고 있다. 새 구조를
+스캐폴딩하기 전까지는 `AGENTS.md`의 Next.js 관련 안내(`next dev`가 자동으로 관리하는
+블록 포함)와 `.env.local` 관련 안내가 `app/` 디렉토리에만 유효하다. 새 프런트엔드/백엔드
+골격이 만들어지고 기존 v1 코드가 제거되면 이 절과 `AGENTS.md`도 함께 정리한다.
