@@ -48,7 +48,7 @@ export const ROOM_MENUS: Partial<Record<string, RoomMenu>> = {
   cafe: {
     kind: "cafe",
     server: "cafe-owner2",
-    chatIds: ["cafe", "cafe-owner2"],
+    chatIds: ["cafe", "cafe-owner2", "cafe-staff"],
     button: "주문하기",
     title: "メニュー · 메뉴",
     hint: "💡 일본어로 주문해 보세요. 메뉴: コーヒー · 紅茶 · いちごのショートケーキ · チーズケーキ (예: 「コーヒーをください」)",

@@ -58,6 +58,12 @@ const ROOM_VILLAGERS: Record<string, VillagerProfile> = {
     avatar: "💼",
     description: "퇴근길에 카페에 들르는 느긋한 직장인",
   },
+  "cafe-staff": {
+    id: "cafe-staff",
+    name: "나나(奈々)",
+    avatar: "🧁",
+    description: "방과후 카페에서 아르바이트하는 명랑한 고등학생",
+  },
   "shop-clerk": {
     id: "shop-clerk",
     name: "모모카(桃花)",
