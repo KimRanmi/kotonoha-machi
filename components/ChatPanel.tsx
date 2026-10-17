@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as wanakana from "wanakana";
 import { ChatMessage, LearnedWord } from "@/lib/types";
-import { addWord, fetchChatHistory, fetchWords, sendChat } from "@/lib/storage";
+import { addWord, fetchChatHistory, fetchWords, GeminiError, sendChat, translateText } from "@/lib/storage";
 import { DEFAULT_VILLAGER_ID, getVillager } from "@/lib/villager";
 import VillagerFace from "@/components/VillagerFace";
 import VillagerMessage from "@/components/VillagerMessage";
@@ -74,6 +74,13 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 보내려던 말은 응답이 성공하기 전까지 대화 기록이 아니다. 전송 중에는 pendingText로만 보여주고,
+  // 실패하면 입력창에 그대로 남긴 채 failedSend에 담아 "다시 시도"로 같은 말을 다시 보낸다.
+  const [pendingText, setPendingText] = useState<string | null>(null);
+  const [failedSend, setFailedSend] = useState<{ text: string; message: string } | null>(null);
+  const [slowConnection, setSlowConnection] = useState(false);
+  const [translating, setTranslating] = useState<Set<string>>(new Set());
+  const sendingRef = useRef(false);
   const [popup, setPopup] = useState<WordPopupState | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
@@ -140,9 +147,22 @@ export default function ChatPanel({
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  // 서버가 일시 장애로 재시도하는 동안(최대 약 10초) 응답이 늦어지므로, 3초 넘게 걸리면 "연결 중…"으로 바꿔 보여준다.
+  useEffect(() => {
+    if (!isLoading) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSlowConnection(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setSlowConnection(true), 3000);
+    return () => window.clearTimeout(timer);
+  }, [isLoading]);
+
   const sendMessage = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
-    if (!text || isLoading || !hydrated) return;
+    // sendingRef: 상태 갱신보다 빠른 연속 호출(더블클릭, 음성 결과와 겹침)도 막는다.
+    if (!text || isLoading || !hydrated || sendingRef.current) return;
+    sendingRef.current = true;
 
     const userMessage: ChatMessage = {
       id: makeId(),
@@ -150,26 +170,28 @@ export default function ChatPanel({
       content: text,
       createdAt: Date.now(),
     };
-    const nextMessages = [...messages, userMessage];
-    setMessages(nextMessages);
-    setInput("");
-    if (inputRef.current) inputRef.current.value = "";
+    // 입력창은 성공할 때까지 비우지 않는다.
+    setPendingText(text);
     setError(null);
+    setFailedSend(null);
     setIsLoading(true);
 
     try {
-      const data = await sendChat(
-        villager.id,
-        nextMessages.map((m) => ({ role: m.role, content: m.content })),
-      );
+      const data = await sendChat(villager.id, [
+        ...messages.map((m) => ({ role: m.role, content: m.content })),
+        { role: "user", content: text },
+      ]);
       const villagerMessage: ChatMessage = {
         id: makeId(),
         role: "assistant",
         content: data.reply,
         translation: data.translation || undefined,
+        translationFailed: !data.translation,
         createdAt: Date.now(),
       };
-      setMessages((prev) => [...prev, villagerMessage]);
+      setMessages((prev) => [...prev, userMessage, villagerMessage]);
+      setInput("");
+      if (inputRef.current) inputRef.current.value = "";
       onExchange?.(userMessage.content, data.reply);
       if (isSpeechSynthesisSupported()) {
         window.speechSynthesis.cancel();
@@ -178,11 +200,40 @@ export default function ChatPanel({
         window.speechSynthesis.speak(utterance);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "요청에 실패했습니다.");
+      // 실패한 말은 기록에 넣지 않고 입력창에 돌려놓는다 (음성으로 보낸 말도 같다).
+      setInput(text);
+      if (inputRef.current) inputRef.current.value = text;
+      setFailedSend({
+        text,
+        message: err instanceof GeminiError ? err.message : "문제가 생겼어요. 잠시 후 다시 시도해 주세요.",
+      });
     } finally {
+      sendingRef.current = false;
+      setPendingText(null);
       setIsLoading(false);
     }
   }, [input, isLoading, hydrated, messages, villager.id, onExchange]);
+
+  // 번역 자리에서만 다시 시도한다. 본 응답은 건드리지 않는다.
+  async function retryTranslation(m: ChatMessage) {
+    if (translating.has(m.id)) return;
+    setTranslating((prev) => new Set(prev).add(m.id));
+    try {
+      const translation = await translateText(m.content);
+      setMessages((prev) =>
+        prev.map((x) => (x.id === m.id ? { ...x, translation, translationFailed: false } : x)),
+      );
+      setShownTranslations((prev) => new Set(prev).add(m.id));
+    } catch {
+      // 실패하면 "번역 실패 · 다시 시도"가 그대로 남는다.
+    } finally {
+      setTranslating((prev) => {
+        const next = new Set(prev);
+        next.delete(m.id);
+        return next;
+      });
+    }
+  }
 
   useEffect(() => {
     sendMessageRef.current = sendMessage;
@@ -334,6 +385,16 @@ export default function ChatPanel({
             {m.role === "assistant" ? (
               <>
                 <VillagerMessage text={m.content} onWordClick={handleWordClick} />
+                {!m.translation && m.translationFailed && (
+                  <button
+                    type="button"
+                    className="translationToggle"
+                    disabled={translating.has(m.id)}
+                    onClick={() => retryTranslation(m)}
+                  >
+                    {translating.has(m.id) ? "번역 중..." : "번역 실패 · 다시 시도"}
+                  </button>
+                )}
                 {m.translation && (
                   <>
                     <button
@@ -355,15 +416,24 @@ export default function ChatPanel({
             )}
           </div>
         ))}
+        {pendingText !== null && <div className="bubbleUser">{pendingText}</div>}
         {isLoading && (
           <div className="bubbleVillager bubbleLoading">
-            {villager.name}가 답하는 중...
+            {slowConnection ? "연결 중... 잠시만 기다려 주세요" : `${villager.name}가 답하는 중...`}
           </div>
         )}
         <div ref={logEndRef} />
       </main>
 
       {error && <p className="errorText">{error}</p>}
+      {failedSend && !isLoading && (
+        <p className="errorText" role="alert">
+          {failedSend.message}{" "}
+          <button type="button" className="pill" onClick={() => sendMessage(failedSend.text)}>
+            다시 시도
+          </button>
+        </p>
+      )}
 
       {(!voiceSupported || micBlocked) && (
         <p className="voiceHint">

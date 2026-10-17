@@ -129,6 +129,18 @@ docker compose --profile full down            # 중지 (DB 데이터는 볼륨�
 | POST | `/api/auth/logout` | refresh 토큰 폐기 + 쿠키 삭제 (204) |
 | GET | `/api/auth/me` | 현재 로그인한 사용자 `{email, nickname}` |
 | POST | `/api/chat` | `{villagerId, messages}` → `{reply, translation}`. 성공 시 대화 2건 저장 + 친밀도 +1. 친밀도는 서버가 DB에서 읽으며 클라이언트가 보낸 `exchanges`는 무시합니다 |
+| POST | `/api/chat/translate` | `{text}` → `{translation}`. 번역만 다시 받을 때 쓴다(저장/친밀도 변화 없음) |
+
+**Gemini 호출 실패 처리**: `/api/chat`, `/api/chat/translate`가 실패하면 `{error, code}`로 응답한다. `error`는 사용자에게 보여줄 짧은 문구뿐이며 키/모델 같은 상세 원인은 서버 로그(`kind=...`)에만 남긴다.
+
+| 유형 | 원인 | HTTP | `code` | 재시도 |
+| --- | --- | --- | --- | --- |
+| 일시 장애/한도 | 503, 429, 그 밖의 5xx, 타임아웃, 네트워크 오류 | 503 | `GEMINI_TRANSIENT` | 최대 2회(1초, 3초 대기), 총 10초 이내 (`gemini.retry-delays`, `gemini.total-timeout`) |
+| 설정 문제 | 401/403/400/404 등 4xx, API 키 미설정 | 500 | `GEMINI_CONFIG` | 없음 |
+| 응답 형식 오류 | JSON 파싱 실패, 빈 응답, `reply` 없음 | 502 | `GEMINI_FORMAT` | 없음 |
+| 중복 요청 | 같은 사용자·주민의 이전 `/api/chat`이 처리 중 | 409 | (없음) | - |
+
+실패한 턴은 대화 기록과 친밀도에 아무것도 남기지 않는다(Gemini 응답을 받은 뒤에만 한 트랜잭션으로 저장).
 | GET | `/api/villagers/{id}/messages` | 주민별 대화 기록 (오래된 순, 최근 500건) |
 | GET | `/api/intimacy` | 주민별 `{villagerId, met, description}` (수치는 노출하지 않고 서술형 문구만) |
 | GET / POST / DELETE | `/api/words`, `/api/words?word=` | 학습 단어 목록 `[{word, addedAt}]` / 단어 추가 `{word}` (이미 있으면 그대로 성공) / 삭제 |
