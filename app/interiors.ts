@@ -111,6 +111,8 @@ export const ROOM_TEMPLATES: Record<InteriorKind, Room> = {
     // 의자에 앉은 손님: 테이블 옆 의자 자리에 앉는다 (좌표는 의자 위치 기준)
     { id: "cafe-guest1", look: "guest-a", x: 360.8, y: 219.2, facing: Math.PI / 2, behavior: "sit" },
     { id: "cafe-guest2", look: "guest-b", x: 128.8, y: 280.8, facing: 0, behavior: "sit" },
+    // 방과후 알바생: 뒤쪽 빈 테이블 주변을 치우며 돌아다닌다 (다른 가구·사람과 겹치지 않는 구역).
+    { id: "cafe-staff", look: "cafe-staff", x: 540, y: 410, facing: 0, label: "아르바이트생", behavior: "wander", area: { x0: 460, y0: 380, x1: 620, y1: 440 } },
   ]),
   shop: baseRoom("shop", "#d9dfe8", "#4a638a", { x: 304, y: 112 }, [
     { id: "shelf1", label: "선반", x: 50, y: 100, width: 170, height: 40, shape: "rect", color: "#8a6a45", emoji: "🥫", ...fixed },

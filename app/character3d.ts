@@ -54,6 +54,7 @@ const VILLAGER_SPECS: Record<string, CharacterSpec> = {
 // 방 안의 직원·손님·학생 모습 (RoomNpc.look). 같은 방 사람들이 서로 구분되도록 색과 머리를 다르게 준다.
 const NPC_SPECS: Record<string, CharacterSpec> = {
   "cafe-owner2": { skin: "#efc9a6", hair: "#2f2a36", hairStyle: "short", top: "#fffaf0", bottom: "#6f5a48", accessory: "chef", accent: "#fffdf8" },
+  "cafe-staff": { skin: "#f6d3b6", hair: "#6a4228", hairStyle: "bob", top: "#fdeaf0", bottom: "#8a6a86", accessory: "apron", accent: "#f2b8c6" },
   "shop-clerk": { skin: "#f6d3b6", hair: "#8a5a3a", hairStyle: "bob", top: "#e8b9a8", bottom: "#5a6a86", accessory: "apron", accent: "#d9604c" },
   "shop-stocker": { skin: "#e8bf9c", hair: "#3a2a20", hairStyle: "spiky", top: "#9ec0c6", bottom: "#4a5a70", accessory: "none" },
   "hall-clerk": { skin: "#f4d6bc", hair: "#3a3a46", hairStyle: "short", top: "#a8b99a", bottom: "#4a5a50", accessory: "glasses", accent: "#5a4a3a" },
