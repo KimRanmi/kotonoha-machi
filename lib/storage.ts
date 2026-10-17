@@ -268,16 +268,54 @@ export async function fetchChatHistory(villagerId: string): Promise<ChatMessage[
   return readJson<ChatMessage[]>(res, "대화 기록을 불러오지 못했습니다.");
 }
 
-// 대화를 보내고 주민의 답변을 받는다. 저장과 친밀도 증가는 서버가 처리한다.
-export async function sendChat(
+// Gemini를 쓰는 호출(대화, 번역)이 실패했을 때 화면이 유형을 구분할 수 있게 던지는 에러.
+// kind: transient = 일시 장애/한도/네트워크("잠시 후 다시 시도"), problem = 설정·응답 형식 등("문제가 생겼어요"),
+// busy = 같은 대화의 이전 요청이 아직 처리 중. 상세 원인은 서버 로그에만 있고 화면에는 이 문구만 보인다.
+export type GeminiErrorKind = "transient" | "problem" | "busy";
+
+const GEMINI_ERROR_MESSAGES: Record<GeminiErrorKind, string> = {
+  transient: "지금 연결이 원활하지 않아요. 잠시 후 다시 시도해 주세요.",
+  problem: "문제가 생겼어요. 잠시 후 다시 시도해 주세요.",
+  busy: "이전 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요.",
+};
+
+export class GeminiError extends Error {
+  readonly kind: GeminiErrorKind;
+  constructor(kind: GeminiErrorKind) {
+    super(GEMINI_ERROR_MESSAGES[kind]);
+    this.kind = kind;
+  }
+}
+
+// Gemini 호출 API를 부르고 실패를 GeminiError로 바꿔 던진다.
+async function geminiFetch<T>(path: string, body: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await apiFetch(path, { method: "POST", body: JSON.stringify(body) });
+  } catch (err) {
+    // 로그인 만료는 그대로 전달하고, 그 밖의 fetch 실패는 네트워크 오류(일시 장애)로 본다.
+    if (err instanceof UnauthorizedError) throw err;
+    throw new GeminiError("transient");
+  }
+  const data = await res.json().catch(() => null);
+  if (res.ok) return data as T;
+  if (data?.code === "GEMINI_TRANSIENT") throw new GeminiError("transient");
+  if (res.status === 409) throw new GeminiError("busy");
+  throw new GeminiError("problem");
+}
+
+// 대화를 보내고 주민의 답변을 받는다. 저장과 친밀도 증가는 서버가 성공했을 때만 처리한다.
+export function sendChat(
   villagerId: string,
   messages: { role: string; content: string }[],
 ): Promise<ChatReply> {
-  const res = await apiFetch("/api/chat", {
-    method: "POST",
-    body: JSON.stringify({ villagerId, messages }),
-  });
-  return readJson<ChatReply>(res, "알 수 없는 오류가 발생했습니다.");
+  return geminiFetch<ChatReply>("/api/chat", { villagerId, messages });
+}
+
+// 번역만 다시 받는다 (대화 기록/친밀도와 무관).
+export async function translateText(text: string): Promise<string> {
+  const data = await geminiFetch<{ translation: string }>("/api/chat/translate", { text });
+  return data.translation;
 }
 
 // 주민별 친밀도 서술형 문구. 아직 만난 적 없으면 met=false, description=null.

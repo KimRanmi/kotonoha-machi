@@ -5,6 +5,8 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   translation?: string;
+  // 방금 받은 답변의 번역이 비어 와서 번역 자리에 "번역 실패 · 다시 시도"를 보여야 할 때 (저장되지 않는 화면용 표시)
+  translationFailed?: boolean;
   createdAt: number;
 }
 
