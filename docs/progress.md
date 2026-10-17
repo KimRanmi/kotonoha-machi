@@ -11,6 +11,9 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   4.x(백엔드), PostgreSQL+Flyway(DB), Gemini API(백엔드 경유). 자세한 이유는
   `docs/decisions/0001-tech-stack.md`.
 - `CLAUDE.md`를 v2 개발 규칙(기술 스택, 학습 원칙, 문서화 원칙)으로 교체했다.
+- v1 전체 작업은 `v1` 브랜치(로컬/`origin/v1`)로 보존하고, `master`는 v1 코드와
+  스택별 설정 파일(Next.js/Gradle/Docker 등)을 전부 지워 비웠다. 안 쓰는 리모트
+  브랜치도 정리했다.
 - 다음 할 일: 새 프런트엔드/백엔드 골격을 가장 작은 단위로 각각 띄워서 검증한다
   (빈 Vite+React+TS 앱 실행, 빈 Spring Boot 4 앱이 Postgres에 Flyway 첫 마이그레이션을
   적용하는지 확인).
