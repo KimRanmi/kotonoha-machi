@@ -124,3 +124,29 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   과정은 `docs/decisions/0004-javadoc-formatting.md`.
 - 다음 할 일: 프런트엔드 로그인 필수 라우트 가드 추가, 이메일 인증코드 시도 횟수 제한
   고려, 그다음 기능(프로필 또는 테마 학습)을 `/pipeline`으로 계속 구현한다.
+
+## 2026-10-22
+
+- 테마 학습(섹션 5) 1번 항목 — 한자→단어→표현→예문→독해 단계 진행 게이트 — 를 백엔드만
+  구현했다(`feature/vibe-theme-stage-gate` 브랜치). 실제 한자/단어/표현/예문/독해
+  콘텐츠(섹션 5의 2번 항목)와 정답 채점(3회 오답 힌트 등)은 범위 밖으로 남기고, "이전
+  단계를 끝내야 다음으로 진행"이라는 순서 규칙만 구현했다 — 사용자와 논의해 이번 범위를
+  좁게 잡기로 확인했다.
+  - `theme` 패키지에 `Theme`/`ThemeProgress` 엔티티, `ThemeStage` enum(KANJI → WORD →
+    EXPRESSION → EXAMPLE → READING 고정 순서), `ThemeService`, `ThemeController`를
+    `auth`/`user` 패키지와 같은 구조(controller/service/dto/repository 하위 패키지,
+    엔티티는 루트)로 추가했다. `GET /api/themes`(목록+내 진행 상태), `POST
+    /api/themes/{themeId}/stages/{stage}/complete`(단계 완료, 건너뛰면 409) 2개 API.
+  - 테마 자체는 아직 콘텐츠가 없어 제목만 가진 샘플 테마 2개를 마이그레이션(`V6`)으로
+    시드했다.
+  - 검증: `./gradlew spotlessApply`, `./gradlew test`(새 단위/통합 테스트 포함 전체 통과),
+    `./gradlew build -x test` 통과. `code-reviewer` 서브에이전트로 패키지 구조/컨벤션/게이트
+    로직 리뷰 — `REVIEW_PASSED`.
+  - 리뷰에서 지적된 비차단 사항(한계로 기록): 같은 사용자가 같은 테마의 진행 상태를 처음
+    만드는 요청 두 개를 동시에 보내면, DB의 유니크 제약(`uq_theme_progress_user_theme`)이
+    중복 행 생성은 막아주지만 서비스 코드가 그 충돌(`DataIntegrityViolationException`)을
+    따로 잡지 않아 패자 쪽 요청이 500으로 끝난다. 데이터는 깨지지 않지만, 재시도 없이
+    실패로 끝나는 사용자 경험 공백이라 다음에 개선할 수 있다.
+  - 다음 할 일: 섹션 5의 2번 항목(한자·단어·표현의 실제 뜻/읽는 법을 DB에서 가져오기) —
+    콘텐츠 출처(자체 제작 vs 공개 JLPT 리스트)가 아직 미정이라 구현 전에 논의 필요. 이번
+    게이트 API를 쓰는 프런트엔드 화면은 아직 없다.
