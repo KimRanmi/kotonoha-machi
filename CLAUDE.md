@@ -89,3 +89,40 @@
 
 문서 간 내용을 불필요하게 중복하지 않는다. 요구사항/기술 설계가 아직 확정되지 않았으면
 확정된 것처럼 기록하지 않는다.
+
+## 🤖 Autonomous Git & Quality Verification Workflow
+에이전트는 사용자가 기능 개발이나 버그 수정을 요청하면, 사람에게 브랜치 생성이나 커밋을 요청하지 말고 반드시 아래의 4단계 프로세스를 터미널 툴을 통해 자율적으로 연속 실행해야 합니다.
+
+1. **Pre-coding (브랜치 자동 생성)**
+   - 코드 수정을 시작하기 전, 무조건 메인 브랜치의 최신 상태를 확보합니다.
+   - 요청 사항을 기반으로 직관적인 영문 브랜치명을 자율적으로 작명하여 새 브랜치를 생성하고 이동합니다.
+   - *실행 명령어:* 
+     ```bash
+     git checkout main && git pull origin main
+     git checkout -b feature/vibe-<short-description>  # 버그일 경우 fix/vibe-...
+     ```
+
+2. **Coding (설명 후 구현 원칙 준수)**
+   - 개발 학습 원칙 1번("설명 후 구현")에 따라 변경할 파일과 목적을 사용자에게 간단히 설명한 후 코드를 구현합니다.
+
+3. **Verification (★테스트 및 리뷰 검증 절대 순서★)**
+   - 코딩이 끝나면 커밋을 하기 전에 **반드시** 아래 검증 명령어들을 순차적으로 실행해야 합니다. 하나라도 실패(Fail)하면 커밋하지 말고 코드를 재수정해야 합니다.
+   - **Step 1 [린트 및 포맷터 적용]:**
+     - 백엔드 수정 시: `./gradlew spotlessApply`
+     - 프론트엔드 수정 시: `npx prettier --write .`
+   - **Step 2 [빌드 및 유닛 테스트 검증]:**
+     - 백엔드 검증: `./gradlew test`
+     - 프론트엔드 검증: `npm run test`
+   - **Step 3 [시니어 코드 리뷰어 자가 검증]:**
+     - 에이전트 내부의 `code-reviewer` 지침을 활성화하여 작성된 코드가 `docs/decisions/0003-package-structure.md`에 명시된 백엔드 패키지 구조(기능 패키지 내 controller/service/dto/repository 분리, 엔티티는 루트)를 완벽히 준수했는지, 구글 컨벤션을 만족하여 `REVIEW_PASSED` 기준을 충족하는지 최종 확정합니다.
+
+4. **Post-coding (자동 커밋)**
+   - 테스트와 포맷터, 코드 리뷰가 모두 완벽히 통과(Green)하면 터미널을 통해 마이크로 커밋을 남깁니다.
+   - *커밋 메시지 형식:* `🤖 [AI] <type>(<scope>): <description>`
+   - *실행 명령어:*
+     ```bash
+     git add .
+     git commit -m "🤖 [AI] feat(auth): implement gemini api secure bridge in backend"
+     ```
+   - 커밋 완료 후 사용자에게 작업 완료 보고와 함께 생성된 브랜치명을 안내합니다.
+
