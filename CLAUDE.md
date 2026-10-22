@@ -13,11 +13,41 @@
 - **백엔드**: Java 25 + Spring Boot 4.x
   - API와 비즈니스 로직 담당. 서블릿 컨테이너는 Tomcat(기본값).
   - 빌드 도구: Gradle 8.14 이상. 테스트: JUnit + Testcontainers.
+  - 패키지 구조: 기능(도메인) 패키지(`auth`, `user` 등) 안에 `controller`/`service`/
+    `dto`/`repository` 역할별 하위 패키지를 둔다. 엔티티는 레이어가 아니라 도메인
+    모델이므로 도메인 패키지 루트에 둔다. `common`처럼 특정 기능이 아닌 전역 공통
+    코드는 이 분리 대상이 아니다. 근거와 대안은
+    [`docs/decisions/0003-package-structure.md`](docs/decisions/0003-package-structure.md)
+    참고.
 - **데이터베이스**: PostgreSQL + Flyway (스키마 변경 이력 관리)
+  - 로컬 개발용 DB는 `backend/docker-compose.yml`로 띄운다(`cd backend && docker compose up -d`).
+    `kotonoha_machi`/`kotonoha_machi`(DB명/계정) 기준이며, `application.yml`의 기본값과
+    맞춰져 있다.
 - **AI**: Gemini API는 백엔드에서만 호출한다. API 키를 프런트엔드에 노출하지 않는다.
 
 결정 이유와 비교한 대안은 [`docs/decisions/0001-tech-stack.md`](docs/decisions/0001-tech-stack.md)
 참고.
+
+# 프로젝트 가이드라인 (CLAUDE.md)
+
+## [코드 컨벤션 (Coding Conventions)]
+- **Javadoc 포맷팅 예외**: Javadoc 주석은 포맷터가 줄바꿈을 강제하지 않는다(한 줄로 길게 써도 됨).
+  구글 공식 포맷터(Google Java Format)는 폭(100자) 설정 자체가 불가능해, 포크인
+  Palantir Java Format(`formatJavadoc(false)`)으로 바꿔 Javadoc만 포맷터 대상에서
+  제외했다. 일반 코드(메서드/생성자 매개변수 등)는 여전히 구글 스타일 100자 제한을
+  그대로 따른다 — 이쪽은 알고리즘 자체에 폭이 고정돼 있어 예외를 둘 수 없다. 근거와
+  시도한 대안은 [`docs/decisions/0004-javadoc-formatting.md`](docs/decisions/0004-javadoc-formatting.md)
+  참고.
+- **표준 규칙**: 본 프로젝트는 전사적으로 **구글 코드 컨벤션(Google Code Style)**을 절대 표준으로 따릅니다.
+- **백엔드 (Java)**: 코드를 수정하거나 추가한 후에는 반드시 구글 자바 스타일 가이드가 적용된 Gradle 린트 명령어(`./gradlew spotlessApply` 또는 `./gradlew checkstyleMain`)를 실행하여 컨벤션을 준수해야 합니다.
+- **프론트엔드 (Vite + React)**: 코드를 수정한 후에는 반드시 구글 스타일이 적용된 프론트엔드 린트/포맷터 명령어(`npm run lint` 또는 `npx prettier --write .`)를 실행하여 코드를 자동 정렬하고 오류를 검사해야 합니다.
+
+## [지속적 통합(CI) 검증 명령어]
+- **백엔드 유닛 테스트 및 검증**: `./gradlew test`
+- **백엔드 프로덕션 빌드 검증**: `./gradlew build -x test` (테스트 중복 방지용)
+- **프론트엔드 유닛 테스트 및 검증**: `npm run test`
+- **프론트엔드 프로덕션 빌드 검증**: `npm run build`
+
 
 ### 기술 선택 원칙
 
@@ -59,11 +89,3 @@
 
 문서 간 내용을 불필요하게 중복하지 않는다. 요구사항/기술 설계가 아직 확정되지 않았으면
 확정된 것처럼 기록하지 않는다.
-
-## v1 → v2 전환 상태
-
-이 브랜치(`v2`)는 아직 v1의 Next.js 프런트엔드(`app/`, `components/`, 최상위 `lib/`)와
-기존 `backend/`(Spring Boot 3.x 기반)를 참고용으로 그대로 두고 있다. 새 구조를
-스캐폴딩하기 전까지는 `AGENTS.md`의 Next.js 관련 안내(`next dev`가 자동으로 관리하는
-블록 포함)와 `.env.local` 관련 안내가 `app/` 디렉토리에만 유효하다. 새 프런트엔드/백엔드
-골격이 만들어지고 기존 v1 코드가 제거되면 이 절과 `AGENTS.md`도 함께 정리한다.
