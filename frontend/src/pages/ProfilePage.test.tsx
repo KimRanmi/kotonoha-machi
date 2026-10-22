@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
@@ -60,12 +60,24 @@ const DEFAULT_AVATAR_OPTIONS: AvatarOptions = {
   shoesColors: ['WHITE', 'BLACK', 'BROWN', 'RED', 'BLUE'],
 };
 
-function renderPage() {
+/** 닉네임/비밀번호/회원탈퇴는 "계정" 설정(/profile?tab=account)에, 캐릭터 꾸미기는 "캐릭터" 설정(/profile)에 있다. */
+function renderPage(section: 'character' | 'account' = 'character') {
+  const initialPath = section === 'account' ? '/profile?tab=account' : '/profile';
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialPath]}>
       <ProfilePage />
     </MemoryRouter>,
   );
+}
+
+/** 계정 설정 로딩(닉네임 입력란이 뜸)이 끝날 때까지 기다린다. */
+async function waitForAccountLoaded() {
+  await screen.findByLabelText('닉네임');
+}
+
+/** 캐릭터 설정 로딩(미리보기 이미지가 뜸)이 끝날 때까지 기다린다. */
+async function waitForCharacterLoaded() {
+  await screen.findByAltText('캐릭터 미리보기');
 }
 
 describe('ProfilePage', () => {
@@ -92,10 +104,11 @@ describe('ProfilePage', () => {
       hasPassword: true,
       ...DEFAULT_AVATAR,
     });
-    renderPage();
+    renderPage('account');
 
-    expect(await screen.findByText('user@test.com')).toBeInTheDocument();
+    await waitForAccountLoaded();
     expect(screen.getByLabelText('닉네임')).toHaveValue('기존닉네임');
+    expect(screen.getByText('user@test.com')).toBeInTheDocument();
   });
 
   it('프로필 조회가 실패하면 에러 메시지를 보여준다', async () => {
@@ -120,9 +133,9 @@ describe('ProfilePage', () => {
       hasPassword: true,
       ...DEFAULT_AVATAR,
     });
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
     fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '새닉네임' } });
     fireEvent.click(screen.getByRole('button', { name: '닉네임 저장' }));
 
@@ -142,9 +155,9 @@ describe('ProfilePage', () => {
       ...DEFAULT_AVATAR,
     });
     vi.mocked(updateNickname).mockRejectedValue(new ApiError(409, '이미 사용 중인 닉네임입니다.'));
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
     fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '중복닉네임' } });
     fireEvent.click(screen.getByRole('button', { name: '닉네임 저장' }));
 
@@ -162,9 +175,9 @@ describe('ProfilePage', () => {
       ...DEFAULT_AVATAR,
     });
     vi.mocked(updateNickname).mockRejectedValue(new Error('network down'));
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
     fireEvent.click(screen.getByRole('button', { name: '닉네임 저장' }));
 
     expect(await screen.findByText('닉네임 변경에 실패했습니다.')).toBeInTheDocument();
@@ -178,9 +191,9 @@ describe('ProfilePage', () => {
       hasPassword: true,
       ...DEFAULT_AVATAR,
     });
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
 
     expect(screen.getByLabelText('현재 비밀번호')).toBeInTheDocument();
     expect(screen.getByLabelText('새 비밀번호')).toBeInTheDocument();
@@ -197,9 +210,9 @@ describe('ProfilePage', () => {
       hasPassword: false,
       ...DEFAULT_AVATAR,
     });
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
 
     expect(screen.queryByLabelText('현재 비밀번호')).not.toBeInTheDocument();
     expect(screen.getByLabelText('새 비밀번호')).toBeInTheDocument();
@@ -217,9 +230,9 @@ describe('ProfilePage', () => {
       ...DEFAULT_AVATAR,
     });
     vi.mocked(changePassword).mockResolvedValue(undefined);
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
     fireEvent.change(screen.getByLabelText('현재 비밀번호'), {
       target: { value: 'oldPassword123' },
     });
@@ -247,9 +260,9 @@ describe('ProfilePage', () => {
     vi.mocked(changePassword).mockRejectedValue(
       new ApiError(400, '현재 비밀번호가 올바르지 않습니다.'),
     );
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
     fireEvent.change(screen.getByLabelText('현재 비밀번호'), {
       target: { value: 'wrongPassword' },
     });
@@ -274,9 +287,9 @@ describe('ProfilePage', () => {
       hasPassword: true,
       ...DEFAULT_AVATAR,
     });
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
 
     expect(screen.getByLabelText('현재 비밀번호 확인')).toBeInTheDocument();
     expect(
@@ -292,9 +305,9 @@ describe('ProfilePage', () => {
       hasPassword: false,
       ...DEFAULT_AVATAR,
     });
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
 
     expect(screen.queryByLabelText('현재 비밀번호 확인')).not.toBeInTheDocument();
     expect(
@@ -311,9 +324,9 @@ describe('ProfilePage', () => {
       ...DEFAULT_AVATAR,
     });
     vi.mocked(withdraw).mockResolvedValue(undefined);
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
     fireEvent.change(screen.getByLabelText('현재 비밀번호 확인'), {
       target: { value: 'myPassword123' },
     });
@@ -343,9 +356,9 @@ describe('ProfilePage', () => {
       ...DEFAULT_AVATAR,
     });
     vi.mocked(withdraw).mockResolvedValue(undefined);
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
     fireEvent.click(screen.getByRole('button', { name: '탈퇴하기' }));
     fireEvent.click(screen.getByRole('button', { name: '탈퇴 확정' }));
 
@@ -366,9 +379,9 @@ describe('ProfilePage', () => {
       ...DEFAULT_AVATAR,
     });
     vi.mocked(withdraw).mockRejectedValue(new ApiError(400, '현재 비밀번호가 올바르지 않습니다.'));
-    renderPage();
+    renderPage('account');
 
-    await screen.findByText('user@test.com');
+    await waitForAccountLoaded();
     fireEvent.change(screen.getByLabelText('현재 비밀번호 확인'), {
       target: { value: 'wrongPassword' },
     });
@@ -379,5 +392,135 @@ describe('ProfilePage', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
     // 실패했으니 입력값은 그대로 남아있어야 한다.
     expect(screen.getByLabelText('현재 비밀번호 확인')).toHaveValue('wrongPassword');
+  });
+
+  it('기본 탭은 캐릭터 설정이다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+      ...DEFAULT_AVATAR,
+    });
+    renderPage();
+
+    await waitForCharacterLoaded();
+    expect(screen.getByRole('heading', { name: '캐릭터 설정' })).toBeInTheDocument();
+  });
+
+  it('피부색 스와치를 클릭하면 선택된 스와치가 바뀐다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+      ...DEFAULT_AVATAR,
+    });
+    renderPage();
+
+    await waitForCharacterLoaded();
+    const skinColorGroup = screen.getByRole('radiogroup', { name: '피부색' });
+    const lightSwatch = within(skinColorGroup).getByRole('radio', { name: '연한' });
+    const fairSwatch = within(skinColorGroup).getByRole('radio', { name: '밝은' });
+
+    expect(lightSwatch).toHaveAttribute('aria-checked', 'true');
+    expect(fairSwatch).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(fairSwatch);
+
+    expect(lightSwatch).toHaveAttribute('aria-checked', 'false');
+    expect(fairSwatch).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('헤어스타일 스테퍼 버튼을 누르면 다음/이전 스타일로 순환한다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+      ...DEFAULT_AVATAR,
+    });
+    renderPage();
+
+    await waitForCharacterLoaded();
+    expect(screen.getByText('숏컷')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 헤어스타일' }));
+    expect(screen.getByText('단발')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '이전 헤어스타일' }));
+    fireEvent.click(screen.getByRole('button', { name: '이전 헤어스타일' }));
+    expect(screen.getByText('모히칸')).toBeInTheDocument();
+  });
+
+  it('캐릭터 꾸미기를 저장하면 변경한 값으로 저장 요청을 보내고 성공 메시지를 보여준다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+      ...DEFAULT_AVATAR,
+    });
+    vi.mocked(updateAvatar).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+      ...DEFAULT_AVATAR,
+      avatarSkinColor: 'FAIR',
+    });
+    renderPage();
+
+    await waitForCharacterLoaded();
+    const skinColorGroup = screen.getByRole('radiogroup', { name: '피부색' });
+    fireEvent.click(within(skinColorGroup).getByRole('radio', { name: '밝은' }));
+    fireEvent.click(screen.getByRole('button', { name: '캐릭터 꾸미기 저장' }));
+
+    await waitFor(() => {
+      expect(updateAvatar).toHaveBeenCalledWith({
+        skinColor: 'FAIR',
+        hairColor: 'BLACK',
+        hairStyle: 'SHORT',
+        clothesStyle: 'PLAIN',
+        shoesColor: 'WHITE',
+      });
+    });
+    expect(await screen.findByText('캐릭터 꾸미기를 저장했습니다.')).toBeInTheDocument();
+  });
+
+  it('캐릭터 꾸미기 저장에 실패하면 에러 메시지를 보여준다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+      ...DEFAULT_AVATAR,
+    });
+    vi.mocked(updateAvatar).mockRejectedValue(
+      new ApiError(400, '캐릭터 꾸미기 저장에 실패했습니다.'),
+    );
+    renderPage();
+
+    await waitForCharacterLoaded();
+    fireEvent.click(screen.getByRole('button', { name: '캐릭터 꾸미기 저장' }));
+
+    expect(await screen.findByText('캐릭터 꾸미기 저장에 실패했습니다.')).toBeInTheDocument();
+  });
+
+  it('캐릭터 선택지 조회가 실패하면 미리보기 폼 없이 에러 메시지만 보여준다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+      ...DEFAULT_AVATAR,
+    });
+    vi.mocked(getAvatarOptions).mockRejectedValue(
+      new ApiError(500, '선택지를 불러오지 못했습니다.'),
+    );
+    renderPage();
+
+    expect(await screen.findByText('선택지를 불러오지 못했습니다.')).toBeInTheDocument();
+    expect(screen.queryByAltText('캐릭터 미리보기')).not.toBeInTheDocument();
   });
 });

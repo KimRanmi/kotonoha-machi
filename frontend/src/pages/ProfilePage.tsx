@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   changePassword,
   getAvatarOptions,
@@ -9,36 +9,34 @@ import {
   withdraw,
   type Avatar,
   type AvatarOptions,
-  type Profile,
 } from '../api/user';
 import { ApiError } from '../api/client';
 import {
+  avatarFromProfile,
   CLOTHES_STYLE_LABELS,
+  HAIR_COLOR_HEX,
   HAIR_COLOR_LABELS,
   HAIR_STYLE_LABELS,
+  SHOES_COLOR_HEX,
   SHOES_COLOR_LABELS,
+  SKIN_COLOR_HEX,
   SKIN_COLOR_LABELS,
   buildAvatarPreviewUrl,
 } from '../lib/avatarPreview';
-import styles from './AuthPage.module.css';
+import styles from './ProfilePage.module.css';
 
-function avatarFromProfile(profile: Profile): Avatar {
-  return {
-    skinColor: profile.avatarSkinColor,
-    hairColor: profile.avatarHairColor,
-    hairStyle: profile.avatarHairStyle,
-    clothesStyle: profile.avatarClothesStyle,
-    shoesColor: profile.avatarShoesColor,
-  };
-}
+type Section = 'character' | 'account';
 
 function ProfilePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const activeSection: Section = searchParams.get('tab') === 'account' ? 'account' : 'character';
   const [userId, setUserId] = useState<number | null>(null);
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -76,7 +74,7 @@ function ProfilePage() {
       })
       .catch((error) => {
         if (!cancelled) {
-          setErrorMessage(
+          setLoadErrorMessage(
             error instanceof ApiError ? error.message : '프로필을 불러오지 못했습니다.',
           );
         }
@@ -185,7 +183,41 @@ function ProfilePage() {
     setWithdrawErrorMessage(null);
   }
 
-  function renderAvatarAxis<K extends keyof Avatar>(
+  function renderColorAxis<K extends 'skinColor' | 'hairColor' | 'shoesColor'>(
+    axis: K,
+    legend: string,
+    options: Avatar[K][],
+    labels: Record<string, string>,
+    hexByOption: Record<string, string>,
+  ) {
+    if (!avatar) {
+      return null;
+    }
+
+    return (
+      <div className={styles.axisRow}>
+        <span className={styles.axisLabel}>{legend}</span>
+        <div className={styles.swatchGroup} role="radiogroup" aria-label={legend}>
+          {options.map((option) => (
+            <button
+              key={String(option)}
+              type="button"
+              role="radio"
+              aria-checked={avatar[axis] === option}
+              aria-label={labels[String(option)]}
+              title={labels[String(option)]}
+              className={styles.swatch}
+              data-selected={avatar[axis] === option ? '' : undefined}
+              style={{ backgroundColor: `#${hexByOption[String(option)]}` }}
+              onClick={() => handleAvatarFieldChange(axis, option)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function renderStyleAxis<K extends 'hairStyle' | 'clothesStyle'>(
     axis: K,
     legend: string,
     options: Avatar[K][],
@@ -195,22 +227,36 @@ function ProfilePage() {
       return null;
     }
 
+    const currentIndex = options.indexOf(avatar[axis]);
+
+    function step(delta: number) {
+      const nextIndex = (currentIndex + delta + options.length) % options.length;
+      handleAvatarFieldChange(axis, options[nextIndex]);
+    }
+
     return (
-      <fieldset className={styles.avatarField}>
-        <legend>{legend}</legend>
-        {options.map((option) => (
-          <label key={String(option)} className={styles.radioOption}>
-            <input
-              type="radio"
-              name={axis}
-              value={String(option)}
-              checked={avatar[axis] === option}
-              onChange={() => handleAvatarFieldChange(axis, option)}
-            />
-            {labels[String(option)]}
-          </label>
-        ))}
-      </fieldset>
+      <div className={styles.axisRow}>
+        <span className={styles.axisLabel}>{legend}</span>
+        <div className={styles.stepper}>
+          <button
+            type="button"
+            aria-label={`이전 ${legend}`}
+            className={styles.stepperArrow}
+            onClick={() => step(-1)}
+          >
+            ‹
+          </button>
+          <span className={styles.stepperValue}>{labels[String(avatar[axis])]}</span>
+          <button
+            type="button"
+            aria-label={`다음 ${legend}`}
+            className={styles.stepperArrow}
+            onClick={() => step(1)}
+          >
+            ›
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -221,7 +267,7 @@ function ProfilePage() {
           <Link to="/town" className={styles.backLink}>
             ← 마을로 돌아가기
           </Link>
-          <h1>프로필 설정</h1>
+          <h1>{activeSection === 'character' ? '캐릭터 설정' : '계정 설정'}</h1>
         </div>
       </main>
     );
@@ -233,155 +279,193 @@ function ProfilePage() {
         <Link to="/town" className={styles.backLink}>
           ← 마을로 돌아가기
         </Link>
-        <h1>프로필 설정</h1>
-        <div className={styles.field}>
-          <span>이메일</span>
-          <p>{email}</p>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className={styles.field}>
-            <label htmlFor="nickname">닉네임</label>
-            <input
-              id="nickname"
-              type="text"
-              value={nickname}
-              onChange={(event) => setNickname(event.target.value)}
-              maxLength={20}
-              required
-            />
-          </div>
-          {errorMessage && (
-            <p className={styles.error} role="alert">
-              {errorMessage}
-            </p>
-          )}
-          {successMessage && <p className={styles.success}>{successMessage}</p>}
-          <button type="submit" className={styles.submit} disabled={isSubmitting}>
-            닉네임 저장
-          </button>
-        </form>
+        <h1>{activeSection === 'character' ? '캐릭터 설정' : '계정 설정'}</h1>
 
-        <h2>캐릭터 꾸미기</h2>
-        {avatar && avatarOptions && (
-          <form onSubmit={handleAvatarSubmit}>
-            <img
-              src={buildAvatarPreviewUrl(avatar, String(userId ?? nickname))}
-              alt="캐릭터 미리보기"
-              className={styles.avatarPreview}
-              width={120}
-              height={120}
-            />
-            {renderAvatarAxis('skinColor', '피부색', avatarOptions.skinColors, SKIN_COLOR_LABELS)}
-            {renderAvatarAxis('hairColor', '머리색', avatarOptions.hairColors, HAIR_COLOR_LABELS)}
-            {renderAvatarAxis(
-              'hairStyle',
-              '헤어스타일',
-              avatarOptions.hairStyles,
-              HAIR_STYLE_LABELS,
-            )}
-            {renderAvatarAxis(
-              'clothesStyle',
-              '옷',
-              avatarOptions.clothesStyles,
-              CLOTHES_STYLE_LABELS,
-            )}
-            {renderAvatarAxis('shoesColor', '신발', avatarOptions.shoesColors, SHOES_COLOR_LABELS)}
-            {avatarErrorMessage && (
-              <p className={styles.error} role="alert">
-                {avatarErrorMessage}
-              </p>
-            )}
-            {avatarSuccessMessage && <p className={styles.success}>{avatarSuccessMessage}</p>}
-            <button type="submit" className={styles.submit} disabled={isAvatarSubmitting}>
-              캐릭터 꾸미기 저장
-            </button>
-          </form>
+        {loadErrorMessage && (
+          <p className={styles.error} role="alert">
+            {loadErrorMessage}
+          </p>
         )}
 
-        <h2>비밀번호 변경</h2>
-        <form onSubmit={handlePasswordSubmit}>
-          {!hasPassword && (
-            <span className={styles.hint} data-tone="muted">
-              소셜 로그인으로 가입한 계정이라 바로 설정할 수 있습니다.
-            </span>
-          )}
-          {hasPassword && (
+        {activeSection === 'character' ? (
+          <>
+            {avatar && avatarOptions && (
+              <form onSubmit={handleAvatarSubmit}>
+                <img
+                  src={buildAvatarPreviewUrl(avatar, String(userId ?? nickname))}
+                  alt="캐릭터 미리보기"
+                  className={styles.avatarPreview}
+                  width={96}
+                  height={96}
+                />
+                <div className={styles.axisList}>
+                  {renderColorAxis(
+                    'skinColor',
+                    '피부색',
+                    avatarOptions.skinColors,
+                    SKIN_COLOR_LABELS,
+                    SKIN_COLOR_HEX,
+                  )}
+                  {renderColorAxis(
+                    'hairColor',
+                    '머리색',
+                    avatarOptions.hairColors,
+                    HAIR_COLOR_LABELS,
+                    HAIR_COLOR_HEX,
+                  )}
+                  {renderStyleAxis(
+                    'hairStyle',
+                    '헤어스타일',
+                    avatarOptions.hairStyles,
+                    HAIR_STYLE_LABELS,
+                  )}
+                  {renderStyleAxis(
+                    'clothesStyle',
+                    '옷',
+                    avatarOptions.clothesStyles,
+                    CLOTHES_STYLE_LABELS,
+                  )}
+                  {renderColorAxis(
+                    'shoesColor',
+                    '신발색',
+                    avatarOptions.shoesColors,
+                    SHOES_COLOR_LABELS,
+                    SHOES_COLOR_HEX,
+                  )}
+                </div>
+                {avatarErrorMessage && (
+                  <p className={styles.error} role="alert">
+                    {avatarErrorMessage}
+                  </p>
+                )}
+                {avatarSuccessMessage && <p className={styles.success}>{avatarSuccessMessage}</p>}
+                <button type="submit" className={styles.submit} disabled={isAvatarSubmitting}>
+                  캐릭터 꾸미기 저장
+                </button>
+              </form>
+            )}
+          </>
+        ) : (
+          <>
             <div className={styles.field}>
-              <label htmlFor="currentPassword">현재 비밀번호</label>
-              <input
-                id="currentPassword"
-                type="password"
-                value={currentPassword}
-                onChange={(event) => setCurrentPassword(event.target.value)}
-                minLength={8}
-                maxLength={100}
-                required
-              />
+              <span>이메일</span>
+              <p>{email}</p>
             </div>
-          )}
-          <div className={styles.field}>
-            <label htmlFor="newPassword">새 비밀번호</label>
-            <input
-              id="newPassword"
-              type="password"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              minLength={8}
-              maxLength={100}
-              required
-            />
-          </div>
-          {passwordErrorMessage && (
-            <p className={styles.error} role="alert">
-              {passwordErrorMessage}
-            </p>
-          )}
-          {passwordSuccessMessage && <p className={styles.success}>{passwordSuccessMessage}</p>}
-          <button type="submit" className={styles.submit} disabled={isPasswordSubmitting}>
-            비밀번호 변경
-          </button>
-        </form>
 
-        <h2>회원 탈퇴</h2>
-        <form onSubmit={handleWithdrawSubmit}>
-          {!hasPassword && (
-            <span className={styles.hint} data-tone="muted">
-              소셜 로그인으로 가입한 계정이라 비밀번호 확인 없이 탈퇴됩니다.
-            </span>
-          )}
-          {hasPassword && (
-            <div className={styles.field}>
-              <label htmlFor="withdrawCurrentPassword">현재 비밀번호 확인</label>
-              <input
-                id="withdrawCurrentPassword"
-                type="password"
-                value={withdrawCurrentPassword}
-                onChange={(event) => setWithdrawCurrentPassword(event.target.value)}
-                minLength={8}
-                maxLength={100}
-                required
-              />
-            </div>
-          )}
-          {isWithdrawConfirming && (
-            <span className={styles.hint} data-tone="error">
-              정말 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.
-            </span>
-          )}
-          {withdrawErrorMessage && (
-            <p className={styles.error} role="alert">
-              {withdrawErrorMessage}
-            </p>
-          )}
-          <button type="submit" className={styles.secondaryButton} disabled={isWithdrawing}>
-            {isWithdrawConfirming ? '탈퇴 확정' : '탈퇴하기'}
-          </button>
-          {isWithdrawConfirming && (
-            <button type="button" className={styles.secondaryButton} onClick={handleWithdrawCancel}>
-              취소
-            </button>
-          )}
-        </form>
+            <h2 className={styles.sectionTitle}>닉네임</h2>
+            <form onSubmit={handleSubmit}>
+              <div className={styles.field}>
+                <label htmlFor="nickname">닉네임</label>
+                <input
+                  id="nickname"
+                  type="text"
+                  value={nickname}
+                  onChange={(event) => setNickname(event.target.value)}
+                  maxLength={20}
+                  required
+                />
+              </div>
+              {errorMessage && (
+                <p className={styles.error} role="alert">
+                  {errorMessage}
+                </p>
+              )}
+              {successMessage && <p className={styles.success}>{successMessage}</p>}
+              <button type="submit" className={styles.submit} disabled={isSubmitting}>
+                닉네임 저장
+              </button>
+            </form>
+
+            <h2 className={styles.sectionTitle}>비밀번호 변경</h2>
+            <form onSubmit={handlePasswordSubmit}>
+              {!hasPassword && (
+                <span className={styles.hint} data-tone="muted">
+                  소셜 로그인으로 가입한 계정이라 바로 설정할 수 있습니다.
+                </span>
+              )}
+              {hasPassword && (
+                <div className={styles.field}>
+                  <label htmlFor="currentPassword">현재 비밀번호</label>
+                  <input
+                    id="currentPassword"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                    minLength={8}
+                    maxLength={100}
+                    required
+                  />
+                </div>
+              )}
+              <div className={styles.field}>
+                <label htmlFor="newPassword">새 비밀번호</label>
+                <input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  minLength={8}
+                  maxLength={100}
+                  required
+                />
+              </div>
+              {passwordErrorMessage && (
+                <p className={styles.error} role="alert">
+                  {passwordErrorMessage}
+                </p>
+              )}
+              {passwordSuccessMessage && <p className={styles.success}>{passwordSuccessMessage}</p>}
+              <button type="submit" className={styles.submit} disabled={isPasswordSubmitting}>
+                비밀번호 변경
+              </button>
+            </form>
+
+            <h2 className={styles.sectionTitle}>회원 탈퇴</h2>
+            <form onSubmit={handleWithdrawSubmit}>
+              {!hasPassword && (
+                <span className={styles.hint} data-tone="muted">
+                  소셜 로그인으로 가입한 계정이라 비밀번호 확인 없이 탈퇴됩니다.
+                </span>
+              )}
+              {hasPassword && (
+                <div className={styles.field}>
+                  <label htmlFor="withdrawCurrentPassword">현재 비밀번호 확인</label>
+                  <input
+                    id="withdrawCurrentPassword"
+                    type="password"
+                    value={withdrawCurrentPassword}
+                    onChange={(event) => setWithdrawCurrentPassword(event.target.value)}
+                    minLength={8}
+                    maxLength={100}
+                    required
+                  />
+                </div>
+              )}
+              {isWithdrawConfirming && (
+                <span className={styles.hint} data-tone="error">
+                  정말 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                </span>
+              )}
+              {withdrawErrorMessage && (
+                <p className={styles.error} role="alert">
+                  {withdrawErrorMessage}
+                </p>
+              )}
+              <button type="submit" className={styles.secondaryButton} disabled={isWithdrawing}>
+                {isWithdrawConfirming ? '탈퇴 확정' : '탈퇴하기'}
+              </button>
+              {isWithdrawConfirming && (
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={handleWithdrawCancel}
+                >
+                  취소
+                </button>
+              )}
+            </form>
+          </>
+        )}
       </div>
     </main>
   );

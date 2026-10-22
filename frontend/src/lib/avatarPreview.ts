@@ -5,7 +5,19 @@ import type {
   AvatarHairStyle,
   AvatarShoesColor,
   AvatarSkinColor,
+  Profile,
 } from '../api/user';
+
+/** 프로필 응답에서 캐릭터 꾸미기 다섯 축만 뽑아낸다. */
+export function avatarFromProfile(profile: Profile): Avatar {
+  return {
+    skinColor: profile.avatarSkinColor,
+    hairColor: profile.avatarHairColor,
+    hairStyle: profile.avatarHairStyle,
+    clothesStyle: profile.avatarClothesStyle,
+    shoesColor: profile.avatarShoesColor,
+  };
+}
 
 export const SKIN_COLOR_LABELS: Record<AvatarSkinColor, string> = {
   LIGHT: '연한',
@@ -24,13 +36,13 @@ export const HAIR_COLOR_LABELS: Record<AvatarHairColor, string> = {
 };
 
 export const HAIR_STYLE_LABELS: Record<AvatarHairStyle, string> = {
-  SHORT: '짧은 머리',
+  SHORT: '숏컷',
   BOB: '단발',
   PONYTAIL: '포니테일',
   AFRO: '아프로',
   BRAIDS: '브레이드',
-  CURLY: '곱슬머리',
-  BUNS: '번 머리',
+  CURLY: '곱슬',
+  BUNS: '번머리',
   MOHAWK: '모히칸',
 };
 
@@ -43,7 +55,7 @@ export const CLOTHES_STYLE_LABELS: Record<AvatarClothesStyle, string> = {
   DRESS: '드레스',
   OVERALLS: '오버올',
   STRIPES: '스트라이프',
-  CHECKER: '체크무늬',
+  CHECKER: '체크',
   TIE: '넥타이',
 };
 
@@ -55,7 +67,7 @@ export const SHOES_COLOR_LABELS: Record<AvatarShoesColor, string> = {
   BLUE: '파랑',
 };
 
-const SKIN_COLOR_HEX: Record<AvatarSkinColor, string> = {
+export const SKIN_COLOR_HEX: Record<AvatarSkinColor, string> = {
   LIGHT: 'ffdbb4',
   FAIR: 'edb98a',
   TAN: 'd08b5b',
@@ -63,7 +75,7 @@ const SKIN_COLOR_HEX: Record<AvatarSkinColor, string> = {
   DARK: '614335',
 };
 
-const HAIR_COLOR_HEX: Record<AvatarHairColor, string> = {
+export const HAIR_COLOR_HEX: Record<AvatarHairColor, string> = {
   BLACK: '2c1b18',
   BROWN: '724133',
   BLONDE: 'd6b370',
@@ -71,7 +83,7 @@ const HAIR_COLOR_HEX: Record<AvatarHairColor, string> = {
   GRAY: 'cccccc',
 };
 
-const SHOES_COLOR_HEX: Record<AvatarShoesColor, string> = {
+export const SHOES_COLOR_HEX: Record<AvatarShoesColor, string> = {
   WHITE: 'ffffff',
   BLACK: '000000',
   BROWN: '6b4423',
