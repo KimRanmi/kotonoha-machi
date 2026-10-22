@@ -66,6 +66,26 @@ public class User {
   @Column(name = "updated_at", nullable = false)
   private OffsetDateTime updatedAt;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "avatar_skin_color", nullable = false)
+  private AvatarSkinColor avatarSkinColor = AvatarSkinColor.LIGHT;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "avatar_hair_color", nullable = false)
+  private AvatarHairColor avatarHairColor = AvatarHairColor.BLACK;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "avatar_hair_style", nullable = false)
+  private AvatarHairStyle avatarHairStyle = AvatarHairStyle.SHORT;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "avatar_clothes_style", nullable = false)
+  private AvatarClothesStyle avatarClothesStyle = AvatarClothesStyle.PLAIN;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "avatar_shoes_color", nullable = false)
+  private AvatarShoesColor avatarShoesColor = AvatarShoesColor.WHITE;
+
   /** JPA가 엔티티를 만들 때 사용하는 기본 생성자. */
   protected User() {}
 
@@ -320,6 +340,28 @@ public class User {
   }
 
   /**
+   * 캐릭터 꾸미기(피부색/머리색/헤어스타일/옷/신발)를 바꾼다.
+   *
+   * @param skinColor 피부색
+   * @param hairColor 머리색
+   * @param hairStyle 헤어스타일
+   * @param clothesStyle 옷
+   * @param shoesColor 신발 색
+   */
+  public void updateAvatar(
+      AvatarSkinColor skinColor,
+      AvatarHairColor hairColor,
+      AvatarHairStyle hairStyle,
+      AvatarClothesStyle clothesStyle,
+      AvatarShoesColor shoesColor) {
+    this.avatarSkinColor = skinColor;
+    this.avatarHairColor = hairColor;
+    this.avatarHairStyle = hairStyle;
+    this.avatarClothesStyle = clothesStyle;
+    this.avatarShoesColor = shoesColor;
+  }
+
+  /**
    * 사용자 ID를 반환한다.
    *
    * @return 사용자 ID
@@ -362,5 +404,50 @@ public class User {
    */
   public UserStatus getStatus() {
     return status;
+  }
+
+  /**
+   * 피부색을 반환한다.
+   *
+   * @return 피부색
+   */
+  public AvatarSkinColor getAvatarSkinColor() {
+    return avatarSkinColor;
+  }
+
+  /**
+   * 머리색을 반환한다.
+   *
+   * @return 머리색
+   */
+  public AvatarHairColor getAvatarHairColor() {
+    return avatarHairColor;
+  }
+
+  /**
+   * 헤어스타일을 반환한다.
+   *
+   * @return 헤어스타일
+   */
+  public AvatarHairStyle getAvatarHairStyle() {
+    return avatarHairStyle;
+  }
+
+  /**
+   * 옷 스타일을 반환한다.
+   *
+   * @return 옷 스타일
+   */
+  public AvatarClothesStyle getAvatarClothesStyle() {
+    return avatarClothesStyle;
+  }
+
+  /**
+   * 신발 색을 반환한다.
+   *
+   * @return 신발 색
+   */
+  public AvatarShoesColor getAvatarShoesColor() {
+    return avatarShoesColor;
   }
 }

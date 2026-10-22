@@ -16,12 +16,49 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 vi.mock('../api/user', () => ({
   getProfile: vi.fn(),
+  getAvatarOptions: vi.fn(),
   updateNickname: vi.fn(),
+  updateAvatar: vi.fn(),
   changePassword: vi.fn(),
   withdraw: vi.fn(),
 }));
 
-import { changePassword, getProfile, updateNickname, withdraw } from '../api/user';
+import {
+  changePassword,
+  getAvatarOptions,
+  getProfile,
+  updateAvatar,
+  updateNickname,
+  withdraw,
+  type AvatarOptions,
+} from '../api/user';
+
+const DEFAULT_AVATAR = {
+  avatarSkinColor: 'LIGHT' as const,
+  avatarHairColor: 'BLACK' as const,
+  avatarHairStyle: 'SHORT' as const,
+  avatarClothesStyle: 'PLAIN' as const,
+  avatarShoesColor: 'WHITE' as const,
+};
+
+const DEFAULT_AVATAR_OPTIONS: AvatarOptions = {
+  skinColors: ['LIGHT', 'FAIR', 'TAN', 'BROWN', 'DARK'],
+  hairColors: ['BLACK', 'BROWN', 'BLONDE', 'RED', 'GRAY'],
+  hairStyles: ['SHORT', 'BOB', 'PONYTAIL', 'AFRO', 'BRAIDS', 'CURLY', 'BUNS', 'MOHAWK'],
+  clothesStyles: [
+    'PLAIN',
+    'HOODIE',
+    'JACKET',
+    'COAT',
+    'SUIT',
+    'DRESS',
+    'OVERALLS',
+    'STRIPES',
+    'CHECKER',
+    'TIE',
+  ],
+  shoesColors: ['WHITE', 'BLACK', 'BROWN', 'RED', 'BLUE'],
+};
 
 function renderPage() {
   render(
@@ -34,7 +71,10 @@ function renderPage() {
 describe('ProfilePage', () => {
   beforeEach(() => {
     vi.mocked(getProfile).mockReset();
+    vi.mocked(getAvatarOptions).mockReset();
+    vi.mocked(getAvatarOptions).mockResolvedValue(DEFAULT_AVATAR_OPTIONS);
     vi.mocked(updateNickname).mockReset();
+    vi.mocked(updateAvatar).mockReset();
     vi.mocked(changePassword).mockReset();
     vi.mocked(withdraw).mockReset();
     mockNavigate.mockReset();
@@ -50,6 +90,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     renderPage();
 
@@ -70,12 +111,14 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     vi.mocked(updateNickname).mockResolvedValue({
       id: 1,
       email: 'user@test.com',
       nickname: '새닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     renderPage();
 
@@ -96,6 +139,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     vi.mocked(updateNickname).mockRejectedValue(new ApiError(409, '이미 사용 중인 닉네임입니다.'));
     renderPage();
@@ -115,6 +159,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     vi.mocked(updateNickname).mockRejectedValue(new Error('network down'));
     renderPage();
@@ -131,6 +176,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     renderPage();
 
@@ -149,6 +195,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: false,
+      ...DEFAULT_AVATAR,
     });
     renderPage();
 
@@ -167,6 +214,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     vi.mocked(changePassword).mockResolvedValue(undefined);
     renderPage();
@@ -194,6 +242,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     vi.mocked(changePassword).mockRejectedValue(
       new ApiError(400, '현재 비밀번호가 올바르지 않습니다.'),
@@ -223,6 +272,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     renderPage();
 
@@ -240,6 +290,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: false,
+      ...DEFAULT_AVATAR,
     });
     renderPage();
 
@@ -257,6 +308,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     vi.mocked(withdraw).mockResolvedValue(undefined);
     renderPage();
@@ -288,6 +340,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: false,
+      ...DEFAULT_AVATAR,
     });
     vi.mocked(withdraw).mockResolvedValue(undefined);
     renderPage();
@@ -310,6 +363,7 @@ describe('ProfilePage', () => {
       email: 'user@test.com',
       nickname: '기존닉네임',
       hasPassword: true,
+      ...DEFAULT_AVATAR,
     });
     vi.mocked(withdraw).mockRejectedValue(new ApiError(400, '현재 비밀번호가 올바르지 않습니다.'));
     renderPage();

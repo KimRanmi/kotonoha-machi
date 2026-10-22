@@ -1,10 +1,50 @@
 import { apiFetch } from './client';
 
+export type AvatarSkinColor = 'LIGHT' | 'FAIR' | 'TAN' | 'BROWN' | 'DARK';
+export type AvatarHairColor = 'BLACK' | 'BROWN' | 'BLONDE' | 'RED' | 'GRAY';
+export type AvatarHairStyle =
+  'SHORT' | 'BOB' | 'PONYTAIL' | 'AFRO' | 'BRAIDS' | 'CURLY' | 'BUNS' | 'MOHAWK';
+export type AvatarClothesStyle =
+  | 'PLAIN'
+  | 'HOODIE'
+  | 'JACKET'
+  | 'COAT'
+  | 'SUIT'
+  | 'DRESS'
+  | 'OVERALLS'
+  | 'STRIPES'
+  | 'CHECKER'
+  | 'TIE';
+export type AvatarShoesColor = 'WHITE' | 'BLACK' | 'BROWN' | 'RED' | 'BLUE';
+
+/** 캐릭터 꾸미기 다섯 축의 선택값. */
+export interface Avatar {
+  skinColor: AvatarSkinColor;
+  hairColor: AvatarHairColor;
+  hairStyle: AvatarHairStyle;
+  clothesStyle: AvatarClothesStyle;
+  shoesColor: AvatarShoesColor;
+}
+
+/** 캐릭터 꾸미기 화면에서 고를 수 있는 축별 선택지 전체 목록. */
+export interface AvatarOptions {
+  skinColors: AvatarSkinColor[];
+  hairColors: AvatarHairColor[];
+  hairStyles: AvatarHairStyle[];
+  clothesStyles: AvatarClothesStyle[];
+  shoesColors: AvatarShoesColor[];
+}
+
 export interface Profile {
   id: number;
   email: string;
   nickname: string;
   hasPassword: boolean;
+  avatarSkinColor: AvatarSkinColor;
+  avatarHairColor: AvatarHairColor;
+  avatarHairStyle: AvatarHairStyle;
+  avatarClothesStyle: AvatarClothesStyle;
+  avatarShoesColor: AvatarShoesColor;
 }
 
 /** 로그인한 사용자 자신의 프로필(이메일, 닉네임)을 가져온다. */
@@ -43,4 +83,19 @@ export async function withdraw(currentPassword: string): Promise<void> {
     method: 'DELETE',
     body: JSON.stringify({ currentPassword }),
   });
+}
+
+/** 캐릭터 꾸미기 화면에서 고를 수 있는 축별 선택지 전체 목록을 가져온다. */
+export async function getAvatarOptions(): Promise<AvatarOptions> {
+  const response = await apiFetch('/api/users/me/avatar/options');
+  return response.json();
+}
+
+/** 로그인한 사용자 자신의 캐릭터 꾸미기(피부색/머리색/헤어스타일/옷/신발)를 바꾼다. */
+export async function updateAvatar(avatar: Avatar): Promise<Profile> {
+  const response = await apiFetch('/api/users/me/avatar', {
+    method: 'PATCH',
+    body: JSON.stringify(avatar),
+  });
+  return response.json();
 }

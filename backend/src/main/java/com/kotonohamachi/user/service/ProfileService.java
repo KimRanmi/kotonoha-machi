@@ -2,10 +2,17 @@ package com.kotonohamachi.user.service;
 
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.common.PasswordVerifier;
+import com.kotonohamachi.user.AvatarClothesStyle;
+import com.kotonohamachi.user.AvatarHairColor;
+import com.kotonohamachi.user.AvatarHairStyle;
+import com.kotonohamachi.user.AvatarShoesColor;
+import com.kotonohamachi.user.AvatarSkinColor;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.UserErrorCode;
+import com.kotonohamachi.user.dto.AvatarOptionsResponse;
 import com.kotonohamachi.user.dto.ProfileResponse;
 import com.kotonohamachi.user.repository.UserRepository;
+import java.util.List;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -84,6 +91,44 @@ public class ProfileService {
     user.changePassword(passwordEncoder.encode(newPassword));
   }
 
+  /**
+   * 캐릭터 꾸미기(피부색/머리색/헤어스타일/옷/신발)를 바꾼다.
+   *
+   * @param userId 꾸미기를 바꿀 사용자 ID(로그인한 본인)
+   * @param skinColor 피부색
+   * @param hairColor 머리색
+   * @param hairStyle 헤어스타일
+   * @param clothesStyle 옷
+   * @param shoesColor 신발 색
+   * @return 변경된 프로필 정보
+   */
+  @Transactional
+  public ProfileResponse updateAvatar(
+      Long userId,
+      AvatarSkinColor skinColor,
+      AvatarHairColor hairColor,
+      AvatarHairStyle hairStyle,
+      AvatarClothesStyle clothesStyle,
+      AvatarShoesColor shoesColor) {
+    User user = findUserOrThrow(userId);
+    user.updateAvatar(skinColor, hairColor, hairStyle, clothesStyle, shoesColor);
+    return toProfileResponse(user);
+  }
+
+  /**
+   * 캐릭터 꾸미기 화면에서 고를 수 있는 선택지 전체 목록을 반환한다. 사용자마다 다르지 않은 고정된 목록이다.
+   *
+   * @return 축별 선택지 목록
+   */
+  public AvatarOptionsResponse getAvatarOptions() {
+    return new AvatarOptionsResponse(
+        List.of(AvatarSkinColor.values()),
+        List.of(AvatarHairColor.values()),
+        List.of(AvatarHairStyle.values()),
+        List.of(AvatarClothesStyle.values()),
+        List.of(AvatarShoesColor.values()));
+  }
+
   private User findUserOrThrow(Long userId) {
     return userRepository
         .findById(userId)
@@ -92,6 +137,14 @@ public class ProfileService {
 
   private ProfileResponse toProfileResponse(User user) {
     return new ProfileResponse(
-        user.getId(), user.getEmail(), user.getNickname(), user.getPasswordHash() != null);
+        user.getId(),
+        user.getEmail(),
+        user.getNickname(),
+        user.getPasswordHash() != null,
+        user.getAvatarSkinColor(),
+        user.getAvatarHairColor(),
+        user.getAvatarHairStyle(),
+        user.getAvatarClothesStyle(),
+        user.getAvatarShoesColor());
   }
 }
