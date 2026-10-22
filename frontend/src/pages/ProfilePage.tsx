@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { changePassword, getProfile, updateNickname } from '../api/user';
+import { Link, useNavigate } from 'react-router-dom';
+import { changePassword, getProfile, updateNickname, withdraw } from '../api/user';
 import { ApiError } from '../api/client';
 import styles from './AuthPage.module.css';
 
 function ProfilePage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
@@ -18,6 +19,11 @@ function ProfilePage() {
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
   const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null);
   const [passwordSuccessMessage, setPasswordSuccessMessage] = useState<string | null>(null);
+
+  const [withdrawCurrentPassword, setWithdrawCurrentPassword] = useState('');
+  const [isWithdrawConfirming, setIsWithdrawConfirming] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawErrorMessage, setWithdrawErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +90,34 @@ function ProfilePage() {
     } finally {
       setIsPasswordSubmitting(false);
     }
+  }
+
+  async function handleWithdrawSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!isWithdrawConfirming) {
+      setIsWithdrawConfirming(true);
+      return;
+    }
+
+    setWithdrawErrorMessage(null);
+    setIsWithdrawing(true);
+
+    try {
+      await withdraw(withdrawCurrentPassword);
+      navigate('/login');
+    } catch (error) {
+      setWithdrawErrorMessage(
+        error instanceof ApiError ? error.message : '회원 탈퇴에 실패했습니다.',
+      );
+    } finally {
+      setIsWithdrawing(false);
+    }
+  }
+
+  function handleWithdrawCancel() {
+    setIsWithdrawConfirming(false);
+    setWithdrawErrorMessage(null);
   }
 
   if (isLoading) {
@@ -175,6 +209,47 @@ function ProfilePage() {
           <button type="submit" className={styles.submit} disabled={isPasswordSubmitting}>
             비밀번호 변경
           </button>
+        </form>
+
+        <h2>회원 탈퇴</h2>
+        <form onSubmit={handleWithdrawSubmit}>
+          {!hasPassword && (
+            <span className={styles.hint} data-tone="muted">
+              소셜 로그인으로 가입한 계정이라 비밀번호 확인 없이 탈퇴됩니다.
+            </span>
+          )}
+          {hasPassword && (
+            <div className={styles.field}>
+              <label htmlFor="withdrawCurrentPassword">현재 비밀번호 확인</label>
+              <input
+                id="withdrawCurrentPassword"
+                type="password"
+                value={withdrawCurrentPassword}
+                onChange={(event) => setWithdrawCurrentPassword(event.target.value)}
+                minLength={8}
+                maxLength={100}
+                required
+              />
+            </div>
+          )}
+          {isWithdrawConfirming && (
+            <span className={styles.hint} data-tone="error">
+              정말 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </span>
+          )}
+          {withdrawErrorMessage && (
+            <p className={styles.error} role="alert">
+              {withdrawErrorMessage}
+            </p>
+          )}
+          <button type="submit" className={styles.secondaryButton} disabled={isWithdrawing}>
+            {isWithdrawConfirming ? '탈퇴 확정' : '탈퇴하기'}
+          </button>
+          {isWithdrawConfirming && (
+            <button type="button" className={styles.secondaryButton} onClick={handleWithdrawCancel}>
+              취소
+            </button>
+          )}
         </form>
       </div>
     </main>
