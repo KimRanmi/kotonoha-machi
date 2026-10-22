@@ -4,13 +4,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import ProfilePage from './ProfilePage';
 
+const mockNavigate = vi.fn();
+
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
 vi.mock('../api/user', () => ({
   getProfile: vi.fn(),
   updateNickname: vi.fn(),
   changePassword: vi.fn(),
+  withdraw: vi.fn(),
 }));
 
-import { changePassword, getProfile, updateNickname } from '../api/user';
+import { changePassword, getProfile, updateNickname, withdraw } from '../api/user';
 
 function renderPage() {
   render(
@@ -25,6 +36,8 @@ describe('ProfilePage', () => {
     vi.mocked(getProfile).mockReset();
     vi.mocked(updateNickname).mockReset();
     vi.mocked(changePassword).mockReset();
+    vi.mocked(withdraw).mockReset();
+    mockNavigate.mockReset();
   });
 
   afterEach(() => {
@@ -202,5 +215,115 @@ describe('ProfilePage', () => {
     expect(screen.queryByText('닉네임 변경에 실패했습니다.')).not.toBeInTheDocument();
     // 실패했으니 입력값은 그대로 남아있어야 한다.
     expect(screen.getByLabelText('현재 비밀번호')).toHaveValue('wrongPassword');
+  });
+
+  it('hasPassword가 true면 회원 탈퇴 섹션에 현재 비밀번호 입력란이 보인다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+    });
+    renderPage();
+
+    await screen.findByText('user@test.com');
+
+    expect(screen.getByLabelText('현재 비밀번호 확인')).toBeInTheDocument();
+    expect(
+      screen.queryByText('소셜 로그인으로 가입한 계정이라 비밀번호 확인 없이 탈퇴됩니다.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('hasPassword가 false면 회원 탈퇴 섹션에 입력란 없이 안내 문구만 보여준다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: false,
+    });
+    renderPage();
+
+    await screen.findByText('user@test.com');
+
+    expect(screen.queryByLabelText('현재 비밀번호 확인')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('소셜 로그인으로 가입한 계정이라 비밀번호 확인 없이 탈퇴됩니다.'),
+    ).toBeInTheDocument();
+  });
+
+  it('탈퇴하기를 누르면 확인 단계가 나타나고, 최종 확인을 누르면 탈퇴 후 로그인 화면으로 이동한다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+    });
+    vi.mocked(withdraw).mockResolvedValue(undefined);
+    renderPage();
+
+    await screen.findByText('user@test.com');
+    fireEvent.change(screen.getByLabelText('현재 비밀번호 확인'), {
+      target: { value: 'myPassword123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '탈퇴하기' }));
+
+    expect(
+      await screen.findByText('정말 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.'),
+    ).toBeInTheDocument();
+    expect(withdraw).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '탈퇴 확정' }));
+
+    await waitFor(() => {
+      expect(withdraw).toHaveBeenCalledWith('myPassword123');
+    });
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
+    });
+  });
+
+  it('비밀번호 없는 계정은 확인 없이 빈 문자열로 탈퇴를 요청한다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: false,
+    });
+    vi.mocked(withdraw).mockResolvedValue(undefined);
+    renderPage();
+
+    await screen.findByText('user@test.com');
+    fireEvent.click(screen.getByRole('button', { name: '탈퇴하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '탈퇴 확정' }));
+
+    await waitFor(() => {
+      expect(withdraw).toHaveBeenCalledWith('');
+    });
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
+    });
+  });
+
+  it('탈퇴에 실패하면 에러 메시지를 보여주고 이동하지 않는다', async () => {
+    vi.mocked(getProfile).mockResolvedValue({
+      id: 1,
+      email: 'user@test.com',
+      nickname: '기존닉네임',
+      hasPassword: true,
+    });
+    vi.mocked(withdraw).mockRejectedValue(new ApiError(400, '현재 비밀번호가 올바르지 않습니다.'));
+    renderPage();
+
+    await screen.findByText('user@test.com');
+    fireEvent.change(screen.getByLabelText('현재 비밀번호 확인'), {
+      target: { value: 'wrongPassword' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '탈퇴하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '탈퇴 확정' }));
+
+    expect(await screen.findByText('현재 비밀번호가 올바르지 않습니다.')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    // 실패했으니 입력값은 그대로 남아있어야 한다.
+    expect(screen.getByLabelText('현재 비밀번호 확인')).toHaveValue('wrongPassword');
   });
 });
