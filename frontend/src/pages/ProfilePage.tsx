@@ -1,12 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { logout } from '../api/auth';
+import { Link } from 'react-router-dom';
 import { changePassword, getProfile, updateNickname } from '../api/user';
 import { ApiError } from '../api/client';
 import styles from './AuthPage.module.css';
 
 function ProfilePage() {
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
@@ -20,9 +18,6 @@ function ProfilePage() {
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
   const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null);
   const [passwordSuccessMessage, setPasswordSuccessMessage] = useState<string | null>(null);
-
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [logoutErrorMessage, setLogoutErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,25 +86,14 @@ function ProfilePage() {
     }
   }
 
-  async function handleLogout() {
-    setLogoutErrorMessage(null);
-    setIsLoggingOut(true);
-
-    try {
-      await logout();
-      navigate('/login', { replace: true });
-    } catch (error) {
-      setLogoutErrorMessage(error instanceof ApiError ? error.message : '로그아웃에 실패했습니다.');
-    } finally {
-      setIsLoggingOut(false);
-    }
-  }
-
   if (isLoading) {
     return (
       <main className={styles.page}>
         <div className={styles.card}>
-          <h1>프로필</h1>
+          <Link to="/town" className={styles.backLink}>
+            ← 마을로 돌아가기
+          </Link>
+          <h1>프로필 설정</h1>
         </div>
       </main>
     );
@@ -118,7 +102,10 @@ function ProfilePage() {
   return (
     <main className={styles.page}>
       <div className={styles.card}>
-        <h1>프로필</h1>
+        <Link to="/town" className={styles.backLink}>
+          ← 마을로 돌아가기
+        </Link>
+        <h1>프로필 설정</h1>
         <div className={styles.field}>
           <span>이메일</span>
           <p>{email}</p>
@@ -189,20 +176,6 @@ function ProfilePage() {
             비밀번호 변경
           </button>
         </form>
-
-        {logoutErrorMessage && (
-          <p className={styles.error} role="alert">
-            {logoutErrorMessage}
-          </p>
-        )}
-        <button
-          type="button"
-          className={styles.submit}
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-        >
-          로그아웃
-        </button>
       </div>
     </main>
   );

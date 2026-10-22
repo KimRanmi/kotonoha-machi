@@ -4,27 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import ProfilePage from './ProfilePage';
 
-const mockNavigate = vi.fn();
-
-vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('react-router-dom')>();
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  };
-});
-
-vi.mock('../api/auth', () => ({
-  logout: vi.fn(),
-}));
-
 vi.mock('../api/user', () => ({
   getProfile: vi.fn(),
   updateNickname: vi.fn(),
   changePassword: vi.fn(),
 }));
 
-import { logout } from '../api/auth';
 import { changePassword, getProfile, updateNickname } from '../api/user';
 
 function renderPage() {
@@ -37,8 +22,6 @@ function renderPage() {
 
 describe('ProfilePage', () => {
   beforeEach(() => {
-    mockNavigate.mockReset();
-    vi.mocked(logout).mockReset();
     vi.mocked(getProfile).mockReset();
     vi.mocked(updateNickname).mockReset();
     vi.mocked(changePassword).mockReset();
@@ -219,43 +202,5 @@ describe('ProfilePage', () => {
     expect(screen.queryByText('닉네임 변경에 실패했습니다.')).not.toBeInTheDocument();
     // 실패했으니 입력값은 그대로 남아있어야 한다.
     expect(screen.getByLabelText('현재 비밀번호')).toHaveValue('wrongPassword');
-  });
-
-  it('로그아웃에 성공하면 /login으로 이동한다', async () => {
-    vi.mocked(getProfile).mockResolvedValue({
-      id: 1,
-      email: 'user@test.com',
-      nickname: '기존닉네임',
-      hasPassword: true,
-    });
-    vi.mocked(logout).mockResolvedValue(undefined);
-    renderPage();
-
-    await screen.findByText('user@test.com');
-    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }));
-
-    await waitFor(() => {
-      expect(logout).toHaveBeenCalled();
-    });
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/login', { replace: true });
-    });
-  });
-
-  it('로그아웃에 실패하면 에러 메시지를 보여주고 이동하지 않는다', async () => {
-    vi.mocked(getProfile).mockResolvedValue({
-      id: 1,
-      email: 'user@test.com',
-      nickname: '기존닉네임',
-      hasPassword: true,
-    });
-    vi.mocked(logout).mockRejectedValue(new ApiError(500, '로그아웃에 실패했습니다.'));
-    renderPage();
-
-    await screen.findByText('user@test.com');
-    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }));
-
-    expect(await screen.findByText('로그아웃에 실패했습니다.')).toBeInTheDocument();
-    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });
