@@ -1,11 +1,40 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { changePassword, getProfile, updateNickname, withdraw } from '../api/user';
+import {
+  changePassword,
+  getAvatarOptions,
+  getProfile,
+  updateAvatar,
+  updateNickname,
+  withdraw,
+  type Avatar,
+  type AvatarOptions,
+  type Profile,
+} from '../api/user';
 import { ApiError } from '../api/client';
+import {
+  CLOTHES_STYLE_LABELS,
+  HAIR_COLOR_LABELS,
+  HAIR_STYLE_LABELS,
+  SHOES_COLOR_LABELS,
+  SKIN_COLOR_LABELS,
+  buildAvatarPreviewUrl,
+} from '../lib/avatarPreview';
 import styles from './AuthPage.module.css';
+
+function avatarFromProfile(profile: Profile): Avatar {
+  return {
+    skinColor: profile.avatarSkinColor,
+    hairColor: profile.avatarHairColor,
+    hairStyle: profile.avatarHairStyle,
+    clothesStyle: profile.avatarClothesStyle,
+    shoesColor: profile.avatarShoesColor,
+  };
+}
 
 function ProfilePage() {
   const navigate = useNavigate();
+  const [userId, setUserId] = useState<number | null>(null);
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
@@ -13,6 +42,12 @@ function ProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const [avatar, setAvatar] = useState<Avatar | null>(null);
+  const [avatarOptions, setAvatarOptions] = useState<AvatarOptions | null>(null);
+  const [isAvatarSubmitting, setIsAvatarSubmitting] = useState(false);
+  const [avatarErrorMessage, setAvatarErrorMessage] = useState<string | null>(null);
+  const [avatarSuccessMessage, setAvatarSuccessMessage] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -28,12 +63,15 @@ function ProfilePage() {
   useEffect(() => {
     let cancelled = false;
 
-    getProfile()
-      .then((profile) => {
+    Promise.all([getProfile(), getAvatarOptions()])
+      .then(([profile, options]) => {
         if (!cancelled) {
+          setUserId(profile.id);
           setEmail(profile.email);
           setNickname(profile.nickname);
           setHasPassword(profile.hasPassword);
+          setAvatar(avatarFromProfile(profile));
+          setAvatarOptions(options);
         }
       })
       .catch((error) => {
@@ -68,6 +106,33 @@ function ProfilePage() {
       setErrorMessage(error instanceof ApiError ? error.message : '닉네임 변경에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function handleAvatarFieldChange<K extends keyof Avatar>(axis: K, value: Avatar[K]) {
+    setAvatar((current) => (current ? { ...current, [axis]: value } : current));
+  }
+
+  async function handleAvatarSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!avatar) {
+      return;
+    }
+
+    setAvatarErrorMessage(null);
+    setAvatarSuccessMessage(null);
+    setIsAvatarSubmitting(true);
+
+    try {
+      const profile = await updateAvatar(avatar);
+      setAvatar(avatarFromProfile(profile));
+      setAvatarSuccessMessage('캐릭터 꾸미기를 저장했습니다.');
+    } catch (error) {
+      setAvatarErrorMessage(
+        error instanceof ApiError ? error.message : '캐릭터 꾸미기 저장에 실패했습니다.',
+      );
+    } finally {
+      setIsAvatarSubmitting(false);
     }
   }
 
@@ -120,6 +185,35 @@ function ProfilePage() {
     setWithdrawErrorMessage(null);
   }
 
+  function renderAvatarAxis<K extends keyof Avatar>(
+    axis: K,
+    legend: string,
+    options: Avatar[K][],
+    labels: Record<string, string>,
+  ) {
+    if (!avatar) {
+      return null;
+    }
+
+    return (
+      <fieldset className={styles.avatarField}>
+        <legend>{legend}</legend>
+        {options.map((option) => (
+          <label key={String(option)} className={styles.radioOption}>
+            <input
+              type="radio"
+              name={axis}
+              value={String(option)}
+              checked={avatar[axis] === option}
+              onChange={() => handleAvatarFieldChange(axis, option)}
+            />
+            {labels[String(option)]}
+          </label>
+        ))}
+      </fieldset>
+    );
+  }
+
   if (isLoading) {
     return (
       <main className={styles.page}>
@@ -166,6 +260,43 @@ function ProfilePage() {
             닉네임 저장
           </button>
         </form>
+
+        <h2>캐릭터 꾸미기</h2>
+        {avatar && avatarOptions && (
+          <form onSubmit={handleAvatarSubmit}>
+            <img
+              src={buildAvatarPreviewUrl(avatar, String(userId ?? nickname))}
+              alt="캐릭터 미리보기"
+              className={styles.avatarPreview}
+              width={120}
+              height={120}
+            />
+            {renderAvatarAxis('skinColor', '피부색', avatarOptions.skinColors, SKIN_COLOR_LABELS)}
+            {renderAvatarAxis('hairColor', '머리색', avatarOptions.hairColors, HAIR_COLOR_LABELS)}
+            {renderAvatarAxis(
+              'hairStyle',
+              '헤어스타일',
+              avatarOptions.hairStyles,
+              HAIR_STYLE_LABELS,
+            )}
+            {renderAvatarAxis(
+              'clothesStyle',
+              '옷',
+              avatarOptions.clothesStyles,
+              CLOTHES_STYLE_LABELS,
+            )}
+            {renderAvatarAxis('shoesColor', '신발', avatarOptions.shoesColors, SHOES_COLOR_LABELS)}
+            {avatarErrorMessage && (
+              <p className={styles.error} role="alert">
+                {avatarErrorMessage}
+              </p>
+            )}
+            {avatarSuccessMessage && <p className={styles.success}>{avatarSuccessMessage}</p>}
+            <button type="submit" className={styles.submit} disabled={isAvatarSubmitting}>
+              캐릭터 꾸미기 저장
+            </button>
+          </form>
+        )}
 
         <h2>비밀번호 변경</h2>
         <form onSubmit={handlePasswordSubmit}>

@@ -248,6 +248,9 @@
 - [x] **비밀번호 재설정**(분실 비밀번호) API
 - [x] **비밀번호 변경** API
 - [x] **프로필 조회 / 닉네임 수정** API
+- [x] **캐릭터 꾸미기(아바타) 선택지 조회/변경** API — `GET /api/users/me/avatar/options`,
+  `PATCH /api/users/me/avatar`. 축별 값과 구현 방식은
+  `docs/decisions/0008-avatar-customization.md` 참고.
 - [x] **회원 탈퇴**(소프트 삭제) API — `docs/decisions/0006-account-deletion.md`에서 확정한 방식대로
   `UserStatus.WITHDRAWN` 처리와 `DELETE /api/auth/me`가 구현되어 있다.
 
@@ -258,7 +261,9 @@
 - [x] 로그인 필수 라우트 가드(`ProtectedRoute`)
 - [x] 프로필 화면 — 닉네임 중복 확인·수정, 비밀번호 변경
 - [x] 로그아웃 버튼/화면
-- [ ] 프로필 화면 — 캐릭터 아바타 꾸미기 UI (5대 축: 피부색/머리색/헤어스타일/옷/신발)
+- [x] 프로필 화면 — 캐릭터 아바타 꾸미기 UI (5대 축: 피부색/머리색/헤어스타일/옷/신발) —
+  2D 미리보기는 `docs/decisions/0008-avatar-customization.md`에서 확정한 대로 DiceBear
+  (voxel-art)를 쓴다.
 - [x] 회원 탈퇴 화면
 
 ### 3. 마을 화면 + 캐릭터 이동
