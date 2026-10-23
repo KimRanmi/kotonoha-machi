@@ -76,6 +76,42 @@
   cursor: not-allowed;
 }
 
+.todayLearningBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: var(--space-5) var(--space-5) 0;
+  padding: var(--space-4) var(--space-5);
+  color: var(--color-surface);
+  background-color: var(--color-primary);
+  border-radius: var(--radius-lg);
+}
+.todayLearningBanner:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.todayLearningText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.todayLearningLabel {
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.todayLearningTitle {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.todayLearningCta {
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .content {
   padding: var(--space-5);
 }

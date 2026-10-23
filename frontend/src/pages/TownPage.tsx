@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import { getProfile, type Avatar } from '../api/user';
+import { getThemes, type Theme } from '../api/theme';
 import { ApiError } from '../api/client';
 import { avatarFromProfile, buildAvatarPreviewUrl } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
@@ -13,6 +14,7 @@ function TownPage() {
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutErrorMessage, setLogoutErrorMessage] = useState<string | null>(null);
+  const [todayTheme, setTodayTheme] = useState<Theme | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,6 +29,24 @@ function TownPage() {
       })
       .catch(() => {
         // 헤더 닉네임/캐릭터 표시는 보조 정보라 실패해도 화면을 막지 않는다.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getThemes()
+      .then((themes) => {
+        if (!cancelled) {
+          setTodayTheme(themes.find((theme) => !theme.completed) ?? null);
+        }
+      })
+      .catch(() => {
+        // 오늘의 학습 배너는 보조 정보라 실패해도 화면을 막지 않는다.
       });
 
     return () => {
@@ -102,6 +122,15 @@ function TownPage() {
           </button>
         </div>
       </header>
+      {todayTheme && (
+        <Link to={`/town/themes/${todayTheme.id}`} className={styles.todayLearningBanner}>
+          <span className={styles.todayLearningText}>
+            <span className={styles.todayLearningLabel}>1순위 · 오늘의 학습</span>
+            <span className={styles.todayLearningTitle}>{todayTheme.title}</span>
+          </span>
+          <span className={styles.todayLearningCta}>시작하기 →</span>
+        </Link>
+      )}
       {logoutErrorMessage && (
         <p className={styles.content} role="alert">
           {logoutErrorMessage}
