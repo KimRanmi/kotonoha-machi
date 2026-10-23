@@ -3,12 +3,21 @@ package com.kotonohamachi.theme.service;
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.theme.Theme;
 import com.kotonohamachi.theme.ThemeErrorCode;
+import com.kotonohamachi.theme.ThemeExample;
+import com.kotonohamachi.theme.ThemeKanji;
 import com.kotonohamachi.theme.ThemeProgress;
 import com.kotonohamachi.theme.ThemeStage;
+import com.kotonohamachi.theme.ThemeVocabulary;
+import com.kotonohamachi.theme.dto.ThemeExampleItemResponse;
+import com.kotonohamachi.theme.dto.ThemeKanjiItemResponse;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
+import com.kotonohamachi.theme.dto.ThemeVocabularyItemResponse;
+import com.kotonohamachi.theme.repository.ThemeExampleRepository;
+import com.kotonohamachi.theme.repository.ThemeKanjiRepository;
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
 import com.kotonohamachi.theme.repository.ThemeRepository;
+import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
 import java.util.List;
@@ -19,14 +28,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 테마 학습의 단계 진행 게이트(한자 → 단어 → 표현 → 예문 → 독해)를 처리한다. 각 단계의 실제 콘텐츠(한자/단어 데이터)와
- * 정답 채점은 이 작업의 범위가 아니다 — 이전 단계를 끝내야 다음 단계로 넘어갈 수 있다는 순서 규칙만 담당한다.
+ * 테마 학습의 단계 진행 게이트(한자 → 단어 → 표현 → 예문 → 독해)와 단계별 실제 콘텐츠 조회를 처리한다.
+ * 정답 채점은 이 작업의 범위가 아니다.
  */
 @Service
 public class ThemeService {
 
   private final ThemeRepository themeRepository;
   private final ThemeProgressRepository themeProgressRepository;
+  private final ThemeKanjiRepository themeKanjiRepository;
+  private final ThemeVocabularyRepository themeVocabularyRepository;
+  private final ThemeExampleRepository themeExampleRepository;
   private final UserRepository userRepository;
 
   /**
@@ -34,14 +46,23 @@ public class ThemeService {
    *
    * @param themeRepository 테마 저장소
    * @param themeProgressRepository 사용자별 테마 진행 상태 저장소
+   * @param themeKanjiRepository 테마 한자 콘텐츠 저장소
+   * @param themeVocabularyRepository 테마 단어·표현 콘텐츠 저장소
+   * @param themeExampleRepository 테마 예문 콘텐츠 저장소
    * @param userRepository 사용자 저장소
    */
   public ThemeService(
       ThemeRepository themeRepository,
       ThemeProgressRepository themeProgressRepository,
+      ThemeKanjiRepository themeKanjiRepository,
+      ThemeVocabularyRepository themeVocabularyRepository,
+      ThemeExampleRepository themeExampleRepository,
       UserRepository userRepository) {
     this.themeRepository = themeRepository;
     this.themeProgressRepository = themeProgressRepository;
+    this.themeKanjiRepository = themeKanjiRepository;
+    this.themeVocabularyRepository = themeVocabularyRepository;
+    this.themeExampleRepository = themeExampleRepository;
     this.userRepository = userRepository;
   }
 
@@ -88,6 +109,61 @@ public class ThemeService {
     progress.completeCurrentStage();
 
     return new ThemeProgressResponse(themeId, progress.getCurrentStage(), progress.isCompleted());
+  }
+
+  /**
+   * 테마의 한 단계에 나오는 실제 콘텐츠를 조회한다. 콘텐츠는 AI가 생성하지 않고 미리 DB에 심어둔 실제
+   * 단어 데이터다. 단계별로 반환되는 목록의 항목 타입이 다르다: {@link ThemeStage#KANJI}는 {@link
+   * ThemeKanjiItemResponse}, {@link ThemeStage#WORD}·{@link ThemeStage#EXPRESSION}은 {@link
+   * ThemeVocabularyItemResponse}, {@link ThemeStage#EXAMPLE}은 {@link ThemeExampleItemResponse}다.
+   * {@link ThemeStage#READING}은 아직 콘텐츠가 설계되지 않아 예외를 던진다.
+   *
+   * @param themeId 조회할 테마 ID
+   * @param stage 조회할 단계
+   * @return 단계에 맞는 콘텐츠 목록
+   */
+  @Transactional(readOnly = true)
+  public List<?> getStageContent(Long themeId, ThemeStage stage) {
+    findThemeOrThrow(themeId);
+
+    return switch (stage) {
+      case KANJI -> toKanjiItems(themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
+      case WORD, EXPRESSION ->
+        toVocabularyItems(
+            themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(themeId, stage));
+      case EXAMPLE ->
+        toExampleItems(themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
+      case READING -> throw new ApiException(ThemeErrorCode.STAGE_CONTENT_NOT_AVAILABLE);
+    };
+  }
+
+  private List<ThemeKanjiItemResponse> toKanjiItems(List<ThemeKanji> kanjiList) {
+    return kanjiList.stream()
+        .map(kanji -> new ThemeKanjiItemResponse(
+            kanji.getKanji(),
+            kanji.getOnReading(),
+            kanji.getKunReading(),
+            kanji.getMeaning(),
+            kanji.getJlptLevel()))
+        .toList();
+  }
+
+  private List<ThemeVocabularyItemResponse> toVocabularyItems(
+      List<ThemeVocabulary> vocabularyList) {
+    return vocabularyList.stream()
+        .map(vocabulary -> new ThemeVocabularyItemResponse(
+            vocabulary.getSurfaceForm(),
+            vocabulary.getReading(),
+            vocabulary.getMeaning(),
+            vocabulary.getJlptLevel()))
+        .toList();
+  }
+
+  private List<ThemeExampleItemResponse> toExampleItems(List<ThemeExample> exampleList) {
+    return exampleList.stream()
+        .map(example ->
+            new ThemeExampleItemResponse(example.getJapaneseSentence(), example.getTranslation()))
+        .toList();
   }
 
   private Theme findThemeOrThrow(Long themeId) {
