@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 테마 학습 목록 조회와 단계 진행(게이트) API. */
+/** 테마 학습 목록 조회, 단계 진행(게이트), 단계별 콘텐츠 조회 API. */
 @RestController
 public class ThemeController {
 
@@ -53,5 +53,18 @@ public class ThemeController {
       Authentication authentication, @PathVariable Long themeId, @PathVariable ThemeStage stage) {
     User user = AuthPrincipal.resolve(authentication);
     return themeService.completeStage(user.getId(), themeId, stage);
+  }
+
+  /**
+   * 테마의 한 단계에 나오는 실제 콘텐츠(한자/단어/표현/예문)를 조회한다. 응답 목록의 항목 모양은 단계마다 다르다 —
+   * {@link ThemeService#getStageContent} 참고.
+   *
+   * @param themeId 조회할 테마 ID
+   * @param stage 조회할 단계
+   * @return 단계에 맞는 콘텐츠 목록
+   */
+  @GetMapping("/api/themes/{themeId}/stages/{stage}/content")
+  public List<?> getStageContent(@PathVariable Long themeId, @PathVariable ThemeStage stage) {
+    return themeService.getStageContent(themeId, stage);
   }
 }

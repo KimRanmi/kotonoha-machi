@@ -7,12 +7,21 @@ import static org.mockito.Mockito.when;
 
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.theme.Theme;
+import com.kotonohamachi.theme.ThemeExample;
+import com.kotonohamachi.theme.ThemeKanji;
 import com.kotonohamachi.theme.ThemeProgress;
 import com.kotonohamachi.theme.ThemeStage;
+import com.kotonohamachi.theme.ThemeVocabulary;
+import com.kotonohamachi.theme.dto.ThemeExampleItemResponse;
+import com.kotonohamachi.theme.dto.ThemeKanjiItemResponse;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
+import com.kotonohamachi.theme.dto.ThemeVocabularyItemResponse;
+import com.kotonohamachi.theme.repository.ThemeExampleRepository;
+import com.kotonohamachi.theme.repository.ThemeKanjiRepository;
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
 import com.kotonohamachi.theme.repository.ThemeRepository;
+import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
 import java.time.OffsetDateTime;
@@ -36,13 +45,28 @@ class ThemeServiceTest {
   private ThemeProgressRepository themeProgressRepository;
 
   @Mock
+  private ThemeKanjiRepository themeKanjiRepository;
+
+  @Mock
+  private ThemeVocabularyRepository themeVocabularyRepository;
+
+  @Mock
+  private ThemeExampleRepository themeExampleRepository;
+
+  @Mock
   private UserRepository userRepository;
 
   private ThemeService themeService;
 
   @BeforeEach
   void setUp() {
-    themeService = new ThemeService(themeRepository, themeProgressRepository, userRepository);
+    themeService = new ThemeService(
+        themeRepository,
+        themeProgressRepository,
+        themeKanjiRepository,
+        themeVocabularyRepository,
+        themeExampleRepository,
+        userRepository);
   }
 
   private static User user() {
@@ -123,6 +147,67 @@ class ThemeServiceTest {
 
     ApiException exception = catchThrowableOfType(
         ApiException.class, () -> themeService.completeStage(1L, 1L, ThemeStage.KANJI));
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  void getStageContent_KANJI_단계는_한자_목록을_반환한다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(1L))
+        .thenReturn(List.of(new ThemeKanji(theme, "水", "スイ", "みず", "물", 5, 1)));
+
+    List<?> content = themeService.getStageContent(1L, ThemeStage.KANJI);
+
+    assertThat(content).hasSize(1);
+    assertThat(content.get(0)).isEqualTo(new ThemeKanjiItemResponse("水", "スイ", "みず", "물", 5));
+  }
+
+  @Test
+  void getStageContent_WORD_단계는_단어_목록을_반환한다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(1L, ThemeStage.WORD))
+        .thenReturn(
+            List.of(new ThemeVocabulary(theme, ThemeStage.WORD, "注文", "ちゅうもん", "주문", 4, 1)));
+
+    List<?> content = themeService.getStageContent(1L, ThemeStage.WORD);
+
+    assertThat(content).hasSize(1);
+    assertThat(content.get(0)).isEqualTo(new ThemeVocabularyItemResponse("注文", "ちゅうもん", "주문", 4));
+  }
+
+  @Test
+  void getStageContent_EXAMPLE_단계는_예문_목록을_반환한다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(1L))
+        .thenReturn(List.of(new ThemeExample(theme, "彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다.", 1)));
+
+    List<?> content = themeService.getStageContent(1L, ThemeStage.EXAMPLE);
+
+    assertThat(content).hasSize(1);
+    assertThat(content.get(0))
+        .isEqualTo(new ThemeExampleItemResponse("彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다."));
+  }
+
+  @Test
+  void getStageContent_READING_단계는_501_예외를_던진다() {
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(new Theme("카페에서 주문하기")));
+
+    ApiException exception = catchThrowableOfType(
+        ApiException.class, () -> themeService.getStageContent(1L, ThemeStage.READING));
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
+  }
+
+  @Test
+  void getStageContent_존재하지_않는_테마면_404_예외를_던진다() {
+    when(themeRepository.findById(1L)).thenReturn(Optional.empty());
+
+    ApiException exception = catchThrowableOfType(
+        ApiException.class, () -> themeService.getStageContent(1L, ThemeStage.KANJI));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
   }

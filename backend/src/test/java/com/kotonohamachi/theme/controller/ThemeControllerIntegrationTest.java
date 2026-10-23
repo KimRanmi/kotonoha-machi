@@ -223,4 +223,55 @@ class ThemeControllerIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].completed").value(true));
   }
+
+  @Test
+  void 단계_콘텐츠_조회는_로그인하지_않으면_401을_반환한다() throws Exception {
+    mockMvc
+        .perform(get("/api/themes/1/stages/KANJI/content"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void KANJI_단계_콘텐츠는_V7이_심은_실제_한자_데이터를_반환한다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    Long themeId = firstThemeId(session);
+
+    mockMvc
+        .perform(get("/api/themes/" + themeId + "/stages/KANJI/content").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].kanji").value("水"))
+        .andExpect(jsonPath("$[0].meaning").value("물"))
+        .andExpect(jsonPath("$[0].jlptLevel").value(5));
+  }
+
+  @Test
+  void EXAMPLE_단계_콘텐츠는_V7이_심은_실제_예문_데이터를_반환한다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    Long themeId = firstThemeId(session);
+
+    mockMvc
+        .perform(get("/api/themes/" + themeId + "/stages/EXAMPLE/content").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].japaneseSentence").exists())
+        .andExpect(jsonPath("$[0].translation").exists());
+  }
+
+  @Test
+  void READING_단계_콘텐츠는_아직_준비되지_않아_501을_반환한다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    Long themeId = firstThemeId(session);
+
+    mockMvc
+        .perform(get("/api/themes/" + themeId + "/stages/READING/content").session(session))
+        .andExpect(status().isNotImplemented());
+  }
+
+  @Test
+  void 존재하지_않는_테마의_콘텐츠는_404를_반환한다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+
+    mockMvc
+        .perform(get("/api/themes/999999/stages/KANJI/content").session(session))
+        .andExpect(status().isNotFound());
+  }
 }

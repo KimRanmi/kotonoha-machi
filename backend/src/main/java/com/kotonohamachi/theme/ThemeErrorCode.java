@@ -6,7 +6,8 @@ import org.springframework.http.HttpStatus;
 /** 테마 학습 진행에서 발생하는 에러 종류를 모아둔다. */
 public enum ThemeErrorCode implements ErrorCode {
   THEME_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 테마입니다."),
-  STAGE_OUT_OF_ORDER(HttpStatus.CONFLICT, "이전 단계를 먼저 끝내야 합니다.");
+  STAGE_OUT_OF_ORDER(HttpStatus.CONFLICT, "이전 단계를 먼저 끝내야 합니다."),
+  STAGE_CONTENT_NOT_AVAILABLE(HttpStatus.NOT_IMPLEMENTED, "아직 준비되지 않은 단계입니다.");
 
   private final HttpStatus status;
   private final String message;
