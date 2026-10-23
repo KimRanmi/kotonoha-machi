@@ -232,20 +232,20 @@ class ThemeControllerIntegrationTest {
   }
 
   @Test
-  void KANJI_단계_콘텐츠는_V7이_심은_실제_한자_데이터를_반환한다() throws Exception {
+  void KANJI_단계_콘텐츠는_V8이_심은_실제_한자_데이터를_반환한다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     Long themeId = firstThemeId(session);
 
     mockMvc
         .perform(get("/api/themes/" + themeId + "/stages/KANJI/content").session(session))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].kanji").value("水"))
-        .andExpect(jsonPath("$[0].meaning").value("물"))
-        .andExpect(jsonPath("$[0].jlptLevel").value(5));
+        .andExpect(jsonPath("$[0].kanji").value("混"))
+        .andExpect(jsonPath("$[0].meaning").value("섞다, 혼합되다"))
+        .andExpect(jsonPath("$[0].jlptLevel").value(2));
   }
 
   @Test
-  void EXAMPLE_단계_콘텐츠는_V7이_심은_실제_예문_데이터를_반환한다() throws Exception {
+  void EXAMPLE_단계_콘텐츠는_V8이_심은_실제_예문_데이터를_반환한다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     Long themeId = firstThemeId(session);
 
