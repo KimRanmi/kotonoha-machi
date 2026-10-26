@@ -52,6 +52,7 @@
 .card {
   min-height: 280px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: var(--space-6);
@@ -66,6 +67,59 @@
   color: var(--color-text-muted);
   font-size: 1.05rem;
   text-align: center;
+}
+
+.contentList {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contentItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.itemSurface {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.levelBadge {
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-surface);
+  background-color: var(--color-primary);
+}
+
+.itemReading {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.itemMeaning {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.95rem;
 }
 
 .error {
