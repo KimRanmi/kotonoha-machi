@@ -74,7 +74,7 @@ function ThemeLearningPage() {
   }, [numericThemeId]);
 
   useEffect(() => {
-    if (!theme || theme.completed || theme.currentStage === 'READING') {
+    if (!theme || theme.completed) {
       setQuizItems(null);
       return;
     }
@@ -114,7 +114,7 @@ function ThemeLearningPage() {
   const currentQuizItem =
     quizItems && currentIndex < quizItems.length ? quizItems[currentIndex] : null;
   const allQuizItemsAnswered = quizItems !== null && currentIndex >= quizItems.length;
-  const canAdvanceStage = theme?.currentStage === 'READING' || allQuizItemsAnswered;
+  const canAdvanceStage = allQuizItemsAnswered;
 
   function handleSelectOption(option: string) {
     if (!currentQuizItem || feedback === 'correct') {
@@ -221,8 +221,6 @@ function ThemeLearningPage() {
         <div className={styles.card}>
           {theme.completed ? (
             <p className={styles.cardMessage}>테마를 모두 완료했습니다!</p>
-          ) : theme.currentStage === 'READING' ? (
-            <p className={styles.cardMessage}>콘텐츠 준비 중입니다.</p>
           ) : isContentLoading ? (
             <p className={styles.cardMessage}>콘텐츠를 불러오는 중입니다…</p>
           ) : contentErrorMessage ? (

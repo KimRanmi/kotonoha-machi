@@ -18,8 +18,8 @@ export interface ThemeProgress {
 }
 
 /**
- * 테마 단계 콘텐츠 하나를 보여주는 객관식 문제. `prompt`(한자 글자/단어·표현 표기/예문 문장)를 보여주고
- * `options` 중 `correctAnswer`를 고르게 한다. 데이터가 부족하면 `options`가 4개보다 적을 수 있다.
+ * 테마 단계 콘텐츠 하나를 보여주는 객관식 문제. `prompt`(한자 글자/단어·표현 표기/예문 문장/독해 지문)를
+ * 보여주고 `options` 중 `correctAnswer`를 고르게 한다. 데이터가 부족하면 `options`가 4개보다 적을 수 있다.
  * `jlptLevel`은 예문(EXAMPLE) 단계에선 레벨 데이터가 없어 `null`이다.
  */
 export interface QuizItem {
@@ -35,10 +35,7 @@ export async function getThemes(): Promise<Theme[]> {
   return response.json();
 }
 
-/**
- * 테마의 한 단계에 나오는 항목들을 객관식 문제로 가져온다. READING은 아직 백엔드에 콘텐츠가 없어 호출하면
- * `ApiError`를 던진다.
- */
+/** 테마의 한 단계에 나오는 항목들을 객관식 문제로 가져온다. */
 export async function getStageContent(themeId: number, stage: ThemeStage): Promise<QuizItem[]> {
   const response = await apiFetch(`/api/themes/${themeId}/stages/${stage}/content`);
   return response.json();

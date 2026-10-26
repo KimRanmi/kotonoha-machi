@@ -10,6 +10,7 @@ import com.kotonohamachi.theme.Theme;
 import com.kotonohamachi.theme.ThemeExample;
 import com.kotonohamachi.theme.ThemeKanji;
 import com.kotonohamachi.theme.ThemeProgress;
+import com.kotonohamachi.theme.ThemeReadingPassage;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
@@ -18,6 +19,7 @@ import com.kotonohamachi.theme.dto.ThemeResponse;
 import com.kotonohamachi.theme.repository.ThemeExampleRepository;
 import com.kotonohamachi.theme.repository.ThemeKanjiRepository;
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
+import com.kotonohamachi.theme.repository.ThemeReadingPassageRepository;
 import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
@@ -52,6 +54,9 @@ class ThemeServiceTest {
   private ThemeExampleRepository themeExampleRepository;
 
   @Mock
+  private ThemeReadingPassageRepository themeReadingPassageRepository;
+
+  @Mock
   private UserRepository userRepository;
 
   private ThemeService themeService;
@@ -64,6 +69,7 @@ class ThemeServiceTest {
         themeKanjiRepository,
         themeVocabularyRepository,
         themeExampleRepository,
+        themeReadingPassageRepository,
         userRepository);
   }
 
@@ -208,13 +214,23 @@ class ThemeServiceTest {
   }
 
   @Test
-  void getStageContent_READING_단계는_501_예외를_던진다() {
-    when(themeRepository.findById(1L)).thenReturn(Optional.of(new Theme("카페에서 주문하기")));
+  void getStageContent_READING_단계는_번역을_정답으로_한_보기_목록을_반환한다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeReadingPassage target = new ThemeReadingPassage(theme, 3, "今日は雨です。", "오늘은 비가 옵니다.", 1);
+    ThemeReadingPassage other = new ThemeReadingPassage(theme, 2, "彼は駅に着きました。", "그는 역에 도착했습니다.", 2);
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(1L))
+        .thenReturn(List.of(target));
+    when(themeReadingPassageRepository.findAll()).thenReturn(List.of(target, other));
 
-    ApiException exception = catchThrowableOfType(
-        ApiException.class, () -> themeService.getStageContent(1L, ThemeStage.READING));
+    List<ThemeQuizItemResponse> content = themeService.getStageContent(1L, ThemeStage.READING);
 
-    assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
+    assertThat(content).hasSize(1);
+    ThemeQuizItemResponse item = content.get(0);
+    assertThat(item.prompt()).isEqualTo("今日は雨です。");
+    assertThat(item.correctAnswer()).isEqualTo("오늘은 비가 옵니다.");
+    assertThat(item.options()).contains("오늘은 비가 옵니다.", "그는 역에 도착했습니다.");
+    assertThat(item.jlptLevel()).isEqualTo(3);
   }
 
   @Test

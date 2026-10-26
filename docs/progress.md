@@ -191,3 +191,23 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
     검증이 1개짜리 테스트만으로는 증명되지 않는다는 `REVIEW_FAILED`를 받아, 2개짜리 퀴즈
     테스트를 추가하고 재검토 `REVIEW_PASSED`.
   - 다음 할 일: 자유 순서 테마 진행, 종합 복습, 발음 체크 등 섹션 5의 남은 항목.
+- 독해(READING) 단계를 임시로 퀴즈 게이트에 연결했다(`feature/vibe-theme-stage-content-display`
+  브랜치 계속). 요구사항이 확정한 최종 방식(RAG: pgvector 검색 + Gemini로 이해 문제 생성)은
+  지문 코퍼스 출처가 아직 미정이고 Gemini API를 실제로 호출하는 코드(`chat` 패키지)도 아직
+  없어서 당장 구현할 수 없다는 점을 사용자에게 먼저 확인받아, 이전 커밋(`V9` 마이그레이션)이
+  심어둔 테스트용 지문 데이터를 한자·단어·표현·예문과 같은 방식(지문이 문제, 번역이 정답인
+  객관식)으로만 연결하기로 범위를 좁혔다 — RAG 인프라는 코퍼스 출처가 정해지면 나중에 다시
+  다룬다.
+  - 백엔드: `ThemeReadingPassage` 엔티티·`ThemeReadingPassageRepository`를 `theme` 패키지에
+    추가하고, `ThemeService.getStageContent`의 `READING` 분기가 501 예외를 던지던 걸 지문
+    번역 보기 목록을 만들도록 바꿨다. 더는 쓰이지 않는 `ThemeErrorCode.STAGE_CONTENT_NOT_AVAILABLE`는
+    제거했다.
+  - 프런트엔드: `ThemeLearningPage`가 `READING` 단계만 콘텐츠 조회를 건너뛰고 "콘텐츠 준비
+    중입니다" 문구를 보여주며 다음 버튼을 바로 활성화하던 특례를 제거해, 다른 단계와 똑같이
+    퀴즈를 모두 맞혀야 다음으로 진행하게 했다.
+  - 검증: 백엔드 `./gradlew spotlessApply test`(기존 501 테스트 2개를 실제 콘텐츠 검증으로
+    교체) 통과. 프런트엔드 `npm run lint`/`npm run test`(62개, READING 관련 테스트 2개를 새
+    동작에 맞게 갱신)/`npm run build` 통과.
+  - 다음 할 일: 독해 지문 코퍼스 출처 결정(별도 결정 문서), pgvector 확장 추가, Gemini API
+    클라이언트 구축 — 이 세 가지가 정리되면 지금의 임시 데이터 연결을 실제 RAG 방식으로
+    교체한다.
