@@ -292,9 +292,12 @@
 - [x] 한자·단어·표현의 뜻/읽는 법은 실제 단어 데이터(DB)에서 가져오기(AI 생성 아님, N1~N3 기준만 추출) —
   백엔드만. kanjiapi.dev(한자/단어/표현)·Tatoeba(예문)에서 1회성으로 받아온 실제 데이터를
   Flyway 마이그레이션에 심고 `GET /api/themes/{themeId}/stages/{stage}/content`로 조회한다.
-  프런트엔드가 이 콘텐츠를 화면에 표시하는 작업은 아래 "레벨 화면 표시" 항목과 함께 아직
-  남아 있다. 데이터 출처 결정은 `docs/decisions/0012-theme-content-data-source.md` 참고.
-- [ ] 학습 중인 단어·표현마다 레벨(N3~N1) 화면 표시
+  프런트엔드가 이 콘텐츠를 화면에 표시하는 작업은 아래 "레벨 화면 표시" 항목에서 완료했다.
+  데이터 출처 결정은 `docs/decisions/0012-theme-content-data-source.md` 참고.
+- [x] 학습 중인 단어·표현마다 레벨(N3~N1) 화면 표시 — `GET
+  /api/themes/{themeId}/stages/{stage}/content`를 프런트엔드(`ThemeLearningPage`)에서 호출해
+  한자/단어/표현/예문 콘텐츠와 JLPT 레벨 배지를 렌더링한다. 독해(READING)는 콘텐츠가
+  아직 없어 placeholder 유지(별도 범위, `docs/decisions/0012-theme-content-data-source.md`).
 - [ ] 정답 게이트: 3회 오답 시 힌트/정답 노출, 이후에도 틀리면 맞힐 때까지 무제한 재시도
 - [ ] 테마는 자유 순서로 진행(고정 순서 강제 없이 언제든 건너뛰기 가능)
 - [ ] 모든 라운드 종료 후 배운 표현으로 답해보는 종합 복습
