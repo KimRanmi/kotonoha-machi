@@ -6,6 +6,7 @@ import com.kotonohamachi.theme.ThemeErrorCode;
 import com.kotonohamachi.theme.ThemeExample;
 import com.kotonohamachi.theme.ThemeKanji;
 import com.kotonohamachi.theme.ThemeProgress;
+import com.kotonohamachi.theme.ThemeReadingPassage;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
@@ -14,6 +15,7 @@ import com.kotonohamachi.theme.dto.ThemeResponse;
 import com.kotonohamachi.theme.repository.ThemeExampleRepository;
 import com.kotonohamachi.theme.repository.ThemeKanjiRepository;
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
+import com.kotonohamachi.theme.repository.ThemeReadingPassageRepository;
 import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
@@ -43,6 +45,7 @@ public class ThemeService {
   private final ThemeKanjiRepository themeKanjiRepository;
   private final ThemeVocabularyRepository themeVocabularyRepository;
   private final ThemeExampleRepository themeExampleRepository;
+  private final ThemeReadingPassageRepository themeReadingPassageRepository;
   private final UserRepository userRepository;
 
   /**
@@ -53,6 +56,7 @@ public class ThemeService {
    * @param themeKanjiRepository 테마 한자 콘텐츠 저장소
    * @param themeVocabularyRepository 테마 단어·표현 콘텐츠 저장소
    * @param themeExampleRepository 테마 예문 콘텐츠 저장소
+   * @param themeReadingPassageRepository 테마 독해 지문 콘텐츠 저장소
    * @param userRepository 사용자 저장소
    */
   public ThemeService(
@@ -61,12 +65,14 @@ public class ThemeService {
       ThemeKanjiRepository themeKanjiRepository,
       ThemeVocabularyRepository themeVocabularyRepository,
       ThemeExampleRepository themeExampleRepository,
+      ThemeReadingPassageRepository themeReadingPassageRepository,
       UserRepository userRepository) {
     this.themeRepository = themeRepository;
     this.themeProgressRepository = themeProgressRepository;
     this.themeKanjiRepository = themeKanjiRepository;
     this.themeVocabularyRepository = themeVocabularyRepository;
     this.themeExampleRepository = themeExampleRepository;
+    this.themeReadingPassageRepository = themeReadingPassageRepository;
     this.userRepository = userRepository;
   }
 
@@ -118,8 +124,8 @@ public class ThemeService {
   /**
    * 테마의 한 단계에 나오는 항목들을 객관식 문제로 만들어 조회한다. {@link ThemeStage#KANJI}는 한자
    * 글자가 문제, {@link ThemeStage#WORD}·{@link ThemeStage#EXPRESSION}은 단어·표현 표기가 문제,
-   * {@link ThemeStage#EXAMPLE}은 예문 문장이 문제이고, 정답은 각각의 뜻·번역이다. {@link
-   * ThemeStage#READING}은 아직 콘텐츠가 설계되지 않아 예외를 던진다.
+   * {@link ThemeStage#EXAMPLE}은 예문 문장이, {@link ThemeStage#READING}은 지문 문장이 문제이고, 정답은
+   * 각각의 뜻·번역이다.
    *
    * @param themeId 조회할 테마 ID
    * @param stage 조회할 단계
@@ -138,7 +144,9 @@ public class ThemeService {
             stage);
       case EXAMPLE ->
         toExampleQuizItems(themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
-      case READING -> throw new ApiException(ThemeErrorCode.STAGE_CONTENT_NOT_AVAILABLE);
+      case READING ->
+        toReadingQuizItems(
+            themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
     };
   }
 
@@ -172,6 +180,16 @@ public class ThemeService {
     return exampleList.stream()
         .map(example ->
             toQuizItem(example.getJapaneseSentence(), example.getTranslation(), answerPool, null))
+        .toList();
+  }
+
+  private List<ThemeQuizItemResponse> toReadingQuizItems(List<ThemeReadingPassage> passages) {
+    List<String> answerPool = themeReadingPassageRepository.findAll().stream()
+        .map(ThemeReadingPassage::getTranslation)
+        .toList();
+    return passages.stream()
+        .map(passage -> toQuizItem(
+            passage.getPassage(), passage.getTranslation(), answerPool, passage.getJlptLevel()))
         .toList();
   }
 

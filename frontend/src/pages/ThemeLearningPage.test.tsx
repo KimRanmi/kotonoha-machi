@@ -46,6 +46,13 @@ const TWO_QUIZ_ITEMS: QuizItem[] = [
   },
 ];
 
+const READING_QUIZ_ITEM: QuizItem = {
+  prompt: '今日のカフェは混雑していて、席がなかなか空かなかった。',
+  options: ['오늘 카페는 혼잡해서 자리가 나지 않았다.', '그는 길을 잃었다.'],
+  correctAnswer: '오늘 카페는 혼잡해서 자리가 나지 않았다.',
+  jlptLevel: 3,
+};
+
 describe('ThemeLearningPage', () => {
   beforeEach(() => {
     vi.mocked(getThemes).mockReset();
@@ -107,13 +114,14 @@ describe('ThemeLearningPage', () => {
     expect(await screen.findByText('콘텐츠를 불러오지 못했습니다.')).toBeInTheDocument();
   });
 
-  it('독해(READING) 단계는 콘텐츠 API를 호출하지 않고 준비 중 문구와 활성화된 다음 버튼을 보여준다', async () => {
+  it('독해(READING) 단계도 다른 단계와 같은 방식으로 콘텐츠 API를 호출해 퀴즈를 보여준다', async () => {
     vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'READING' }]);
+    vi.mocked(getStageContent).mockResolvedValue([READING_QUIZ_ITEM]);
     renderPage();
 
-    expect(await screen.findByText('콘텐츠 준비 중입니다.')).toBeInTheDocument();
-    expect(getStageContent).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
+    expect(await screen.findByText(READING_QUIZ_ITEM.prompt)).toBeInTheDocument();
+    expect(getStageContent).toHaveBeenCalledWith(11, 'READING');
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
   });
 
   it('문제를 풀기 전에는 다음 버튼이 비활성화된다', async () => {
@@ -242,12 +250,16 @@ describe('ThemeLearningPage', () => {
 
   it('completed가 true가 되면 완료 문구와 마을로 돌아가기 링크를 보여주고 다음 버튼은 사라진다', async () => {
     vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'READING' }]);
+    vi.mocked(getStageContent).mockResolvedValue([READING_QUIZ_ITEM]);
     vi.mocked(completeStage).mockResolvedValue({
       themeId: 11,
       currentStage: 'READING',
       completed: true,
     });
     renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: READING_QUIZ_ITEM.correctAnswer }));
+    fireEvent.click(await screen.findByRole('button', { name: '완료' }));
 
     const nextButton = await screen.findByRole('button', { name: '다음' });
     fireEvent.click(nextButton);

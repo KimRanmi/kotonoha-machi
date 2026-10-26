@@ -258,13 +258,16 @@ class ThemeControllerIntegrationTest {
   }
 
   @Test
-  void READING_단계_콘텐츠는_아직_준비되지_않아_501을_반환한다() throws Exception {
+  void READING_단계_콘텐츠는_V9가_심은_실제_지문_데이터를_반환한다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     Long themeId = firstThemeId(session);
 
     mockMvc
         .perform(get("/api/themes/" + themeId + "/stages/READING/content").session(session))
-        .andExpect(status().isNotImplemented());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].prompt").exists())
+        .andExpect(jsonPath("$[0].correctAnswer").exists())
+        .andExpect(jsonPath("$[0].jlptLevel").exists());
   }
 
   @Test
