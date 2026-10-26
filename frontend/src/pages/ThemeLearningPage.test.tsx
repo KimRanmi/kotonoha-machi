@@ -10,7 +10,7 @@ vi.mock('../api/theme', () => ({
   getStageContent: vi.fn(),
 }));
 
-import { completeStage, getStageContent, getThemes, type Theme } from '../api/theme';
+import { completeStage, getStageContent, getThemes, type QuizItem, type Theme } from '../api/theme';
 
 function renderPage(themeId = '11') {
   render(
@@ -28,6 +28,23 @@ const WEATHER_THEME: Theme = {
   currentStage: 'WORD',
   completed: false,
 };
+
+const SINGLE_QUIZ_ITEM: QuizItem = {
+  prompt: '混雑',
+  options: ['혼잡함', '안내', '거리'],
+  correctAnswer: '혼잡함',
+  jlptLevel: 2,
+};
+
+const TWO_QUIZ_ITEMS: QuizItem[] = [
+  SINGLE_QUIZ_ITEM,
+  {
+    prompt: '満席',
+    options: ['만석', '안내', '거리'],
+    correctAnswer: '만석',
+    jlptLevel: 2,
+  },
+];
 
 describe('ThemeLearningPage', () => {
   beforeEach(() => {
@@ -68,17 +85,15 @@ describe('ThemeLearningPage', () => {
     expect(expressionStep).toHaveAttribute('data-active', 'false');
   });
 
-  it('현재 단계의 실제 콘텐츠와 JLPT 레벨을 보여준다', async () => {
+  it('현재 단계의 문제와 JLPT 레벨, 보기를 보여준다', async () => {
     vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
-    vi.mocked(getStageContent).mockResolvedValue([
-      { surfaceForm: '混雑', reading: 'こんざつ', meaning: '혼잡함', jlptLevel: 2 },
-    ]);
+    vi.mocked(getStageContent).mockResolvedValue([SINGLE_QUIZ_ITEM]);
     renderPage();
 
     expect(await screen.findByText('混雑')).toBeInTheDocument();
-    expect(screen.getByText('こんざつ')).toBeInTheDocument();
-    expect(screen.getByText('혼잡함')).toBeInTheDocument();
     expect(screen.getByText('N2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '혼잡함' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '안내' })).toBeInTheDocument();
     expect(getStageContent).toHaveBeenCalledWith(11, 'WORD');
   });
 
@@ -92,30 +107,106 @@ describe('ThemeLearningPage', () => {
     expect(await screen.findByText('콘텐츠를 불러오지 못했습니다.')).toBeInTheDocument();
   });
 
-  it('독해(READING) 단계는 콘텐츠 API를 호출하지 않고 준비 중 문구를 보여준다', async () => {
+  it('독해(READING) 단계는 콘텐츠 API를 호출하지 않고 준비 중 문구와 활성화된 다음 버튼을 보여준다', async () => {
     vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'READING' }]);
     renderPage();
 
     expect(await screen.findByText('콘텐츠 준비 중입니다.')).toBeInTheDocument();
     expect(getStageContent).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
   });
 
-  it('힌트 버튼은 항상 disabled 상태다', async () => {
+  it('문제를 풀기 전에는 다음 버튼이 비활성화된다', async () => {
     vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
+    vi.mocked(getStageContent).mockResolvedValue([SINGLE_QUIZ_ITEM]);
     renderPage();
 
-    const hintButton = await screen.findByRole('button', { name: '힌트' });
-    expect(hintButton).toBeDisabled();
+    await screen.findByText('混雑');
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+  });
+
+  it('오답을 고르면 틀렸다는 안내와 시도 횟수를 보여주고 다시 선택할 수 있다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
+    vi.mocked(getStageContent).mockResolvedValue([SINGLE_QUIZ_ITEM]);
+    renderPage();
+
+    const wrongOption = await screen.findByRole('button', { name: '안내' });
+    fireEvent.click(wrongOption);
+
+    expect(await screen.findByText('틀렸습니다. 다시 선택해보세요. (1/3)')).toBeInTheDocument();
+  });
+
+  it('3회 오답을 고르면 정답을 보여주지만 정답을 직접 선택해야 진행된다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
+    vi.mocked(getStageContent).mockResolvedValue([SINGLE_QUIZ_ITEM]);
+    renderPage();
+
+    const wrongOption = await screen.findByRole('button', { name: '안내' });
+    fireEvent.click(wrongOption);
+    fireEvent.click(wrongOption);
+    fireEvent.click(wrongOption);
+
+    expect(
+      await screen.findByText('정답은 "혼잡함"입니다. 위에서 정답을 선택해주세요.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '혼잡함' }));
+
+    expect(await screen.findByText('정답입니다!')).toBeInTheDocument();
+  });
+
+  it('정답을 고르면 정답 안내와 완료 버튼을 보여주고, 누르면 다음 버튼이 활성화된다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
+    vi.mocked(getStageContent).mockResolvedValue([SINGLE_QUIZ_ITEM]);
+    renderPage();
+
+    const correctOption = await screen.findByRole('button', { name: '혼잡함' });
+    fireEvent.click(correctOption);
+
+    expect(await screen.findByText('정답입니다!')).toBeInTheDocument();
+    const finishButton = screen.getByRole('button', { name: '완료' });
+
+    fireEvent.click(finishButton);
+
+    expect(
+      await screen.findByText('이 단계의 문제를 모두 맞혔습니다! 아래 "다음" 버튼으로 진행하세요.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
+  });
+
+  it('문제가 여러 개면 일부만 맞혀서는 다음 버튼이 활성화되지 않고, 전부 맞혀야 활성화된다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
+    vi.mocked(getStageContent).mockResolvedValue(TWO_QUIZ_ITEMS);
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '혼잡함' }));
+    fireEvent.click(await screen.findByRole('button', { name: '다음 문제' }));
+
+    expect(await screen.findByText('満席')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+
+    fireEvent.click(await screen.findByRole('button', { name: '만석' }));
+    fireEvent.click(await screen.findByRole('button', { name: '완료' }));
+
+    expect(
+      await screen.findByText('이 단계의 문제를 모두 맞혔습니다! 아래 "다음" 버튼으로 진행하세요.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
   });
 
   it('다음 버튼을 누르면 completeStage가 올바른 인자로 호출되고 응답으로 상태를 갱신한다', async () => {
     vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
+    vi.mocked(getStageContent).mockResolvedValue([SINGLE_QUIZ_ITEM]);
     vi.mocked(completeStage).mockResolvedValue({
       themeId: 11,
       currentStage: 'EXPRESSION',
       completed: false,
     });
     renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '혼잡함' }));
+    fireEvent.click(await screen.findByRole('button', { name: '완료' }));
 
     const nextButton = await screen.findByRole('button', { name: '다음' });
     fireEvent.click(nextButton);
@@ -132,8 +223,12 @@ describe('ThemeLearningPage', () => {
 
   it('completeStage가 실패하면 에러 메시지를 보여주고 단계는 그대로 유지된다', async () => {
     vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
+    vi.mocked(getStageContent).mockResolvedValue([SINGLE_QUIZ_ITEM]);
     vi.mocked(completeStage).mockRejectedValue(new ApiError(409, '이미 완료된 단계입니다.'));
     renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '혼잡함' }));
+    fireEvent.click(await screen.findByRole('button', { name: '완료' }));
 
     const nextButton = await screen.findByRole('button', { name: '다음' });
     fireEvent.click(nextButton);

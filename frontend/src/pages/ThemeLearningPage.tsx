@@ -5,16 +5,14 @@ import {
   completeStage,
   getStageContent,
   getThemes,
-  type ExampleItem,
-  type KanjiItem,
-  type StageContentItem,
+  type QuizItem,
   type Theme,
   type ThemeStage,
-  type VocabularyItem,
 } from '../api/theme';
 import styles from './ThemeLearningPage.module.css';
 
 const STAGE_ORDER: ThemeStage[] = ['KANJI', 'WORD', 'EXPRESSION', 'EXAMPLE', 'READING'];
+const MAX_WRONG_ATTEMPTS = 3;
 
 const STAGE_LABELS: Record<ThemeStage, string> = {
   KANJI: '한자',
@@ -23,46 +21,6 @@ const STAGE_LABELS: Record<ThemeStage, string> = {
   EXAMPLE: '예문',
   READING: '독해',
 };
-
-function renderStageContentItem(stage: ThemeStage, item: StageContentItem) {
-  if (stage === 'KANJI') {
-    const kanjiItem = item as KanjiItem;
-    return (
-      <>
-        <div className={styles.itemHeader}>
-          <span className={styles.itemSurface}>{kanjiItem.kanji}</span>
-          <span className={styles.levelBadge}>N{kanjiItem.jlptLevel}</span>
-        </div>
-        <p className={styles.itemReading}>
-          음독 {kanjiItem.onReading} · 훈독 {kanjiItem.kunReading}
-        </p>
-        <p className={styles.itemMeaning}>{kanjiItem.meaning}</p>
-      </>
-    );
-  }
-
-  if (stage === 'WORD' || stage === 'EXPRESSION') {
-    const vocabularyItem = item as VocabularyItem;
-    return (
-      <>
-        <div className={styles.itemHeader}>
-          <span className={styles.itemSurface}>{vocabularyItem.surfaceForm}</span>
-          <span className={styles.levelBadge}>N{vocabularyItem.jlptLevel}</span>
-        </div>
-        <p className={styles.itemReading}>{vocabularyItem.reading}</p>
-        <p className={styles.itemMeaning}>{vocabularyItem.meaning}</p>
-      </>
-    );
-  }
-
-  const exampleItem = item as ExampleItem;
-  return (
-    <>
-      <p className={styles.itemSurface}>{exampleItem.japaneseSentence}</p>
-      <p className={styles.itemMeaning}>{exampleItem.translation}</p>
-    </>
-  );
-}
 
 function ThemeLearningPage() {
   const { themeId } = useParams<{ themeId: string }>();
@@ -73,9 +31,14 @@ function ThemeLearningPage() {
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [advanceErrorMessage, setAdvanceErrorMessage] = useState<string | null>(null);
-  const [stageItems, setStageItems] = useState<StageContentItem[] | null>(null);
+
+  const [quizItems, setQuizItems] = useState<QuizItem[] | null>(null);
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [contentErrorMessage, setContentErrorMessage] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
+  const [isRevealed, setIsRevealed] = useState(false);
+  const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +75,7 @@ function ThemeLearningPage() {
 
   useEffect(() => {
     if (!theme || theme.completed || theme.currentStage === 'READING') {
-      setStageItems(null);
+      setQuizItems(null);
       return;
     }
 
@@ -123,7 +86,11 @@ function ThemeLearningPage() {
     getStageContent(theme.id, theme.currentStage)
       .then((items) => {
         if (!cancelled) {
-          setStageItems(items);
+          setQuizItems(items);
+          setCurrentIndex(0);
+          setWrongCount(0);
+          setIsRevealed(false);
+          setFeedback(null);
         }
       })
       .catch((error: unknown) => {
@@ -143,6 +110,40 @@ function ThemeLearningPage() {
       cancelled = true;
     };
   }, [theme]);
+
+  const currentQuizItem =
+    quizItems && currentIndex < quizItems.length ? quizItems[currentIndex] : null;
+  const allQuizItemsAnswered = quizItems !== null && currentIndex >= quizItems.length;
+  const canAdvanceStage = theme?.currentStage === 'READING' || allQuizItemsAnswered;
+
+  function handleSelectOption(option: string) {
+    if (!currentQuizItem || feedback === 'correct') {
+      return;
+    }
+
+    if (option === currentQuizItem.correctAnswer) {
+      setFeedback('correct');
+      return;
+    }
+
+    if (isRevealed) {
+      return;
+    }
+
+    const nextWrongCount = wrongCount + 1;
+    setWrongCount(nextWrongCount);
+    setFeedback('incorrect');
+    if (nextWrongCount >= MAX_WRONG_ATTEMPTS) {
+      setIsRevealed(true);
+    }
+  }
+
+  function handleNextQuizItem() {
+    setCurrentIndex((index) => index + 1);
+    setWrongCount(0);
+    setIsRevealed(false);
+    setFeedback(null);
+  }
 
   async function handleAdvance() {
     if (!theme) {
@@ -228,15 +229,65 @@ function ThemeLearningPage() {
             <p className={styles.error} role="alert">
               {contentErrorMessage}
             </p>
-          ) : (
-            <ul className={styles.contentList}>
-              {stageItems?.map((item, index) => (
-                <li key={index} className={styles.contentItem}>
-                  {renderStageContentItem(theme.currentStage, item)}
-                </li>
-              ))}
-            </ul>
-          )}
+          ) : allQuizItemsAnswered ? (
+            <p className={styles.cardMessage}>
+              이 단계의 문제를 모두 맞혔습니다! 아래 "다음" 버튼으로 진행하세요.
+            </p>
+          ) : currentQuizItem ? (
+            <div className={styles.quiz}>
+              {currentQuizItem.jlptLevel !== null && (
+                <span className={styles.levelBadge}>N{currentQuizItem.jlptLevel}</span>
+              )}
+              <p className={styles.prompt}>{currentQuizItem.prompt}</p>
+
+              <div className={styles.optionList}>
+                {currentQuizItem.options.map((option) => {
+                  const isCorrectOption = option === currentQuizItem.correctAnswer;
+                  const variant =
+                    feedback === 'correct' && isCorrectOption
+                      ? 'correct'
+                      : isRevealed && isCorrectOption
+                        ? 'hint'
+                        : undefined;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      className={styles.optionButton}
+                      data-variant={variant}
+                      disabled={feedback === 'correct'}
+                      onClick={() => handleSelectOption(option)}
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {feedback === 'incorrect' && !isRevealed && (
+                <p className={styles.quizFeedbackIncorrect}>
+                  틀렸습니다. 다시 선택해보세요. ({wrongCount}/{MAX_WRONG_ATTEMPTS})
+                </p>
+              )}
+              {isRevealed && feedback !== 'correct' && (
+                <p className={styles.quizFeedbackHint}>
+                  정답은 "{currentQuizItem.correctAnswer}"입니다. 위에서 정답을 선택해주세요.
+                </p>
+              )}
+              {feedback === 'correct' && (
+                <div className={styles.quizFeedbackCorrectRow}>
+                  <p className={styles.quizFeedbackCorrect}>정답입니다!</p>
+                  <button
+                    type="button"
+                    className={styles.nextQuestionButton}
+                    onClick={handleNextQuizItem}
+                  >
+                    {currentIndex + 1 < quizItems!.length ? '다음 문제' : '완료'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
         {advanceErrorMessage && (
@@ -246,14 +297,6 @@ function ThemeLearningPage() {
         )}
 
         <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.hintButton}
-            disabled
-            title="정답 확인 기능은 아직 준비 중입니다"
-          >
-            힌트
-          </button>
           {theme.completed ? (
             <Link to="/town" className={styles.nextButton}>
               마을로 돌아가기
@@ -263,7 +306,7 @@ function ThemeLearningPage() {
               type="button"
               className={styles.nextButton}
               onClick={handleAdvance}
-              disabled={isAdvancing}
+              disabled={isAdvancing || !canAdvanceStage}
             >
               다음
             </button>
