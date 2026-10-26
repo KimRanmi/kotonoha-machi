@@ -5,6 +5,7 @@
 .idea/
 .vscode/
 .claude/worktrees/
+.claude/sprint_patch.json
 
 # env files (프런트/백엔드 각자의 .gitignore에서도 관리한다)
 .env
