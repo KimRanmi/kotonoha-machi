@@ -150,3 +150,26 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 다음 할 일: 섹션 5의 2번 항목(한자·단어·표현의 실제 뜻/읽는 법을 DB에서 가져오기) —
     콘텐츠 출처(자체 제작 vs 공개 JLPT 리스트)가 아직 미정이라 구현 전에 논의 필요. 이번
     게이트 API를 쓰는 프런트엔드 화면은 아직 없다.
+
+## 2026-10-26
+
+- 이전 세션에서 로그를 남기지 못하고 넘어간 작업들: 캐릭터 아바타 꾸미기 백엔드/프런트엔드
+  구현(`docs/decisions/0008-avatar-customization.md`), `/pipeline` 커맨드를 삭제하고 그
+  역할을 `CLAUDE.md`의 Autonomous Git & Quality Verification Workflow로 통합, 테마 학습
+  콘텐츠(한자·단어·표현·예문) 데이터를 kanjiapi.dev·Tatoeba에서 1회성으로 가져와 Flyway에
+  심는 작업과 JLPT N1~N3 수준으로 교체(`docs/decisions/0012-theme-content-data-source.md`),
+  테마 학습 단계 게이트 프런트엔드(`ThemeLearningPage`) 최초 구현(콘텐츠는 placeholder),
+  프로필 화면 캐릭터/계정 탭 분리.
+- 테마 학습(섹션 5) "학습 중인 단어·표현마다 레벨(N3~N1) 화면 표시" 항목을
+  `feature/vibe-theme-stage-content-display` 브랜치로 구현했다. `ThemeLearningPage`가
+  단계가 바뀔 때마다 `GET /api/themes/{themeId}/stages/{stage}/content`를 호출해 한자(음독·
+  훈독·뜻)/단어·표현(표기·읽는 법·뜻)/예문(일본어 문장·번역)과 JLPT 레벨 배지를 렌더링하도록
+  바꿨다. 독해(READING)는 백엔드에 콘텐츠가 아직 없어(0012 문서 참고) placeholder를
+  유지한다.
+  - 검증: `npm run lint`(경고 1건 — useEffect 의존성 배열에 `theme` 전체를 넣어 해결),
+    `npm run test`(58개 전부 통과, 콘텐츠 렌더링/로딩/에러/READING 분기 테스트 추가),
+    `npm run build` 통과. `code-reviewer` 서브에이전트 리뷰 `REVIEW_PASSED`(경미한 비차단
+    제안 2건: advance 시 재조회를 직접 검증하는 테스트 부재, 리스트 key로 index 사용 — 둘 다
+    지금 범위에서는 반영하지 않음).
+  - 다음 할 일: 정답 게이트(3회 오답 시 힌트/정답 노출), 자유 순서 테마 진행, 종합 복습,
+    발음 체크 등 섹션 5의 남은 항목.
