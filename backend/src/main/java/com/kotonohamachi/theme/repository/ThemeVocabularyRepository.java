@@ -16,4 +16,13 @@ public interface ThemeVocabularyRepository extends JpaRepository<ThemeVocabulary
    * @return 표시 순서로 정렬된 단어·표현 목록
    */
   List<ThemeVocabulary> findAllByThemeIdAndStageOrderByDisplayOrder(Long themeId, ThemeStage stage);
+
+  /**
+   * 테마와 상관없이 특정 단계(단어 또는 표현)의 모든 항목을 조회한다. 객관식 보기를 만들 때 오답 후보 풀로
+   * 쓴다.
+   *
+   * @param stage {@link ThemeStage#WORD} 또는 {@link ThemeStage#EXPRESSION}
+   * @return 그 단계에 속한 모든 단어·표현 목록
+   */
+  List<ThemeVocabulary> findAllByStage(ThemeStage stage);
 }

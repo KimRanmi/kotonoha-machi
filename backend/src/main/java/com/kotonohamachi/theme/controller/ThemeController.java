@@ -3,6 +3,7 @@ package com.kotonohamachi.theme.controller;
 import com.kotonohamachi.auth.service.AuthPrincipal;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
+import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
 import com.kotonohamachi.theme.service.ThemeService;
 import com.kotonohamachi.user.User;
@@ -56,15 +57,15 @@ public class ThemeController {
   }
 
   /**
-   * 테마의 한 단계에 나오는 실제 콘텐츠(한자/단어/표현/예문)를 조회한다. 응답 목록의 항목 모양은 단계마다 다르다 —
-   * {@link ThemeService#getStageContent} 참고.
+   * 테마의 한 단계(한자/단어/표현/예문)에 나오는 항목들을 객관식 문제로 조회한다.
    *
    * @param themeId 조회할 테마 ID
    * @param stage 조회할 단계
-   * @return 단계에 맞는 콘텐츠 목록
+   * @return 단계에 맞는 객관식 문제 목록
    */
   @GetMapping("/api/themes/{themeId}/stages/{stage}/content")
-  public List<?> getStageContent(@PathVariable Long themeId, @PathVariable ThemeStage stage) {
+  public List<ThemeQuizItemResponse> getStageContent(
+      @PathVariable Long themeId, @PathVariable ThemeStage stage) {
     return themeService.getStageContent(themeId, stage);
   }
 }

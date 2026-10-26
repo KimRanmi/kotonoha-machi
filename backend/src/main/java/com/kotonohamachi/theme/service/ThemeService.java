@@ -8,11 +8,9 @@ import com.kotonohamachi.theme.ThemeKanji;
 import com.kotonohamachi.theme.ThemeProgress;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
-import com.kotonohamachi.theme.dto.ThemeExampleItemResponse;
-import com.kotonohamachi.theme.dto.ThemeKanjiItemResponse;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
+import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
-import com.kotonohamachi.theme.dto.ThemeVocabularyItemResponse;
 import com.kotonohamachi.theme.repository.ThemeExampleRepository;
 import com.kotonohamachi.theme.repository.ThemeKanjiRepository;
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
@@ -20,19 +18,25 @@ import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 테마 학습의 단계 진행 게이트(한자 → 단어 → 표현 → 예문 → 독해)와 단계별 실제 콘텐츠 조회를 처리한다.
- * 정답 채점은 이 작업의 범위가 아니다.
+ * 테마 학습의 단계 진행 게이트(한자 → 단어 → 표현 → 예문 → 독해)와 단계별 객관식 문제 생성을 처리한다. 문제는
+ * AI가 아니라 DB에 심어둔 실제 데이터로만 만든다 — 정답은 그 항목 자신의 뜻/번역이고, 오답 보기는 같은
+ * 단계의 다른 항목들(테마 상관없이 전체) 중에서 무작위로 고른다.
  */
 @Service
 public class ThemeService {
+
+  private static final int MAX_OPTIONS = 4;
 
   private final ThemeRepository themeRepository;
   private final ThemeProgressRepository themeProgressRepository;
@@ -112,58 +116,83 @@ public class ThemeService {
   }
 
   /**
-   * 테마의 한 단계에 나오는 실제 콘텐츠를 조회한다. 콘텐츠는 AI가 생성하지 않고 미리 DB에 심어둔 실제
-   * 단어 데이터다. 단계별로 반환되는 목록의 항목 타입이 다르다: {@link ThemeStage#KANJI}는 {@link
-   * ThemeKanjiItemResponse}, {@link ThemeStage#WORD}·{@link ThemeStage#EXPRESSION}은 {@link
-   * ThemeVocabularyItemResponse}, {@link ThemeStage#EXAMPLE}은 {@link ThemeExampleItemResponse}다.
-   * {@link ThemeStage#READING}은 아직 콘텐츠가 설계되지 않아 예외를 던진다.
+   * 테마의 한 단계에 나오는 항목들을 객관식 문제로 만들어 조회한다. {@link ThemeStage#KANJI}는 한자
+   * 글자가 문제, {@link ThemeStage#WORD}·{@link ThemeStage#EXPRESSION}은 단어·표현 표기가 문제,
+   * {@link ThemeStage#EXAMPLE}은 예문 문장이 문제이고, 정답은 각각의 뜻·번역이다. {@link
+   * ThemeStage#READING}은 아직 콘텐츠가 설계되지 않아 예외를 던진다.
    *
    * @param themeId 조회할 테마 ID
    * @param stage 조회할 단계
-   * @return 단계에 맞는 콘텐츠 목록
+   * @return 단계에 맞는 객관식 문제 목록
    */
   @Transactional(readOnly = true)
-  public List<?> getStageContent(Long themeId, ThemeStage stage) {
+  public List<ThemeQuizItemResponse> getStageContent(Long themeId, ThemeStage stage) {
     findThemeOrThrow(themeId);
 
     return switch (stage) {
-      case KANJI -> toKanjiItems(themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
+      case KANJI ->
+        toKanjiQuizItems(themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
       case WORD, EXPRESSION ->
-        toVocabularyItems(
-            themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(themeId, stage));
+        toVocabularyQuizItems(
+            themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(themeId, stage),
+            stage);
       case EXAMPLE ->
-        toExampleItems(themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
+        toExampleQuizItems(themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
       case READING -> throw new ApiException(ThemeErrorCode.STAGE_CONTENT_NOT_AVAILABLE);
     };
   }
 
-  private List<ThemeKanjiItemResponse> toKanjiItems(List<ThemeKanji> kanjiList) {
+  private List<ThemeQuizItemResponse> toKanjiQuizItems(List<ThemeKanji> kanjiList) {
+    List<String> answerPool =
+        themeKanjiRepository.findAll().stream().map(ThemeKanji::getMeaning).toList();
     return kanjiList.stream()
-        .map(kanji -> new ThemeKanjiItemResponse(
-            kanji.getKanji(),
-            kanji.getOnReading(),
-            kanji.getKunReading(),
-            kanji.getMeaning(),
-            kanji.getJlptLevel()))
+        .map(kanji ->
+            toQuizItem(kanji.getKanji(), kanji.getMeaning(), answerPool, kanji.getJlptLevel()))
         .toList();
   }
 
-  private List<ThemeVocabularyItemResponse> toVocabularyItems(
-      List<ThemeVocabulary> vocabularyList) {
+  private List<ThemeQuizItemResponse> toVocabularyQuizItems(
+      List<ThemeVocabulary> vocabularyList, ThemeStage stage) {
+    List<String> answerPool = themeVocabularyRepository.findAllByStage(stage).stream()
+        .map(ThemeVocabulary::getMeaning)
+        .toList();
     return vocabularyList.stream()
-        .map(vocabulary -> new ThemeVocabularyItemResponse(
+        .map(vocabulary -> toQuizItem(
             vocabulary.getSurfaceForm(),
-            vocabulary.getReading(),
             vocabulary.getMeaning(),
+            answerPool,
             vocabulary.getJlptLevel()))
         .toList();
   }
 
-  private List<ThemeExampleItemResponse> toExampleItems(List<ThemeExample> exampleList) {
+  private List<ThemeQuizItemResponse> toExampleQuizItems(List<ThemeExample> exampleList) {
+    List<String> answerPool = themeExampleRepository.findAll().stream()
+        .map(ThemeExample::getTranslation)
+        .toList();
     return exampleList.stream()
         .map(example ->
-            new ThemeExampleItemResponse(example.getJapaneseSentence(), example.getTranslation()))
+            toQuizItem(example.getJapaneseSentence(), example.getTranslation(), answerPool, null))
         .toList();
+  }
+
+  /**
+   * 문제 하나를 만든다. 정답 보기 풀({@code answerPool})에서 이 항목의 정답과 다른 값을 최대 {@value
+   * #MAX_OPTIONS}-1개 무작위로 골라 오답으로 섞는다. 풀에 다른 값이 부족하면 보기가 그만큼 적게 나온다.
+   */
+  private ThemeQuizItemResponse toQuizItem(
+      String prompt, String correctAnswer, List<String> answerPool, Integer jlptLevel) {
+    List<String> distractors = answerPool.stream()
+        .filter(candidate -> !candidate.equals(correctAnswer))
+        .distinct()
+        .collect(Collectors.toCollection(ArrayList::new));
+    Collections.shuffle(distractors, ThreadLocalRandom.current());
+
+    List<String> options = new ArrayList<>();
+    options.add(correctAnswer);
+    options.addAll(distractors.subList(0, Math.min(MAX_OPTIONS - 1, distractors.size())));
+    Collections.shuffle(options, ThreadLocalRandom.current());
+
+    return new ThemeQuizItemResponse(prompt, options, correctAnswer, jlptLevel);
   }
 
   private Theme findThemeOrThrow(Long themeId) {

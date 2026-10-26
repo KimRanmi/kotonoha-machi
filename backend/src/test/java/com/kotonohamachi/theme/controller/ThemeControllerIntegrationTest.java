@@ -239,8 +239,9 @@ class ThemeControllerIntegrationTest {
     mockMvc
         .perform(get("/api/themes/" + themeId + "/stages/KANJI/content").session(session))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].kanji").value("混"))
-        .andExpect(jsonPath("$[0].meaning").value("섞다, 혼합되다"))
+        .andExpect(jsonPath("$[0].prompt").value("混"))
+        .andExpect(jsonPath("$[0].correctAnswer").value("섞다, 혼합되다"))
+        .andExpect(jsonPath("$[0].options").isArray())
         .andExpect(jsonPath("$[0].jlptLevel").value(2));
   }
 
@@ -252,8 +253,8 @@ class ThemeControllerIntegrationTest {
     mockMvc
         .perform(get("/api/themes/" + themeId + "/stages/EXAMPLE/content").session(session))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].japaneseSentence").exists())
-        .andExpect(jsonPath("$[0].translation").exists());
+        .andExpect(jsonPath("$[0].prompt").exists())
+        .andExpect(jsonPath("$[0].correctAnswer").exists());
   }
 
   @Test

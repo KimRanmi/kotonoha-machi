@@ -12,11 +12,9 @@ import com.kotonohamachi.theme.ThemeKanji;
 import com.kotonohamachi.theme.ThemeProgress;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
-import com.kotonohamachi.theme.dto.ThemeExampleItemResponse;
-import com.kotonohamachi.theme.dto.ThemeKanjiItemResponse;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
+import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
-import com.kotonohamachi.theme.dto.ThemeVocabularyItemResponse;
 import com.kotonohamachi.theme.repository.ThemeExampleRepository;
 import com.kotonohamachi.theme.repository.ThemeKanjiRepository;
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
@@ -152,44 +150,61 @@ class ThemeServiceTest {
   }
 
   @Test
-  void getStageContent_KANJI_단계는_한자_목록을_반환한다() {
+  void getStageContent_KANJI_단계는_정답을_포함한_보기_목록을_반환한다() {
     Theme theme = new Theme("카페에서 주문하기");
+    ThemeKanji target = new ThemeKanji(theme, "混", "コン", "ま.じる", "혼잡", 2, 1);
+    ThemeKanji other = new ThemeKanji(theme, "雑", "ザツ", "まじ.る", "뒤섞임", 2, 2);
     when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
-    when(themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(1L))
-        .thenReturn(List.of(new ThemeKanji(theme, "水", "スイ", "みず", "물", 5, 1)));
+    when(themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(1L)).thenReturn(List.of(target));
+    when(themeKanjiRepository.findAll()).thenReturn(List.of(target, other));
 
-    List<?> content = themeService.getStageContent(1L, ThemeStage.KANJI);
+    List<ThemeQuizItemResponse> content = themeService.getStageContent(1L, ThemeStage.KANJI);
 
     assertThat(content).hasSize(1);
-    assertThat(content.get(0)).isEqualTo(new ThemeKanjiItemResponse("水", "スイ", "みず", "물", 5));
+    ThemeQuizItemResponse item = content.get(0);
+    assertThat(item.prompt()).isEqualTo("混");
+    assertThat(item.correctAnswer()).isEqualTo("혼잡");
+    assertThat(item.options()).contains("혼잡", "뒤섞임");
+    assertThat(item.jlptLevel()).isEqualTo(2);
   }
 
   @Test
-  void getStageContent_WORD_단계는_단어_목록을_반환한다() {
+  void getStageContent_WORD_단계는_오답_보기가_부족하면_정답만_반환한다() {
     Theme theme = new Theme("카페에서 주문하기");
+    ThemeVocabulary target = new ThemeVocabulary(theme, ThemeStage.WORD, "注文", "ちゅうもん", "주문", 4, 1);
     when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
     when(themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(1L, ThemeStage.WORD))
-        .thenReturn(
-            List.of(new ThemeVocabulary(theme, ThemeStage.WORD, "注文", "ちゅうもん", "주문", 4, 1)));
+        .thenReturn(List.of(target));
+    when(themeVocabularyRepository.findAllByStage(ThemeStage.WORD)).thenReturn(List.of(target));
 
-    List<?> content = themeService.getStageContent(1L, ThemeStage.WORD);
+    List<ThemeQuizItemResponse> content = themeService.getStageContent(1L, ThemeStage.WORD);
 
     assertThat(content).hasSize(1);
-    assertThat(content.get(0)).isEqualTo(new ThemeVocabularyItemResponse("注文", "ちゅうもん", "주문", 4));
+    ThemeQuizItemResponse item = content.get(0);
+    assertThat(item.prompt()).isEqualTo("注文");
+    assertThat(item.correctAnswer()).isEqualTo("주문");
+    assertThat(item.options()).containsExactly("주문");
+    assertThat(item.jlptLevel()).isEqualTo(4);
   }
 
   @Test
-  void getStageContent_EXAMPLE_단계는_예문_목록을_반환한다() {
+  void getStageContent_EXAMPLE_단계는_번역을_정답으로_한_보기_목록을_반환한다() {
     Theme theme = new Theme("카페에서 주문하기");
+    ThemeExample target = new ThemeExample(theme, "彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다.", 1);
+    ThemeExample other = new ThemeExample(theme, "道に迷いました。", "길을 잃었습니다.", 2);
     when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
     when(themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(1L))
-        .thenReturn(List.of(new ThemeExample(theme, "彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다.", 1)));
+        .thenReturn(List.of(target));
+    when(themeExampleRepository.findAll()).thenReturn(List.of(target, other));
 
-    List<?> content = themeService.getStageContent(1L, ThemeStage.EXAMPLE);
+    List<ThemeQuizItemResponse> content = themeService.getStageContent(1L, ThemeStage.EXAMPLE);
 
     assertThat(content).hasSize(1);
-    assertThat(content.get(0))
-        .isEqualTo(new ThemeExampleItemResponse("彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다."));
+    ThemeQuizItemResponse item = content.get(0);
+    assertThat(item.prompt()).isEqualTo("彼女は紅茶を注文した。");
+    assertThat(item.correctAnswer()).isEqualTo("그녀는 차 한 잔을 주문했다.");
+    assertThat(item.options()).contains("그녀는 차 한 잔을 주문했다.", "길을 잃었습니다.");
+    assertThat(item.jlptLevel()).isNull();
   }
 
   @Test
