@@ -7,9 +7,10 @@ import ThemeLearningPage from './ThemeLearningPage';
 vi.mock('../api/theme', () => ({
   getThemes: vi.fn(),
   completeStage: vi.fn(),
+  getStageContent: vi.fn(),
 }));
 
-import { completeStage, getThemes, type Theme } from '../api/theme';
+import { completeStage, getStageContent, getThemes, type Theme } from '../api/theme';
 
 function renderPage(themeId = '11') {
   render(
@@ -32,6 +33,8 @@ describe('ThemeLearningPage', () => {
   beforeEach(() => {
     vi.mocked(getThemes).mockReset();
     vi.mocked(completeStage).mockReset();
+    vi.mocked(getStageContent).mockReset();
+    vi.mocked(getStageContent).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -52,19 +55,49 @@ describe('ThemeLearningPage', () => {
     expect(await screen.findByText('테마를 불러오지 못했습니다.')).toBeInTheDocument();
   });
 
-  it('정상 조회 시 현재 단계가 강조된 스텝 인디케이터와 콘텐츠 준비 중 문구를 보여준다', async () => {
+  it('정상 조회 시 현재 단계가 강조된 스텝 인디케이터를 보여준다', async () => {
     vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
     renderPage();
 
-    expect(await screen.findByText('콘텐츠 준비 중입니다.')).toBeInTheDocument();
-
-    const kanjiStep = screen.getByText('한자');
+    const kanjiStep = await screen.findByText('한자');
     const wordStep = screen.getByText('단어');
     const expressionStep = screen.getByText('표현');
 
     expect(kanjiStep).toHaveAttribute('data-active', 'true');
     expect(wordStep).toHaveAttribute('data-active', 'true');
     expect(expressionStep).toHaveAttribute('data-active', 'false');
+  });
+
+  it('현재 단계의 실제 콘텐츠와 JLPT 레벨을 보여준다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
+    vi.mocked(getStageContent).mockResolvedValue([
+      { surfaceForm: '混雑', reading: 'こんざつ', meaning: '혼잡함', jlptLevel: 2 },
+    ]);
+    renderPage();
+
+    expect(await screen.findByText('混雑')).toBeInTheDocument();
+    expect(screen.getByText('こんざつ')).toBeInTheDocument();
+    expect(screen.getByText('혼잡함')).toBeInTheDocument();
+    expect(screen.getByText('N2')).toBeInTheDocument();
+    expect(getStageContent).toHaveBeenCalledWith(11, 'WORD');
+  });
+
+  it('콘텐츠 조회가 실패하면 에러 메시지를 보여준다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([WEATHER_THEME]);
+    vi.mocked(getStageContent).mockRejectedValue(
+      new ApiError(500, '콘텐츠를 불러오지 못했습니다.'),
+    );
+    renderPage();
+
+    expect(await screen.findByText('콘텐츠를 불러오지 못했습니다.')).toBeInTheDocument();
+  });
+
+  it('독해(READING) 단계는 콘텐츠 API를 호출하지 않고 준비 중 문구를 보여준다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'READING' }]);
+    renderPage();
+
+    expect(await screen.findByText('콘텐츠 준비 중입니다.')).toBeInTheDocument();
+    expect(getStageContent).not.toHaveBeenCalled();
   });
 
   it('힌트 버튼은 항상 disabled 상태다', async () => {
