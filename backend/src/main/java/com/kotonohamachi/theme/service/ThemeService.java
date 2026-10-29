@@ -155,14 +155,15 @@ public class ThemeService {
   }
 
   /**
-   * 테마의 한 단계에 나오는 항목들을 객관식 문제로 만들어 조회한다. {@link ThemeStage#KANJI}는 한자
-   * 글자가 문제, {@link ThemeStage#WORD}·{@link ThemeStage#EXPRESSION}은 단어·표현 표기가 문제,
-   * {@link ThemeStage#EXAMPLE}은 예문 문장이, {@link ThemeStage#READING}은 지문 문장이 문제이고, 정답은
-   * 각각의 뜻·번역이다.
+   * 테마의 한 단계에 나오는 항목들을 조회한다. {@link ThemeStage#KANJI}는 한자 글자가 문제, {@link
+   * ThemeStage#WORD}·{@link ThemeStage#EXPRESSION}은 단어·표현 표기가 문제, {@link ThemeStage#EXAMPLE}은
+   * 예문 문장이, {@link ThemeStage#READING}은 지문 문장이 문제이고, 정답은 각각의 뜻·번역인 객관식이다.
+   * {@link ThemeStage#REVIEW}는 객관식이 아니라, 이 테마에서 배운 한자·단어·표현·예문을 전부 모아 소리 내어
+   * 따라 읽는 말하기 연습 목록이다.
    *
    * @param themeId 조회할 테마 ID
    * @param stage 조회할 단계
-   * @return 단계에 맞는 객관식 문제 목록
+   * @return 단계에 맞는 콘텐츠 목록
    */
   @Transactional(readOnly = true)
   public List<ThemeQuizItemResponse> getStageContent(Long themeId, ThemeStage stage) {
@@ -180,6 +181,7 @@ public class ThemeService {
       case READING ->
         toReadingQuizItems(
             themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
+      case REVIEW -> toReviewItems(themeId);
     };
   }
 
@@ -204,6 +206,36 @@ public class ThemeService {
             answerPool,
             vocabulary.getJlptLevel()))
         .toList();
+  }
+
+  /**
+   * REVIEW 단계의 말하기 연습 목록을 만든다. 이 테마의 한자 → 단어 → 표현 → 예문을 그 순서 그대로 모아, 각 항목의
+   * 일본어 표기 자체를 소리 내어 읽는 항목으로 바꾼다.
+   */
+  private List<ThemeQuizItemResponse> toReviewItems(Long themeId) {
+    List<ThemeQuizItemResponse> items = new ArrayList<>();
+    themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(themeId).stream()
+        .map(kanji -> toReadAloudItem(kanji.getKanji(), kanji.getJlptLevel()))
+        .forEach(items::add);
+    themeVocabularyRepository
+        .findAllByThemeIdAndStageOrderByDisplayOrder(themeId, ThemeStage.WORD)
+        .stream()
+        .map(vocabulary -> toReadAloudItem(vocabulary.getSurfaceForm(), vocabulary.getJlptLevel()))
+        .forEach(items::add);
+    themeVocabularyRepository
+        .findAllByThemeIdAndStageOrderByDisplayOrder(themeId, ThemeStage.EXPRESSION)
+        .stream()
+        .map(vocabulary -> toReadAloudItem(vocabulary.getSurfaceForm(), vocabulary.getJlptLevel()))
+        .forEach(items::add);
+    themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(themeId).stream()
+        .map(example -> toReadAloudItem(example.getJapaneseSentence(), null))
+        .forEach(items::add);
+    return items;
+  }
+
+  /** 말하기 연습 항목 하나를 만든다. 선택지가 없고, 정답은 읽어야 할 문구 자신이다. */
+  private ThemeQuizItemResponse toReadAloudItem(String text, Integer jlptLevel) {
+    return new ThemeQuizItemResponse(text, List.of(), text, jlptLevel);
   }
 
   private List<ThemeQuizItemResponse> toExampleQuizItems(List<ThemeExample> exampleList) {

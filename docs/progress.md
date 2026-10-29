@@ -234,3 +234,31 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 다음 할 일: 독해 코퍼스 출처는 여전히 미정으로 보류 중. 섹션 5의 남은 항목(종합 복습,
     학습 진행 상황 서버 저장 — 이미 `ThemeProgress`로 저장되고 있어 재검토 필요, 발음
     체크)을 계속 진행한다.
+- 섹션 5의 남은 두 항목(종합 복습, 발음 체크)을 사용자와 상의해 하나로 합쳐 구현했다 — 테마의
+  마지막 라운드를 "배운 표현을 소리 내어 따라 읽는 발음 체크"로 만들면 두 요구사항을 동시에
+  만족한다는 제안을 사용자가 승인했다. 같은 브랜치에서 계속 작업했다.
+  - 설계 확인(2건, 사용자 승인): ① 이 라운드를 `ThemeStage`에 `REVIEW`라는 6번째 단계로
+    추가해 기존 게이트 구조에 그대로 편입시킬지(승인) vs 완료 후 비필수 보너스로 둘지 →
+    REVIEW 추가로 결정. ② 따라 읽을 콘텐츠 범위를 단어+표현만으로 좁힐지 vs 한자·단어·
+    표현·예문 전부로 할지 → 전부로 결정.
+  - 백엔드: `ThemeStage`에 `REVIEW`를 추가해 READING 다음 마지막 단계로 삼았다(이제 REVIEW를
+    끝내야 테마가 `completed`된다). `ThemeService.getStageContent`의 REVIEW 분기가 테마의
+    한자·단어(WORD)·표현(EXPRESSION)·예문을 순서대로 모아 `ThemeQuizItemResponse`로 돌려주는데,
+    REVIEW는 선택지(`options`)가 항상 빈 목록이고 `correctAnswer`가 뜻이 아니라 `prompt`와
+    같은 값(음성 인식 결과와 비교할 기준 문자열)이라는 점이 다른 단계와 다르다 — 새 DTO를
+    만들지 않고 기존 `ThemeQuizItemResponse`를 이 용도로 재사용했다(Javadoc에 명시).
+  - 프런트엔드: `lib/speechRecognition.ts`(신규)가 Web Speech API(`SpeechRecognition`/
+    `webkitSpeechRecognition`, 표준 TS DOM 타입에 없어 최소한의 타입을 직접 선언)를 감싸
+    일본어(`ja-JP`) 음성 한 번을 텍스트로 바꿔준다. `ThemeLearningPage`는 REVIEW 단계일 때
+    기존 선택지 버튼 목록 대신 "🎤 말하기" 버튼을 보여주고, 인식된 텍스트와 정답(공백만
+    제거하고 비교)이 맞으면 기존 정답 처리 흐름(다음 문제/완료 버튼)을 그대로 재사용한다.
+    음성 인식을 지원하지 않는 브라우저에서는 안내 문구를 보여주고 버튼을 비활성화한다.
+  - 검증: 백엔드 `./gradlew spotlessApply test`(전체 통과 — 기존 "READING까지 끝내면 완료"
+    테스트를 "READING은 REVIEW로 넘어감 + REVIEW까지 끝내면 완료" 2개로 나누고, REVIEW 콘텐츠
+    테스트를 단위/통합 양쪽에 추가). 프런트엔드 `npx prettier --write .`/`npm run lint`/
+    `npm run test`(66개, REVIEW 단계 렌더링·정답/오답·음성 인식 실패·브라우저 미지원 케이스
+    5개 추가)/`npm run build` 통과.
+  - 알려진 한계: Web Speech API가 Chrome 계열에서만 안정적으로 동작해, 다른 브라우저
+    사용자는 이 라운드를 진행할 방법이 없다(텍스트 대체 입력 등 미구현, 다음에 재검토).
+  - 다음 할 일: 독해 코퍼스 출처 결정은 여전히 보류 중. 섹션 5 체크리스트가 전부
+    끝나(독해 RAG 제외) 섹션 6(주민과의 대화) 등 다른 기능으로 넘어갈 수 있다.

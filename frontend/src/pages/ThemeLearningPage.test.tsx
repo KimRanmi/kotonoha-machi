@@ -10,7 +10,13 @@ vi.mock('../api/theme', () => ({
   getStageContent: vi.fn(),
 }));
 
+vi.mock('../lib/speechRecognition', () => ({
+  isSpeechRecognitionSupported: vi.fn(),
+  recognizeJapaneseSpeech: vi.fn(),
+}));
+
 import { completeStage, getStageContent, getThemes, type QuizItem, type Theme } from '../api/theme';
+import { isSpeechRecognitionSupported, recognizeJapaneseSpeech } from '../lib/speechRecognition';
 
 function renderPage(themeId = '11') {
   render(
@@ -53,12 +59,22 @@ const READING_QUIZ_ITEM: QuizItem = {
   jlptLevel: 3,
 };
 
+const REVIEW_QUIZ_ITEM: QuizItem = {
+  prompt: '混雑',
+  options: [],
+  correctAnswer: '混雑',
+  jlptLevel: 2,
+};
+
 describe('ThemeLearningPage', () => {
   beforeEach(() => {
     vi.mocked(getThemes).mockReset();
     vi.mocked(completeStage).mockReset();
     vi.mocked(getStageContent).mockReset();
     vi.mocked(getStageContent).mockResolvedValue([]);
+    vi.mocked(isSpeechRecognitionSupported).mockReset();
+    vi.mocked(isSpeechRecognitionSupported).mockReturnValue(true);
+    vi.mocked(recognizeJapaneseSpeech).mockReset();
   });
 
   afterEach(() => {
@@ -268,5 +284,67 @@ describe('ThemeLearningPage', () => {
     const backLink = screen.getByRole('link', { name: '마을로 돌아가기' });
     expect(backLink).toHaveAttribute('href', '/town');
     expect(screen.queryByRole('button', { name: '다음' })).not.toBeInTheDocument();
+  });
+
+  it('복습(REVIEW) 단계는 선택지 버튼 대신 말하기 버튼을 보여준다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
+    vi.mocked(getStageContent).mockResolvedValue([REVIEW_QUIZ_ITEM]);
+    renderPage();
+
+    expect(await screen.findByText('混雑')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '🎤 말하기' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '혼잡함' })).not.toBeInTheDocument();
+    expect(getStageContent).toHaveBeenCalledWith(11, 'REVIEW');
+  });
+
+  it('따라 말한 내용이 정답과 일치하면 정답 처리되고 완료 버튼이 나타난다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
+    vi.mocked(getStageContent).mockResolvedValue([REVIEW_QUIZ_ITEM]);
+    vi.mocked(recognizeJapaneseSpeech).mockResolvedValue('混雑');
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '🎤 말하기' }));
+
+    expect(await screen.findByText('정답입니다!')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '완료' })).toBeInTheDocument();
+  });
+
+  it('따라 말한 내용이 다르게 인식되면 다시 말해보라는 안내를 보여준다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
+    vi.mocked(getStageContent).mockResolvedValue([REVIEW_QUIZ_ITEM]);
+    vi.mocked(recognizeJapaneseSpeech).mockResolvedValue('전혀 다른 말');
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '🎤 말하기' }));
+
+    expect(await screen.findByText('다르게 들렸습니다. 다시 말해보세요.')).toBeInTheDocument();
+  });
+
+  it('음성 인식 자체가 실패하면 에러 메시지를 보여준다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
+    vi.mocked(getStageContent).mockResolvedValue([REVIEW_QUIZ_ITEM]);
+    vi.mocked(recognizeJapaneseSpeech).mockRejectedValue(
+      new Error('음성을 인식하지 못했습니다. 다시 시도해주세요.'),
+    );
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '🎤 말하기' }));
+
+    expect(
+      await screen.findByText('음성을 인식하지 못했습니다. 다시 시도해주세요.'),
+    ).toBeInTheDocument();
+  });
+
+  it('음성 인식을 지원하지 않는 브라우저에서는 안내 문구를 보여주고 말하기 버튼을 비활성화한다', async () => {
+    vi.mocked(isSpeechRecognitionSupported).mockReturnValue(false);
+    vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
+    vi.mocked(getStageContent).mockResolvedValue([REVIEW_QUIZ_ITEM]);
+    renderPage();
+
+    await screen.findByText('混雑');
+    expect(
+      screen.getByText('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 이용해주세요.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '🎤 말하기' })).toBeDisabled();
   });
 });

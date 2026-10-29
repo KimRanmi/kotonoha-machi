@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
+import { isSpeechRecognitionSupported, recognizeJapaneseSpeech } from '../lib/speechRecognition';
 import {
   completeStage,
   getStageContent,
@@ -11,7 +12,7 @@ import {
 } from '../api/theme';
 import styles from './ThemeLearningPage.module.css';
 
-const STAGE_ORDER: ThemeStage[] = ['KANJI', 'WORD', 'EXPRESSION', 'EXAMPLE', 'READING'];
+const STAGE_ORDER: ThemeStage[] = ['KANJI', 'WORD', 'EXPRESSION', 'EXAMPLE', 'READING', 'REVIEW'];
 const MAX_WRONG_ATTEMPTS = 3;
 
 const STAGE_LABELS: Record<ThemeStage, string> = {
@@ -20,7 +21,13 @@ const STAGE_LABELS: Record<ThemeStage, string> = {
   EXPRESSION: '표현',
   EXAMPLE: '예문',
   READING: '독해',
+  REVIEW: '복습',
 };
+
+/** 음성 인식 결과와 정답 문구를 비교하기 전에 공백 차이를 무시하도록 정리한다. */
+function normalizeForSpeechComparison(text: string): string {
+  return text.replace(/\s+/g, '').trim();
+}
 
 function ThemeLearningPage() {
   const { themeId } = useParams<{ themeId: string }>();
@@ -39,6 +46,8 @@ function ThemeLearningPage() {
   const [wrongCount, setWrongCount] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
   const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [speechErrorMessage, setSpeechErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +100,8 @@ function ThemeLearningPage() {
           setWrongCount(0);
           setIsRevealed(false);
           setFeedback(null);
+          setIsListening(false);
+          setSpeechErrorMessage(null);
         }
       })
       .catch((error: unknown) => {
@@ -143,6 +154,29 @@ function ThemeLearningPage() {
     setWrongCount(0);
     setIsRevealed(false);
     setFeedback(null);
+    setSpeechErrorMessage(null);
+  }
+
+  function handleStartListening() {
+    if (!currentQuizItem || feedback === 'correct' || isListening) {
+      return;
+    }
+
+    setSpeechErrorMessage(null);
+    setIsListening(true);
+
+    recognizeJapaneseSpeech()
+      .then((transcript) => {
+        setIsListening(false);
+        const isMatch =
+          normalizeForSpeechComparison(transcript) ===
+          normalizeForSpeechComparison(currentQuizItem.correctAnswer);
+        setFeedback(isMatch ? 'correct' : 'incorrect');
+      })
+      .catch((error: unknown) => {
+        setIsListening(false);
+        setSpeechErrorMessage(error instanceof Error ? error.message : '음성 인식에 실패했습니다.');
+      });
   }
 
   async function handleAdvance() {
@@ -198,6 +232,8 @@ function ThemeLearningPage() {
   }
 
   const currentStageIndex = STAGE_ORDER.indexOf(theme.currentStage);
+  const isReviewStage = theme.currentStage === 'REVIEW';
+  const speechSupported = isSpeechRecognitionSupported();
 
   return (
     <main className={styles.page}>
@@ -238,36 +274,62 @@ function ThemeLearningPage() {
               )}
               <p className={styles.prompt}>{currentQuizItem.prompt}</p>
 
-              <div className={styles.optionList}>
-                {currentQuizItem.options.map((option) => {
-                  const isCorrectOption = option === currentQuizItem.correctAnswer;
-                  const variant =
-                    feedback === 'correct' && isCorrectOption
-                      ? 'correct'
-                      : isRevealed && isCorrectOption
-                        ? 'hint'
-                        : undefined;
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      className={styles.optionButton}
-                      data-variant={variant}
-                      disabled={feedback === 'correct'}
-                      onClick={() => handleSelectOption(option)}
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
-              </div>
+              {isReviewStage ? (
+                <div className={styles.speechPractice}>
+                  <button
+                    type="button"
+                    className={styles.speakButton}
+                    disabled={!speechSupported || isListening || feedback === 'correct'}
+                    onClick={handleStartListening}
+                  >
+                    {isListening ? '듣고 있어요…' : '🎤 말하기'}
+                  </button>
+                  {!speechSupported && (
+                    <p className={styles.error} role="alert">
+                      이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 이용해주세요.
+                    </p>
+                  )}
+                  {speechErrorMessage && (
+                    <p className={styles.quizFeedbackIncorrect}>{speechErrorMessage}</p>
+                  )}
+                  {feedback === 'incorrect' && (
+                    <p className={styles.quizFeedbackIncorrect}>
+                      다르게 들렸습니다. 다시 말해보세요.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.optionList}>
+                  {currentQuizItem.options.map((option) => {
+                    const isCorrectOption = option === currentQuizItem.correctAnswer;
+                    const variant =
+                      feedback === 'correct' && isCorrectOption
+                        ? 'correct'
+                        : isRevealed && isCorrectOption
+                          ? 'hint'
+                          : undefined;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        className={styles.optionButton}
+                        data-variant={variant}
+                        disabled={feedback === 'correct'}
+                        onClick={() => handleSelectOption(option)}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-              {feedback === 'incorrect' && !isRevealed && (
+              {!isReviewStage && feedback === 'incorrect' && !isRevealed && (
                 <p className={styles.quizFeedbackIncorrect}>
                   틀렸습니다. 다시 선택해보세요. ({wrongCount}/{MAX_WRONG_ATTEMPTS})
                 </p>
               )}
-              {isRevealed && feedback !== 'correct' && (
+              {!isReviewStage && isRevealed && feedback !== 'correct' && (
                 <p className={styles.quizFeedbackHint}>
                   정답은 "{currentQuizItem.correctAnswer}"입니다. 위에서 정답을 선택해주세요.
                 </p>
