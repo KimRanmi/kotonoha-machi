@@ -211,3 +211,26 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 다음 할 일: 독해 지문 코퍼스 출처 결정(별도 결정 문서), pgvector 확장 추가, Gemini API
     클라이언트 구축 — 이 세 가지가 정리되면 지금의 임시 데이터 연결을 실제 RAG 방식으로
     교체한다.
+
+## 2026-10-29
+
+- 독해 지문 코퍼스 출처를 조사했으나 적당한 공개 데이터셋을 찾지 못했다(OpenJLPT 등은
+  어휘·한자 리스트뿐이고, Tadoku Supporters는 레벨별 자료는 있지만 재사용 라이선스가
+  명시돼 있지 않았다). 사용자와 확인해 이 항목은 당장 결정하지 않고 보류하기로 했다 —
+  독해(READING) RAG 작업은 계속 막혀 있다.
+- 대신 섹션 5의 다른 미구현 항목 중 요구사항이 이미 확정돼 있고 막힌 선행 조건이 없는
+  두 가지를 `feature/vibe-theme-stage-content-display` 브랜치에서 구현했다.
+  - **테마 자유 순서 진행**: 코드를 확인해보니 `ThemeProgress`가 테마별로 완전히 독립된
+    진행 상태라 이미 자유 순서가 보장돼 있었다 — 추가 구현 없이 체크리스트만 갱신했다.
+  - **"오늘의 학습" 배너 하루 1회 제한**: `GET /api/themes/today-recommendation`을
+    추가했다. `ThemeService.getTodayRecommendedTheme`이 사용자의 `ThemeProgress` 중
+    오늘(한국 시간, `Asia/Seoul`) 완료된 게 있으면 빈 값(204)을, 없으면 미완료 테마 중
+    하나를 돌려준다. "오늘"은 별도 컬럼 없이 기존 `updated_at`으로 판단한다(요구사항
+    확정 방식). 프런트엔드 `TownPage`는 기존에 쓰던 `getThemes().find(!completed)`(항상
+    아무 미완료 테마나 추천)를 이 새 엔드포인트 호출로 교체했다.
+  - 검증: 백엔드 `./gradlew spotlessApply test`(전체 통과, 기존 `ThemeServiceTest`는 수정
+    없이 통과). 프런트엔드 `npx prettier --write .`/`npm run lint`/`npm run test`(61개,
+    `TownPage.test.tsx`를 새 API에 맞게 갱신)/`npm run build` 통과.
+  - 다음 할 일: 독해 코퍼스 출처는 여전히 미정으로 보류 중. 섹션 5의 남은 항목(종합 복습,
+    학습 진행 상황 서버 저장 — 이미 `ThemeProgress`로 저장되고 있어 재검토 필요, 발음
+    체크)을 계속 진행한다.

@@ -8,6 +8,7 @@ import com.kotonohamachi.theme.dto.ThemeResponse;
 import com.kotonohamachi.theme.service.ThemeService;
 import com.kotonohamachi.user.User;
 import java.util.List;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +40,22 @@ public class ThemeController {
   public List<ThemeResponse> getThemes(Authentication authentication) {
     User user = AuthPrincipal.resolve(authentication);
     return themeService.getThemes(user.getId());
+  }
+
+  /**
+   * "오늘의 학습" 배너에 추천할 테마를 조회한다. 오늘(한국 시간) 안에 테마를 하나라도 완료했으면 추천할 테마가
+   * 없다(204 No Content).
+   *
+   * @param authentication 현재 요청의 인증 정보
+   * @return 추천할 테마(없으면 204 No Content)
+   */
+  @GetMapping("/api/themes/today-recommendation")
+  public ResponseEntity<ThemeResponse> getTodayRecommendation(Authentication authentication) {
+    User user = AuthPrincipal.resolve(authentication);
+    return themeService
+        .getTodayRecommendedTheme(user.getId())
+        .map(ResponseEntity::ok)
+        .orElseGet(() -> ResponseEntity.noContent().build());
   }
 
   /**

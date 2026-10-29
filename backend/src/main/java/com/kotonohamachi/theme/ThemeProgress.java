@@ -134,4 +134,14 @@ public class ThemeProgress {
   public boolean isCompleted() {
     return completed;
   }
+
+  /**
+   * 마지막으로 단계가 완료 처리된 시각을 반환한다. "오늘의 학습" 배너가 오늘 이미 테마를 완료했는지 판단하는 데
+   * 쓰인다.
+   *
+   * @return 마지막 수정 시각
+   */
+  public OffsetDateTime getUpdatedAt() {
+    return updatedAt;
+  }
 }
