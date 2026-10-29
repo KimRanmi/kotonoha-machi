@@ -1,6 +1,6 @@
 import { apiFetch } from './client';
 
-export type ThemeStage = 'KANJI' | 'WORD' | 'EXPRESSION' | 'EXAMPLE' | 'READING';
+export type ThemeStage = 'KANJI' | 'WORD' | 'EXPRESSION' | 'EXAMPLE' | 'READING' | 'REVIEW';
 
 /** 테마 학습 목록에 나오는 테마 하나와 로그인한 사용자의 진행 상태. */
 export interface Theme {
@@ -18,9 +18,11 @@ export interface ThemeProgress {
 }
 
 /**
- * 테마 단계 콘텐츠 하나를 보여주는 객관식 문제. `prompt`(한자 글자/단어·표현 표기/예문 문장/독해 지문)를
- * 보여주고 `options` 중 `correctAnswer`를 고르게 한다. 데이터가 부족하면 `options`가 4개보다 적을 수 있다.
- * `jlptLevel`은 예문(EXAMPLE) 단계에선 레벨 데이터가 없어 `null`이다.
+ * 테마 단계 콘텐츠 하나. `prompt`(한자 글자/단어·표현 표기/예문 문장/독해 지문)를 보여주고 `options` 중
+ * `correctAnswer`를 고르게 하는 객관식이다. 데이터가 부족하면 `options`가 4개보다 적을 수 있다. `jlptLevel`은
+ * 예문(EXAMPLE) 단계에선 레벨 데이터가 없어 `null`이다. REVIEW 단계는 예외적으로 선택지가 없는 말하기 연습이라
+ * `options`가 항상 빈 배열이고, `correctAnswer`는 뜻이 아니라 `prompt`와 같은 값(음성 인식 결과와 비교할 기준
+ * 문자열)이다.
  */
 export interface QuizItem {
   prompt: string;

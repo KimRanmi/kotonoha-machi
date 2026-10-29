@@ -104,7 +104,7 @@ class ThemeServiceTest {
   }
 
   @Test
-  void completeStage_마지막_단계인_READING까지_끝내면_테마가_완료된다() {
+  void completeStage_READING을_완료하면_REVIEW_단계로_넘어간다() {
     Theme theme = new Theme("카페에서 주문하기");
     ThemeProgress progress = new ThemeProgress(user(), theme);
     progress.completeCurrentStage(); // KANJI -> WORD
@@ -115,6 +115,24 @@ class ThemeServiceTest {
     when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
 
     ThemeProgressResponse response = themeService.completeStage(1L, 1L, ThemeStage.READING);
+
+    assertThat(response.currentStage()).isEqualTo(ThemeStage.REVIEW);
+    assertThat(response.completed()).isFalse();
+  }
+
+  @Test
+  void completeStage_마지막_단계인_REVIEW까지_끝내면_테마가_완료된다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    progress.completeCurrentStage(); // KANJI -> WORD
+    progress.completeCurrentStage(); // WORD -> EXPRESSION
+    progress.completeCurrentStage(); // EXPRESSION -> EXAMPLE
+    progress.completeCurrentStage(); // EXAMPLE -> READING
+    progress.completeCurrentStage(); // READING -> REVIEW
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
+
+    ThemeProgressResponse response = themeService.completeStage(1L, 1L, ThemeStage.REVIEW);
 
     assertThat(response.completed()).isTrue();
   }
@@ -231,6 +249,34 @@ class ThemeServiceTest {
     assertThat(item.correctAnswer()).isEqualTo("오늘은 비가 옵니다.");
     assertThat(item.options()).contains("오늘은 비가 옵니다.", "그는 역에 도착했습니다.");
     assertThat(item.jlptLevel()).isEqualTo(3);
+  }
+
+  @Test
+  void getStageContent_REVIEW_단계는_한자_단어_표현_예문을_모아_말하기_항목으로_반환한다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeKanji kanji = new ThemeKanji(theme, "混", "コン", "ま.じる", "혼잡", 2, 1);
+    ThemeVocabulary word = new ThemeVocabulary(theme, ThemeStage.WORD, "注文", "ちゅうもん", "주문", 4, 1);
+    ThemeVocabulary expression =
+        new ThemeVocabulary(theme, ThemeStage.EXPRESSION, "いらっしゃいませ", "いらっしゃいませ", "어서 오세요", 4, 1);
+    ThemeExample example = new ThemeExample(theme, "彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다.", 1);
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(1L)).thenReturn(List.of(kanji));
+    when(themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(1L, ThemeStage.WORD))
+        .thenReturn(List.of(word));
+    when(themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(
+            1L, ThemeStage.EXPRESSION))
+        .thenReturn(List.of(expression));
+    when(themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(1L))
+        .thenReturn(List.of(example));
+
+    List<ThemeQuizItemResponse> content = themeService.getStageContent(1L, ThemeStage.REVIEW);
+
+    assertThat(content)
+        .extracting(ThemeQuizItemResponse::prompt)
+        .containsExactly("混", "注文", "いらっしゃいませ", "彼女は紅茶を注文した。");
+    assertThat(content)
+        .allSatisfy(item -> assertThat(item.correctAnswer()).isEqualTo(item.prompt()));
+    assertThat(content).allSatisfy(item -> assertThat(item.options()).isEmpty());
   }
 
   @Test

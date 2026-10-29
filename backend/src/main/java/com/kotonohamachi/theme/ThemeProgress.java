@@ -92,7 +92,7 @@ public class ThemeProgress {
   }
 
   /**
-   * 지금 단계를 완료 처리하고 다음 단계로 넘어간다. 마지막 단계({@link ThemeStage#READING})였다면 테마 전체를
+   * 지금 단계를 완료 처리하고 다음 단계로 넘어간다. 마지막 단계({@link ThemeStage#REVIEW})였다면 테마 전체를
    * 완료 처리한다. 호출하기 전에 {@link #canComplete}로 먼저 확인해야 한다.
    */
   public void completeCurrentStage() {

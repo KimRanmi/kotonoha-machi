@@ -2,13 +2,14 @@ package com.kotonohamachi.theme;
 
 import java.util.Optional;
 
-/** 테마 하나를 구성하는 학습 단계. 선언 순서가 그대로 진행 순서다(한자 → 단어 → 표현 → 예문 → 독해). */
+/** 테마 하나를 구성하는 학습 단계. 선언 순서가 그대로 진행 순서다(한자 → 단어 → 표현 → 예문 → 독해 → 복습). */
 public enum ThemeStage {
   KANJI,
   WORD,
   EXPRESSION,
   EXAMPLE,
-  READING;
+  READING,
+  REVIEW;
 
   /**
    * 이 단계 다음에 진행할 단계를 반환한다.

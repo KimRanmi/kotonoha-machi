@@ -216,6 +216,11 @@ class ThemeControllerIntegrationTest {
     mockMvc
         .perform(post("/api/themes/" + themeId + "/stages/READING/complete").session(session))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.currentStage").value("REVIEW"))
+        .andExpect(jsonPath("$.completed").value(false));
+    mockMvc
+        .perform(post("/api/themes/" + themeId + "/stages/REVIEW/complete").session(session))
+        .andExpect(status().isOk())
         .andExpect(jsonPath("$.completed").value(true));
 
     mockMvc
@@ -268,6 +273,19 @@ class ThemeControllerIntegrationTest {
         .andExpect(jsonPath("$[0].prompt").exists())
         .andExpect(jsonPath("$[0].correctAnswer").exists())
         .andExpect(jsonPath("$[0].jlptLevel").exists());
+  }
+
+  @Test
+  void REVIEW_단계_콘텐츠는_한자_단어_표현_예문을_모아_말하기_항목으로_반환한다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    Long themeId = firstThemeId(session);
+
+    mockMvc
+        .perform(get("/api/themes/" + themeId + "/stages/REVIEW/content").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].prompt").value("混"))
+        .andExpect(jsonPath("$[0].correctAnswer").value("混"))
+        .andExpect(jsonPath("$[0].options").isEmpty());
   }
 
   @Test
