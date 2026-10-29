@@ -4,6 +4,7 @@
 # IDE
 .idea/
 .vscode/
+*.code-workspace
 .claude/worktrees/
 .claude/sprint_patch.json
 
