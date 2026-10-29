@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { isSpeechRecognitionSupported, recognizeJapaneseSpeech } from '../lib/speechRecognition';
+import { calculateTextSimilarity } from '../lib/textSimilarity';
 import {
   completeStage,
   getStageContent,
@@ -14,6 +15,7 @@ import styles from './ThemeLearningPage.module.css';
 
 const STAGE_ORDER: ThemeStage[] = ['KANJI', 'WORD', 'EXPRESSION', 'EXAMPLE', 'READING', 'REVIEW'];
 const MAX_WRONG_ATTEMPTS = 3;
+const SPEECH_PASS_THRESHOLD = 0.8;
 
 const STAGE_LABELS: Record<ThemeStage, string> = {
   KANJI: '한자',
@@ -48,6 +50,7 @@ function ThemeLearningPage() {
   const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [speechErrorMessage, setSpeechErrorMessage] = useState<string | null>(null);
+  const [speechAccuracy, setSpeechAccuracy] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +105,7 @@ function ThemeLearningPage() {
           setFeedback(null);
           setIsListening(false);
           setSpeechErrorMessage(null);
+          setSpeechAccuracy(null);
         }
       })
       .catch((error: unknown) => {
@@ -155,6 +159,7 @@ function ThemeLearningPage() {
     setIsRevealed(false);
     setFeedback(null);
     setSpeechErrorMessage(null);
+    setSpeechAccuracy(null);
   }
 
   function handleStartListening() {
@@ -168,10 +173,12 @@ function ThemeLearningPage() {
     recognizeJapaneseSpeech()
       .then((transcript) => {
         setIsListening(false);
-        const isMatch =
-          normalizeForSpeechComparison(transcript) ===
-          normalizeForSpeechComparison(currentQuizItem.correctAnswer);
-        setFeedback(isMatch ? 'correct' : 'incorrect');
+        const accuracy = calculateTextSimilarity(
+          normalizeForSpeechComparison(transcript),
+          normalizeForSpeechComparison(currentQuizItem.correctAnswer),
+        );
+        setSpeechAccuracy(accuracy);
+        setFeedback(accuracy >= SPEECH_PASS_THRESHOLD ? 'correct' : 'incorrect');
       })
       .catch((error: unknown) => {
         setIsListening(false);
@@ -292,9 +299,11 @@ function ThemeLearningPage() {
                   {speechErrorMessage && (
                     <p className={styles.quizFeedbackIncorrect}>{speechErrorMessage}</p>
                   )}
-                  {feedback === 'incorrect' && (
+                  {feedback === 'incorrect' && speechAccuracy !== null && (
                     <p className={styles.quizFeedbackIncorrect}>
-                      다르게 들렸습니다. 다시 말해보세요.
+                      정확도 {Math.round(speechAccuracy * 100)}%였습니다.{' '}
+                      {Math.round(SPEECH_PASS_THRESHOLD * 100)}% 이상이어야 통과합니다. 다시
+                      말해보세요.
                     </p>
                   )}
                 </div>
@@ -336,7 +345,11 @@ function ThemeLearningPage() {
               )}
               {feedback === 'correct' && (
                 <div className={styles.quizFeedbackCorrectRow}>
-                  <p className={styles.quizFeedbackCorrect}>정답입니다!</p>
+                  <p className={styles.quizFeedbackCorrect}>
+                    {isReviewStage && speechAccuracy !== null
+                      ? `정확도 ${Math.round(speechAccuracy * 100)}%로 정답입니다!`
+                      : '정답입니다!'}
+                  </p>
                   <button
                     type="button"
                     className={styles.nextQuestionButton}

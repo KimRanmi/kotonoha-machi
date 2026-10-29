@@ -297,7 +297,7 @@ describe('ThemeLearningPage', () => {
     expect(getStageContent).toHaveBeenCalledWith(11, 'REVIEW');
   });
 
-  it('따라 말한 내용이 정답과 일치하면 정답 처리되고 완료 버튼이 나타난다', async () => {
+  it('따라 말한 내용이 정답과 똑같으면 정확도 100%로 정답 처리되고 완료 버튼이 나타난다', async () => {
     vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
     vi.mocked(getStageContent).mockResolvedValue([REVIEW_QUIZ_ITEM]);
     vi.mocked(recognizeJapaneseSpeech).mockResolvedValue('混雑');
@@ -305,11 +305,25 @@ describe('ThemeLearningPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '🎤 말하기' }));
 
-    expect(await screen.findByText('정답입니다!')).toBeInTheDocument();
+    expect(await screen.findByText('정확도 100%로 정답입니다!')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '완료' })).toBeInTheDocument();
   });
 
-  it('따라 말한 내용이 다르게 인식되면 다시 말해보라는 안내를 보여준다', async () => {
+  it('정확도가 80% 이상이면 완전히 일치하지 않아도 정답으로 처리된다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
+    vi.mocked(getStageContent).mockResolvedValue([
+      { prompt: 'いらっしゃいませ', options: [], correctAnswer: 'いらっしゃいませ', jlptLevel: 4 },
+    ]);
+    // 8글자 중 1글자만 달라 정확도 87%(7/8) — 80% 기준을 넘는다.
+    vi.mocked(recognizeJapaneseSpeech).mockResolvedValue('いらっしゃいませー');
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '🎤 말하기' }));
+
+    expect(await screen.findByText('정확도 89%로 정답입니다!')).toBeInTheDocument();
+  });
+
+  it('정확도가 80% 미만이면 몇 퍼센트였는지와 다시 말해보라는 안내를 보여준다', async () => {
     vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
     vi.mocked(getStageContent).mockResolvedValue([REVIEW_QUIZ_ITEM]);
     vi.mocked(recognizeJapaneseSpeech).mockResolvedValue('전혀 다른 말');
@@ -317,7 +331,9 @@ describe('ThemeLearningPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '🎤 말하기' }));
 
-    expect(await screen.findByText('다르게 들렸습니다. 다시 말해보세요.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('정확도 0%였습니다. 80% 이상이어야 통과합니다. 다시 말해보세요.'),
+    ).toBeInTheDocument();
   });
 
   it('음성 인식 자체가 실패하면 에러 메시지를 보여준다', async () => {
