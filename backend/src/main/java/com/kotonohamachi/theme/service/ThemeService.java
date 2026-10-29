@@ -20,10 +20,14 @@ import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -39,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ThemeService {
 
   private static final int MAX_OPTIONS = 4;
+  private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
   private final ThemeRepository themeRepository;
   private final ThemeProgressRepository themeProgressRepository;
@@ -94,6 +99,34 @@ public class ThemeService {
     return themes.stream()
         .map(theme -> toThemeResponse(theme, progressByThemeId.get(theme.getId())))
         .toList();
+  }
+
+  /**
+   * "오늘의 학습" 배너에 추천할 테마를 조회한다. 오늘(한국 시간) 안에 테마를 하나라도 완료했으면 그날은 더 이상
+   * 추천하지 않는다(빈 값). 그렇지 않으면 아직 완료하지 않은 테마 중 첫 번째를 추천한다.
+   *
+   * @param userId 조회할 사용자 ID(로그인한 본인)
+   * @return 추천할 테마(오늘 이미 완료했거나 모든 테마를 끝냈으면 빈 값)
+   */
+  @Transactional(readOnly = true)
+  public Optional<ThemeResponse> getTodayRecommendedTheme(Long userId) {
+    List<ThemeProgress> progressList = themeProgressRepository.findAllByUserId(userId);
+    boolean completedToday = progressList.stream()
+        .anyMatch(progress -> progress.isCompleted() && isToday(progress.getUpdatedAt()));
+    if (completedToday) {
+      return Optional.empty();
+    }
+
+    Map<Long, ThemeProgress> progressByThemeId = progressList.stream()
+        .collect(Collectors.toMap(progress -> progress.getTheme().getId(), Function.identity()));
+    return themeRepository.findAllByOrderById().stream()
+        .map(theme -> toThemeResponse(theme, progressByThemeId.get(theme.getId())))
+        .filter(response -> !response.completed())
+        .findFirst();
+  }
+
+  private boolean isToday(OffsetDateTime dateTime) {
+    return dateTime.atZoneSameInstant(KOREA_ZONE).toLocalDate().equals(LocalDate.now(KOREA_ZONE));
   }
 
   /**

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import { getProfile, type Avatar } from '../api/user';
-import { getThemes, type Theme } from '../api/theme';
+import { getTodayRecommendation, type Theme } from '../api/theme';
 import { ApiError } from '../api/client';
 import { avatarFromProfile, buildAvatarPreviewUrl } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
@@ -39,10 +39,10 @@ function TownPage() {
   useEffect(() => {
     let cancelled = false;
 
-    getThemes()
-      .then((themes) => {
+    getTodayRecommendation()
+      .then((theme) => {
         if (!cancelled) {
-          setTodayTheme(themes.find((theme) => !theme.completed) ?? null);
+          setTodayTheme(theme);
         }
       })
       .catch(() => {

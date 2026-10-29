@@ -35,6 +35,17 @@ export async function getThemes(): Promise<Theme[]> {
   return response.json();
 }
 
+/**
+ * "오늘의 학습" 배너에 추천할 테마를 가져온다. 오늘(한국 시간) 안에 테마를 하나라도 완료했으면 `null`이다.
+ */
+export async function getTodayRecommendation(): Promise<Theme | null> {
+  const response = await apiFetch('/api/themes/today-recommendation');
+  if (response.status === 204) {
+    return null;
+  }
+  return response.json();
+}
+
 /** 테마의 한 단계에 나오는 항목들을 객관식 문제로 가져온다. */
 export async function getStageContent(themeId: number, stage: ThemeStage): Promise<QuizItem[]> {
   const response = await apiFetch(`/api/themes/${themeId}/stages/${stage}/content`);

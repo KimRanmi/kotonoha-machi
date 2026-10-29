@@ -23,12 +23,12 @@ vi.mock('../api/user', () => ({
 }));
 
 vi.mock('../api/theme', () => ({
-  getThemes: vi.fn(),
+  getTodayRecommendation: vi.fn(),
 }));
 
 import { logout } from '../api/auth';
 import { getProfile } from '../api/user';
-import { getThemes } from '../api/theme';
+import { getTodayRecommendation } from '../api/theme';
 
 function renderPage() {
   render(
@@ -54,8 +54,8 @@ describe('TownPage', () => {
       avatarClothesStyle: 'PLAIN',
       avatarShoesColor: 'WHITE',
     });
-    vi.mocked(getThemes).mockReset();
-    vi.mocked(getThemes).mockResolvedValue([]);
+    vi.mocked(getTodayRecommendation).mockReset();
+    vi.mocked(getTodayRecommendation).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -100,11 +100,13 @@ describe('TownPage', () => {
     expect(characterLink).toHaveAttribute('href', '/profile?tab=character');
   });
 
-  it('완료되지 않은 테마가 있으면 오늘의 학습 배너를 보여주고 테마 학습 화면으로 연결한다', async () => {
-    vi.mocked(getThemes).mockResolvedValue([
-      { id: 10, title: '가족', currentStage: 'WORD', completed: true },
-      { id: 11, title: '날씨', currentStage: 'KANJI', completed: false },
-    ]);
+  it('오늘 추천할 테마가 있으면 오늘의 학습 배너를 보여주고 테마 학습 화면으로 연결한다', async () => {
+    vi.mocked(getTodayRecommendation).mockResolvedValue({
+      id: 11,
+      title: '날씨',
+      currentStage: 'KANJI',
+      completed: false,
+    });
     renderPage();
 
     const bannerLink = await screen.findByRole('link', { name: /날씨/ });
@@ -112,26 +114,18 @@ describe('TownPage', () => {
     expect(screen.getByText('1순위 · 오늘의 학습')).toBeInTheDocument();
   });
 
-  it('모든 테마를 완료했으면 오늘의 학습 배너를 보여주지 않는다', async () => {
-    vi.mocked(getThemes).mockResolvedValue([
-      { id: 10, title: '가족', currentStage: 'READING', completed: true },
-    ]);
+  it('오늘 이미 테마를 완료했으면(추천 없음) 오늘의 학습 배너를 보여주지 않는다', async () => {
+    vi.mocked(getTodayRecommendation).mockResolvedValue(null);
     renderPage();
 
     await screen.findByRole('link', { name: '하루 님' });
     expect(screen.queryByText('1순위 · 오늘의 학습')).not.toBeInTheDocument();
   });
 
-  it('테마가 없으면 오늘의 학습 배너를 보여주지 않는다', async () => {
-    vi.mocked(getThemes).mockResolvedValue([]);
-    renderPage();
-
-    await screen.findByRole('link', { name: '하루 님' });
-    expect(screen.queryByText('1순위 · 오늘의 학습')).not.toBeInTheDocument();
-  });
-
-  it('테마 목록 조회가 실패해도 화면은 조용히 정상 동작한다', async () => {
-    vi.mocked(getThemes).mockRejectedValue(new ApiError(500, '테마를 불러오지 못했습니다.'));
+  it('오늘의 학습 추천 조회가 실패해도 화면은 조용히 정상 동작한다', async () => {
+    vi.mocked(getTodayRecommendation).mockRejectedValue(
+      new ApiError(500, '테마를 불러오지 못했습니다.'),
+    );
     renderPage();
 
     await screen.findByRole('link', { name: '하루 님' });
