@@ -1,0 +1,13 @@
+{
+  "name": "import-theme-content",
+  "private": true,
+  "type": "module",
+  "description": "테마 학습 콘텐츠(한자·단어·표현·예문)를 새 테마용으로 추가할 때 쓰는 1회성 개발 도구. 앱(backend/frontend)에는 포함되지 않는다.",
+  "scripts": {
+    "propose": "node --env-file=.env propose.mjs",
+    "finalize": "node finalize.mjs"
+  },
+  "dependencies": {
+    "kuromoji": "^0.1.2"
+  }
+}
