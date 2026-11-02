@@ -215,27 +215,39 @@ public class ThemeService {
   private List<ThemeQuizItemResponse> toReviewItems(Long themeId) {
     List<ThemeQuizItemResponse> items = new ArrayList<>();
     themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(themeId).stream()
-        .map(kanji -> toReadAloudItem(kanji.getKanji(), kanji.getJlptLevel()))
+        .map(kanji -> toReadAloudItem(
+            kanji.getKanji(), firstReading(kanji.getOnReading()), kanji.getJlptLevel()))
         .forEach(items::add);
     themeVocabularyRepository
         .findAllByThemeIdAndStageOrderByDisplayOrder(themeId, ThemeStage.WORD)
         .stream()
-        .map(vocabulary -> toReadAloudItem(vocabulary.getSurfaceForm(), vocabulary.getJlptLevel()))
+        .map(vocabulary -> toReadAloudItem(
+            vocabulary.getSurfaceForm(), vocabulary.getReading(), vocabulary.getJlptLevel()))
         .forEach(items::add);
     themeVocabularyRepository
         .findAllByThemeIdAndStageOrderByDisplayOrder(themeId, ThemeStage.EXPRESSION)
         .stream()
-        .map(vocabulary -> toReadAloudItem(vocabulary.getSurfaceForm(), vocabulary.getJlptLevel()))
+        .map(vocabulary -> toReadAloudItem(
+            vocabulary.getSurfaceForm(), vocabulary.getReading(), vocabulary.getJlptLevel()))
         .forEach(items::add);
     themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(themeId).stream()
-        .map(example -> toReadAloudItem(example.getJapaneseSentence(), null))
+        .map(example -> toReadAloudItem(example.getJapaneseSentence(), example.getReading(), null))
         .forEach(items::add);
     return items;
   }
 
-  /** 말하기 연습 항목 하나를 만든다. 선택지가 없고, 정답은 읽어야 할 문구 자신이다. */
-  private ThemeQuizItemResponse toReadAloudItem(String text, Integer jlptLevel) {
-    return new ThemeQuizItemResponse(text, List.of(), text, jlptLevel);
+  /**
+   * 말하기 연습 항목 하나를 만든다. 선택지가 없고, 정답은 읽어야 할 문구 자신이다. {@code reading}은
+   * 음성 인식 결과가 한자 표기 대신 가나로 나왔을 때도 맞혀진 걸로 볼 수 있도록 프런트엔드가 표기와
+   * 함께 비교하는 보조 기준이다.
+   */
+  private ThemeQuizItemResponse toReadAloudItem(String text, String reading, Integer jlptLevel) {
+    return new ThemeQuizItemResponse(text, List.of(), text, reading, jlptLevel);
+  }
+
+  /** 쉼표로 구분된 여러 읽는 법({@link ThemeKanji#getOnReading()} 등) 중 첫 번째만 가져온다. */
+  private String firstReading(String commaSeparatedReadings) {
+    return commaSeparatedReadings.split(",")[0].trim();
   }
 
   private List<ThemeQuizItemResponse> toExampleQuizItems(List<ThemeExample> exampleList) {
@@ -275,7 +287,7 @@ public class ThemeService {
     options.addAll(distractors.subList(0, Math.min(MAX_OPTIONS - 1, distractors.size())));
     Collections.shuffle(options, ThreadLocalRandom.current());
 
-    return new ThemeQuizItemResponse(prompt, options, correctAnswer, jlptLevel);
+    return new ThemeQuizItemResponse(prompt, options, correctAnswer, null, jlptLevel);
   }
 
   private Theme findThemeOrThrow(Long themeId) {

@@ -22,12 +22,14 @@ export interface ThemeProgress {
  * `correctAnswer`를 고르게 하는 객관식이다. 데이터가 부족하면 `options`가 4개보다 적을 수 있다. `jlptLevel`은
  * 예문(EXAMPLE) 단계에선 레벨 데이터가 없어 `null`이다. REVIEW 단계는 예외적으로 선택지가 없는 말하기 연습이라
  * `options`가 항상 빈 배열이고, `correctAnswer`는 뜻이 아니라 `prompt`와 같은 값(음성 인식 결과와 비교할 기준
- * 문자열)이다.
+ * 문자열)이다. `reading`도 REVIEW에서만 쓰며, 음성 인식 결과가 한자 대신 가나로 나와도 맞힌 걸로 볼 수 있도록
+ * `prompt`와 함께 비교할 히라가나 읽는 법이다(다른 단계는 `null`).
  */
 export interface QuizItem {
   prompt: string;
   options: string[];
   correctAnswer: string;
+  reading: string | null;
   jlptLevel: number | null;
 }
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { isSpeechRecognitionSupported, recognizeJapaneseSpeech } from '../lib/speechRecognition';
-import { calculateTextSimilarity } from '../lib/textSimilarity';
+import { calculateTextSimilarity, toHiragana } from '../lib/textSimilarity';
 import {
   completeStage,
   getStageContent,
@@ -29,6 +29,29 @@ const STAGE_LABELS: Record<ThemeStage, string> = {
 /** 음성 인식 결과와 정답 문구를 비교하기 전에 공백 차이를 무시하도록 정리한다. */
 function normalizeForSpeechComparison(text: string): string {
   return text.replace(/\s+/g, '').trim();
+}
+
+/**
+ * 음성 인식 결과의 정확도를 계산한다. 정답 표기(한자 등)와 비교한 유사도, 읽는 법(가나)이 있다면
+ * 그것과 비교한 유사도(가타카나는 히라가나로 맞춰서 비교) 중 더 높은 쪽을 쓴다 — 음성 인식이 같은
+ * 발음을 한자로 돌려주든 가나로 돌려주든 둘 중 하나는 맞힌 걸로 보기 위해서다.
+ */
+function calculateSpeechAccuracy(transcript: string, quizItem: QuizItem): number {
+  const normalizedTranscript = normalizeForSpeechComparison(transcript);
+  const surfaceAccuracy = calculateTextSimilarity(
+    normalizedTranscript,
+    normalizeForSpeechComparison(quizItem.correctAnswer),
+  );
+
+  if (!quizItem.reading) {
+    return surfaceAccuracy;
+  }
+
+  const readingAccuracy = calculateTextSimilarity(
+    toHiragana(normalizedTranscript),
+    toHiragana(normalizeForSpeechComparison(quizItem.reading)),
+  );
+  return Math.max(surfaceAccuracy, readingAccuracy);
 }
 
 function ThemeLearningPage() {
@@ -173,10 +196,7 @@ function ThemeLearningPage() {
     recognizeJapaneseSpeech()
       .then((transcript) => {
         setIsListening(false);
-        const accuracy = calculateTextSimilarity(
-          normalizeForSpeechComparison(transcript),
-          normalizeForSpeechComparison(currentQuizItem.correctAnswer),
-        );
+        const accuracy = calculateSpeechAccuracy(transcript, currentQuizItem);
         setSpeechAccuracy(accuracy);
         setFeedback(accuracy >= SPEECH_PASS_THRESHOLD ? 'correct' : 'incorrect');
       })
