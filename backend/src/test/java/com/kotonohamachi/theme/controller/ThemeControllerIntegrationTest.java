@@ -285,6 +285,7 @@ class ThemeControllerIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].prompt").value("混"))
         .andExpect(jsonPath("$[0].correctAnswer").value("混"))
+        .andExpect(jsonPath("$[0].reading").value("コン"))
         .andExpect(jsonPath("$[0].options").isEmpty());
   }
 

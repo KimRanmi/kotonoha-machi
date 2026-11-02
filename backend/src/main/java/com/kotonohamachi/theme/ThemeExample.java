@@ -32,6 +32,9 @@ public class ThemeExample {
   @Column(nullable = false)
   private String translation;
 
+  @Column(nullable = false)
+  private String reading;
+
   @Column(name = "display_order", nullable = false)
   private int displayOrder;
 
@@ -44,12 +47,15 @@ public class ThemeExample {
    * @param theme 이 예문이 속한 테마
    * @param japaneseSentence 일본어 예문
    * @param translation 한글 번역
+   * @param reading 예문 전체를 히라가나로 읽은 법(REVIEW 단계 발음 체크에서 한자 표기와 함께 비교 기준으로 쓴다)
    * @param displayOrder 단계 안에서 보여줄 순서
    */
-  public ThemeExample(Theme theme, String japaneseSentence, String translation, int displayOrder) {
+  public ThemeExample(
+      Theme theme, String japaneseSentence, String translation, String reading, int displayOrder) {
     this.theme = theme;
     this.japaneseSentence = japaneseSentence;
     this.translation = translation;
+    this.reading = reading;
     this.displayOrder = displayOrder;
   }
 
@@ -69,5 +75,14 @@ public class ThemeExample {
    */
   public String getTranslation() {
     return translation;
+  }
+
+  /**
+   * 예문 전체의 히라가나 읽는 법을 반환한다.
+   *
+   * @return 히라가나 읽는 법
+   */
+  public String getReading() {
+    return reading;
   }
 }

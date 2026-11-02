@@ -214,8 +214,9 @@ class ThemeServiceTest {
   @Test
   void getStageContent_EXAMPLE_단계는_번역을_정답으로_한_보기_목록을_반환한다() {
     Theme theme = new Theme("카페에서 주문하기");
-    ThemeExample target = new ThemeExample(theme, "彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다.", 1);
-    ThemeExample other = new ThemeExample(theme, "道に迷いました。", "길을 잃었습니다.", 2);
+    ThemeExample target =
+        new ThemeExample(theme, "彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다.", "かのじょはこうちゃをちゅうもんした。", 1);
+    ThemeExample other = new ThemeExample(theme, "道に迷いました。", "길을 잃었습니다.", "みちにまよいました。", 2);
     when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
     when(themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(1L))
         .thenReturn(List.of(target));
@@ -258,7 +259,8 @@ class ThemeServiceTest {
     ThemeVocabulary word = new ThemeVocabulary(theme, ThemeStage.WORD, "注文", "ちゅうもん", "주문", 4, 1);
     ThemeVocabulary expression =
         new ThemeVocabulary(theme, ThemeStage.EXPRESSION, "いらっしゃいませ", "いらっしゃいませ", "어서 오세요", 4, 1);
-    ThemeExample example = new ThemeExample(theme, "彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다.", 1);
+    ThemeExample example =
+        new ThemeExample(theme, "彼女は紅茶を注文した。", "그녀는 차 한 잔을 주문했다.", "かのじょはこうちゃをちゅうもんした。", 1);
     when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
     when(themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(1L)).thenReturn(List.of(kanji));
     when(themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(1L, ThemeStage.WORD))
@@ -274,6 +276,9 @@ class ThemeServiceTest {
     assertThat(content)
         .extracting(ThemeQuizItemResponse::prompt)
         .containsExactly("混", "注文", "いらっしゃいませ", "彼女は紅茶を注文した。");
+    assertThat(content)
+        .extracting(ThemeQuizItemResponse::reading)
+        .containsExactly("コン", "ちゅうもん", "いらっしゃいませ", "かのじょはこうちゃをちゅうもんした。");
     assertThat(content)
         .allSatisfy(item -> assertThat(item.correctAnswer()).isEqualTo(item.prompt()));
     assertThat(content).allSatisfy(item -> assertThat(item.options()).isEmpty());

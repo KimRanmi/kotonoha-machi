@@ -12,6 +12,25 @@ export function calculateTextSimilarity(a: string, b: string): number {
   return 1 - distance / Math.max(a.length, b.length);
 }
 
+const KATAKANA_START = 0x30a1;
+const KATAKANA_END = 0x30f6;
+const KATAKANA_TO_HIRAGANA_OFFSET = 0x60;
+
+/**
+ * 가타카나를 히라가나로 바꾼다(그 외 문자는 그대로 둔다). 음성 인식 결과가 같은 발음을 가타카나로
+ * 돌려줄 수도 있어서, 히라가나로 저장된 읽는 법과 비교하기 전에 표기를 맞추는 데 쓴다.
+ */
+export function toHiragana(text: string): string {
+  return Array.from(text)
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint >= KATAKANA_START && codePoint <= KATAKANA_END
+        ? String.fromCodePoint(codePoint - KATAKANA_TO_HIRAGANA_OFFSET)
+        : character;
+    })
+    .join('');
+}
+
 function levenshteinDistance(a: string, b: string): number {
   const rows = a.length + 1;
   const columns = b.length + 1;

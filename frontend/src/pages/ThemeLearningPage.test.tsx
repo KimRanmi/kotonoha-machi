@@ -39,6 +39,7 @@ const SINGLE_QUIZ_ITEM: QuizItem = {
   prompt: '混雑',
   options: ['혼잡함', '안내', '거리'],
   correctAnswer: '혼잡함',
+  reading: null,
   jlptLevel: 2,
 };
 
@@ -48,6 +49,7 @@ const TWO_QUIZ_ITEMS: QuizItem[] = [
     prompt: '満席',
     options: ['만석', '안내', '거리'],
     correctAnswer: '만석',
+    reading: null,
     jlptLevel: 2,
   },
 ];
@@ -56,6 +58,7 @@ const READING_QUIZ_ITEM: QuizItem = {
   prompt: '今日のカフェは混雑していて、席がなかなか空かなかった。',
   options: ['오늘 카페는 혼잡해서 자리가 나지 않았다.', '그는 길을 잃었다.'],
   correctAnswer: '오늘 카페는 혼잡해서 자리가 나지 않았다.',
+  reading: null,
   jlptLevel: 3,
 };
 
@@ -63,6 +66,7 @@ const REVIEW_QUIZ_ITEM: QuizItem = {
   prompt: '混雑',
   options: [],
   correctAnswer: '混雑',
+  reading: 'こんざつ',
   jlptLevel: 2,
 };
 
@@ -309,10 +313,29 @@ describe('ThemeLearningPage', () => {
     expect(screen.getByRole('button', { name: '완료' })).toBeInTheDocument();
   });
 
+  it('한자 표기 대신 읽는 법(가나)으로 말해도 정답으로 처리된다', async () => {
+    vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
+    vi.mocked(getStageContent).mockResolvedValue([REVIEW_QUIZ_ITEM]);
+    // REVIEW_QUIZ_ITEM.prompt는 "混雑"(한자)이지만, 음성 인식이 읽는 법(reading: "こんざつ")으로
+    // 돌려줘도 정답으로 처리돼야 한다.
+    vi.mocked(recognizeJapaneseSpeech).mockResolvedValue('こんざつ');
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '🎤 말하기' }));
+
+    expect(await screen.findByText('정확도 100%로 정답입니다!')).toBeInTheDocument();
+  });
+
   it('정확도가 80% 이상이면 완전히 일치하지 않아도 정답으로 처리된다', async () => {
     vi.mocked(getThemes).mockResolvedValue([{ ...WEATHER_THEME, currentStage: 'REVIEW' }]);
     vi.mocked(getStageContent).mockResolvedValue([
-      { prompt: 'いらっしゃいませ', options: [], correctAnswer: 'いらっしゃいませ', jlptLevel: 4 },
+      {
+        prompt: 'いらっしゃいませ',
+        options: [],
+        correctAnswer: 'いらっしゃいませ',
+        reading: 'いらっしゃいませ',
+        jlptLevel: 4,
+      },
     ]);
     // 8글자 중 1글자만 달라 정확도 87%(7/8) — 80% 기준을 넘는다.
     vi.mocked(recognizeJapaneseSpeech).mockResolvedValue('いらっしゃいませー');
