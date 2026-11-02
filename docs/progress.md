@@ -276,3 +276,33 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 한계: 글자 단위 텍스트 유사도라 발음의 음소·억양 품질과는 직접 관련이 없다(예: 완전히
     다른 단어를 말해도 글자 수·구성이 비슷하면 우연히 높은 정확도가 나올 수 있음) — 요구사항
     문서가 처음부터 "정밀한 발음 채점은 아니다"로 범위를 좁혀둔 것과 일치하는 한계로 기록.
+- REVIEW 발음 체크가 음성 인식 결과를 한자 표기와 읽는 법(가나) 둘 다와 비교하도록 개선하고,
+  향후 테마 콘텐츠 추가를 위한 임포트 도구를 새로 만들었다. 같은 브랜치에서 계속 작업했다.
+  - 문제: 한자·단어·표현은 이미 읽는 법 컬럼이 있어 음성 인식이 한자로 인식하든 가나로
+    인식하든 둘 중 하나와 비교해 맞힐 수 있었지만, 예문(`theme_example`)만 읽는 법이 없어
+    한자 표기로만 비교됐다 — 음성 인식이 같은 발음을 가나로 인식하면 억울하게 오답 처리됐다.
+  - 백엔드: `theme_example`에 `reading` 컬럼 추가(`V10` 마이그레이션, 기존 예문 4개는 사람이
+    직접 음독해 적은 값으로 백필) 후 `ThemeExample`/`ThemeQuizItemResponse`/`ThemeService`에
+    전달 경로 추가. `toReviewItems`가 한자·단어·표현·예문 각각의 읽는 법을 `reading` 필드로
+    함께 내려준다(한자는 `onReading`의 첫 번째 읽는 법만 사용).
+  - 프런트엔드: `textSimilarity.ts`에 가나 통일용 `toHiragana`(가타카나→히라가나 코드포인트
+    변환) 추가. `ThemeLearningPage`의 `calculateSpeechAccuracy`가 인식 결과를 한자 표기·
+    읽는 법(둘 다 히라가나로 통일) 각각과 비교해 유사도를 계산한 뒤 더 높은 쪽을 채점에
+    사용한다.
+  - 검증: 백엔드 `./gradlew spotlessApply test`, 프런트엔드
+    `npx prettier --write .`/`npm run lint`/`npm run test` 모두 통과. 초기 마이그레이션이
+    V7 시절 예문 문장을 `WHERE` 조건으로 써서 V8이 교체한 실제 예문과 안 맞아 테스트가 50개
+    실패했던 버그를 고쳤다(V8의 실제 예문으로 `WHERE` 조건 수정).
+  - 신규 도구 `scripts/import-theme-content/`(백엔드/프런트엔드 앱과 완전히 분리, 1회성
+    개발 도구): 향후 새 테마 콘텐츠를 추가할 때, Gemini가 "어울리는 표기"만 추천하고
+    kanjiapi.dev·Tatoeba가 실제 뜻/읽는 법/JLPT 레벨/예문을 조회·검증(N1~N3 범위 밖이면
+    자동 거부)한 뒤 사람이 `drafts/*.json`을 검토·승인해야 Flyway 마이그레이션 SQL이
+    생성되는 파이프라인이다. "AI가 콘텐츠를 짓지 않는다" 제약을 지키기 위해 뜻/읽는 법/레벨
+    같은 사실 데이터는 전부 실제 사전·코퍼스 API로만 조회하고, Gemini는 어떤 데이터도 직접
+    만들지 않는다(후보 표기 제안과 Tatoeba 검색 키워드 제안만 담당).
+  - 검증 범위: `kanjiApi.mjs`(kanjiapi.dev 실제 호출), `tatoebaApi.mjs`(Tatoeba 실제 호출),
+    `furigana.mjs`(kuromoji 실제 호출), `finalize.mjs`(손으로 만든 샘플 draft로 SQL 생성
+    확인, 버전 번호 자동 증가 확인) 모두 실제로 호출해 검증했다. `gemini.mjs`와
+    `propose.mjs`의 Gemini 호출 경로는 API 키가 없어 문법 검사만 하고 실제 호출은 검증하지
+    못했다 — 사용자가 `scripts/import-theme-content/.env`에 본인 `GEMINI_API_KEY`를 넣고
+    `npm run propose`를 직접 한 번 실행해 확인해야 한다.
