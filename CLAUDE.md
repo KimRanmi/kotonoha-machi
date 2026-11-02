@@ -8,7 +8,9 @@ v1 프로토타입을 재구현하며 코드 구조와 동작 원리를 학습�
 - **Backend (`/backend`)**: Java 25, Spring Boot 4.x, Gradle 8.14+, PostgreSQL, Flyway, JUnit + Testcontainers
   - 로컬 DB: `cd backend && docker compose up -d` (`kotonoha_machi`)
   - 패키지 구조: 도메인 패키지(`auth`, `user` 등) 내에 `controller`/`service`/`dto`/`repository` 배치. **엔티티는 도메인 패키지 루트에 배치.** 공통 코드는 `common`에 배치.
-- **AI**: Gemini API는 백엔드에서만 호출 (프런트엔드 키 노출 금지).
+- **AI**: Gemini API는 백엔드에서만 호출 (프런트엔드 키 노출 금지). 단, `scripts/`의
+  1회성 개발 도구(앱에 포함되지 않고 사람이 로컬에서 직접 실행)는 예외 — 키가
+  `.env`(`.gitignore` 등록)에만 있고 브라우저에 노출되지 않으면 된다.
 
 ## 2. 코드 컨벤션 및 검증 명령어
 - Google Code Style 준수 (Java는 Javadoc 줄바꿈만 예외 허용됨 — `build.gradle` 설정 절대 임의 변경 금지).
