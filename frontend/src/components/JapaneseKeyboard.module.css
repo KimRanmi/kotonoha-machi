@@ -68,32 +68,3 @@
   background-color: var(--color-primary);
   color: #fff;
 }
-
-/* QWERTY 키보드 */
-.qwerty {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.qwertyRow {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-1);
-}
-
-.letterKey {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 36px;
-  height: 44px;
-  font-size: 1rem;
-  text-transform: uppercase;
-}
-
-.spaceKey {
-  flex: 5;
-  height: 44px;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-}

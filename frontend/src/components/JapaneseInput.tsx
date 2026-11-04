@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { toHiragana, toKana, toKatakana } from 'wanakana';
 import FlickKeyboard from './FlickKeyboard';
-import QwertyKeyboard from './QwertyKeyboard';
 import styles from './JapaneseInput.module.css';
 
 type KanaMode = 'toHiragana' | 'toKatakana';
@@ -39,20 +38,17 @@ const MODIFY_CYCLES = [
   'よょ',
 ];
 
-type KeyboardType = 'flick' | 'qwerty';
-
 interface JapaneseInputProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  keyboard?: KeyboardType;
 }
 
 /**
  * 영문 키보드로 친 로마자를 히라가나(또는 가타카나)로 바꿔 주는 입력란.
  * 히라가나/가타카나는 사용자가 버튼으로 직접 전환한다. 화면 가상 키보드로도 입력할 수 있다.
  */
-function JapaneseInput({ value, onChange, placeholder, keyboard = 'flick' }: JapaneseInputProps) {
+function JapaneseInput({ value, onChange, placeholder }: JapaneseInputProps) {
   const [mode, setMode] = useState<KanaMode>('toHiragana');
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
@@ -63,10 +59,6 @@ function JapaneseInput({ value, onChange, placeholder, keyboard = 'flick' }: Jap
 
   function appendKana(kana: string) {
     onChange(value + kana);
-  }
-
-  function appendLetter(letter: string) {
-    onChange(toKana(value + letter, { IMEMode: mode }));
   }
 
   function modifyLast() {
@@ -119,17 +111,13 @@ function JapaneseInput({ value, onChange, placeholder, keyboard = 'flick' }: Jap
       </div>
       {isKeyboardOpen && (
         <div className={styles.keyboard}>
-          {keyboard === 'flick' ? (
-            <FlickKeyboard
-              isKatakana={mode === 'toKatakana'}
-              onKana={appendKana}
-              onModify={modifyLast}
-              onSpace={appendSpace}
-              onDelete={deleteLast}
-            />
-          ) : (
-            <QwertyKeyboard onLetter={appendLetter} onSpace={appendSpace} onDelete={deleteLast} />
-          )}
+          <FlickKeyboard
+            isKatakana={mode === 'toKatakana'}
+            onKana={appendKana}
+            onModify={modifyLast}
+            onSpace={appendSpace}
+            onDelete={deleteLast}
+          />
         </div>
       )}
     </div>
