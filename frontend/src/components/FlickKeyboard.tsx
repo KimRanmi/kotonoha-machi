@@ -31,6 +31,7 @@ const POPUP_CELLS = [
 const FLICK_THRESHOLD = 18;
 
 interface Pressed {
+  pointerId: number;
   keyIndex: number;
   direction: number;
   startX: number;
@@ -54,13 +55,23 @@ function FlickKeyboard({ isKatakana, onKana, onModify, onSpace, onDelete }: Flic
   }
 
   function handlePointerDown(event: PointerEvent<HTMLButtonElement>, keyIndex: number) {
+    // 마우스 왼쪽 버튼만 받고, 이미 누른 손가락이 있으면 두 번째 손가락은 무시한다.
+    if (event.button !== 0 || pressed !== null) {
+      return;
+    }
     // 손가락이 키 밖으로 나가도 이 키가 move/up 이벤트를 계속 받는다.
     event.currentTarget.setPointerCapture(event.pointerId);
-    setPressed({ keyIndex, direction: 0, startX: event.clientX, startY: event.clientY });
+    setPressed({
+      pointerId: event.pointerId,
+      keyIndex,
+      direction: 0,
+      startX: event.clientX,
+      startY: event.clientY,
+    });
   }
 
   function handlePointerMove(event: PointerEvent<HTMLButtonElement>) {
-    if (pressed === null) {
+    if (pressed === null || event.pointerId !== pressed.pointerId) {
       return;
     }
     const dx = event.clientX - pressed.startX;
@@ -76,14 +87,20 @@ function FlickKeyboard({ isKatakana, onKana, onModify, onSpace, onDelete }: Flic
     setPressed({ ...pressed, direction });
   }
 
-  function handlePointerUp() {
-    if (pressed === null) {
+  function handlePointerUp(event: PointerEvent<HTMLButtonElement>) {
+    if (pressed === null || event.pointerId !== pressed.pointerId) {
       return;
     }
     const chars = FLICK_KEYS[pressed.keyIndex];
-    // 글자가 없는 방향으로 밀었으면 가운데 글자를 쓴다.
-    onKana(chars[pressed.direction] || chars[0]);
+    // 글자가 없는 방향으로 밀었으면 가운데 글자를 쓴다. 가타카나 모드 변환도 여기서 한 번만 한다.
+    onKana(show(chars[pressed.direction] || chars[0]));
     setPressed(null);
+  }
+
+  function handlePointerCancel(event: PointerEvent<HTMLButtonElement>) {
+    if (pressed !== null && event.pointerId === pressed.pointerId) {
+      setPressed(null);
+    }
   }
 
   return (
@@ -97,7 +114,7 @@ function FlickKeyboard({ isKatakana, onKana, onModify, onSpace, onDelete }: Flic
           onPointerDown={(event) => handlePointerDown(event, keyIndex)}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerCancel={() => setPressed(null)}
+          onPointerCancel={handlePointerCancel}
         >
           {show(chars[0])}
           {pressed?.keyIndex === keyIndex && (

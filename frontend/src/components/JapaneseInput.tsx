@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { toHiragana, toKana, toKatakana } from 'wanakana';
+import { isKatakana, toHiragana, toKana, toKatakana } from 'wanakana';
 import FlickKeyboard from './FlickKeyboard';
 import styles from './JapaneseInput.module.css';
 
@@ -73,7 +73,8 @@ function JapaneseInput({ value, onChange, placeholder }: JapaneseInputProps) {
       return;
     }
     const next = cycle[(cycle.indexOf(hiragana) + 1) % cycle.length];
-    onChange(chars.join('') + (mode === 'toKatakana' ? toKatakana(next) : next));
+    // 현재 모드가 아니라 바꾸는 글자 자신의 종류(히라가나/가타카나)를 따른다.
+    onChange(chars.join('') + (isKatakana(last) ? toKatakana(next) : next));
   }
 
   function appendSpace() {
