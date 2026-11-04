@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.tts.TtsAudio;
+import com.kotonohamachi.tts.TtsErrorCode;
 import com.kotonohamachi.tts.repository.TtsAudioRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,6 +84,19 @@ class TtsServiceTest {
     assertThat(blank.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(tooLong.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
     verify(googleTtsClient, never()).synthesize(any(), any());
+  }
+
+  @Test
+  void getAudio_합성에_실패하면_하루_횟수를_차감하지_않는다() {
+    when(ttsAudioRepository.findByVoiceAndText(any(), any())).thenReturn(Optional.empty());
+    when(googleTtsClient.synthesize(any(), any()))
+        .thenThrow(new ApiException(TtsErrorCode.UNAVAILABLE));
+
+    for (int i = 0; i < TtsService.DAILY_SYNTHESIS_LIMIT + 5; i++) {
+      ApiException failed =
+          catchThrowableOfType(ApiException.class, () -> ttsService.getAudio(1L, "失敗"));
+      assertThat(failed.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
   }
 
   @Test

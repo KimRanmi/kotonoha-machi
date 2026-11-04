@@ -7,7 +7,7 @@ import {
   recognizeJapaneseSpeech,
   SpeechCancelledError,
 } from '../lib/speechRecognition';
-import { isSpeechSynthesisSupported, speakJapanese } from '../lib/speechSynthesis';
+import { speakJapanese, stopSpeaking } from '../lib/speechSynthesis';
 import { calculateTextSimilarity, toHiragana, toKatakana } from '../lib/textSimilarity';
 import {
   completeStage,
@@ -171,6 +171,14 @@ function ThemeLearningPage() {
     };
   }, [theme]);
 
+  // 페이지를 떠날 때 재생 중인 소리와 켜져 있는 마이크 인식을 멈춘다.
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+      cancelSpeechRecognition();
+    };
+  }, []);
+
   const currentQuizItem =
     quizItems && currentIndex < quizItems.length ? quizItems[currentIndex] : null;
   const allQuizItemsAnswered = quizItems !== null && currentIndex >= quizItems.length;
@@ -199,6 +207,7 @@ function ThemeLearningPage() {
   }
 
   function handleNextQuizItem() {
+    stopSpeaking();
     setCurrentIndex((index) => index + 1);
     setWrongCount(0);
     setIsRevealed(false);
@@ -340,15 +349,13 @@ function ThemeLearningPage() {
 
               {!isReviewStage && (
                 <div className={styles.promptTools}>
-                  {isSpeechSynthesisSupported() && (
-                    <button
-                      type="button"
-                      className={styles.listenButton}
-                      onClick={() => speakJapanese(getSpokenText(currentQuizItem))}
-                    >
-                      🔊 듣기
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className={styles.listenButton}
+                    onClick={() => speakJapanese(getSpokenText(currentQuizItem))}
+                  >
+                    🔊 듣기
+                  </button>
                   {currentQuizItem.reading && (
                     <button
                       type="button"
@@ -384,19 +391,13 @@ function ThemeLearningPage() {
                           ? `${toHiragana(currentQuizItem.reading)} / ${toKatakana(currentQuizItem.reading)}`
                           : currentQuizItem.prompt}
                       </span>
-                      {isSpeechSynthesisSupported() ? (
-                        <button
-                          type="button"
-                          className={styles.listenButton}
-                          onClick={handleShowReadingHint}
-                        >
-                          🔊 다시 듣기
-                        </button>
-                      ) : (
-                        <span className={styles.quizFeedbackHint}>
-                          이 브라우저는 소리 재생을 지원하지 않습니다.
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        className={styles.listenButton}
+                        onClick={handleShowReadingHint}
+                      >
+                        🔊 다시 듣기
+                      </button>
                     </div>
                   )}
                   <button

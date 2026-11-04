@@ -69,8 +69,9 @@ public class TtsService {
   }
 
   private byte[] synthesizeAndStore(Long userId, String text) {
-    consumeDailyQuota(userId);
+    ensureWithinDailyQuota(userId);
     byte[] audio = googleTtsClient.synthesize(text, voice);
+    recordSynthesis(userId);
     try {
       ttsAudioRepository.save(new TtsAudio(voice, text, audio));
     } catch (DataIntegrityViolationException e) {
@@ -80,17 +81,24 @@ public class TtsService {
     return audio;
   }
 
-  private void consumeDailyQuota(Long userId) {
-    LocalDate today = LocalDate.now(KST);
-    DailyCount updated = dailyCounts.compute(userId, (id, current) -> {
-      if (current == null || !current.date().equals(today)) {
-        return new DailyCount(today, 1);
-      }
-      return new DailyCount(today, current.count() + 1);
-    });
-    if (updated.count() > DAILY_SYNTHESIS_LIMIT) {
+  /** 오늘 이미 하루 한도만큼 합성했으면 거부한다. 합성이 실패해도 횟수가 줄지 않도록 세는 건 성공한 뒤에 한다. */
+  private void ensureWithinDailyQuota(Long userId) {
+    DailyCount current = dailyCounts.get(userId);
+    if (current != null
+        && current.date().equals(LocalDate.now(KST))
+        && current.count() >= DAILY_SYNTHESIS_LIMIT) {
       throw new ApiException(TtsErrorCode.DAILY_LIMIT_EXCEEDED);
     }
+  }
+
+  /** 합성에 성공한 횟수를 하나 올리고, 어제 이전 기록은 정리한다. */
+  private void recordSynthesis(Long userId) {
+    LocalDate today = LocalDate.now(KST);
+    dailyCounts.values().removeIf(count -> !count.date().equals(today));
+    dailyCounts.merge(
+        userId,
+        new DailyCount(today, 1),
+        (current, added) -> new DailyCount(today, current.count() + 1));
   }
 
   /** 사용자 한 명의 하루 합성 횟수. */
