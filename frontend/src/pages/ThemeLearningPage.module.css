@@ -150,6 +150,32 @@
   cursor: not-allowed;
 }
 
+.unknownButton,
+.listenButton {
+  height: 36px;
+  padding: 0 var(--space-4);
+  color: var(--color-primary);
+  background-color: transparent;
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  font-weight: 700;
+}
+.unknownButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.readingHint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.readingText {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
 .quizFeedbackIncorrect {
   margin: 0;
   color: var(--color-error);

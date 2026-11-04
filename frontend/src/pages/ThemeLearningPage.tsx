@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { isSpeechRecognitionSupported, recognizeJapaneseSpeech } from '../lib/speechRecognition';
+import { isSpeechSynthesisSupported, speakJapanese } from '../lib/speechSynthesis';
 import { calculateTextSimilarity, toHiragana } from '../lib/textSimilarity';
 import {
   completeStage,
@@ -74,6 +75,7 @@ function ThemeLearningPage() {
   const [isListening, setIsListening] = useState(false);
   const [speechErrorMessage, setSpeechErrorMessage] = useState<string | null>(null);
   const [speechAccuracy, setSpeechAccuracy] = useState<number | null>(null);
+  const [isReadingHintShown, setIsReadingHintShown] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,6 +131,7 @@ function ThemeLearningPage() {
           setIsListening(false);
           setSpeechErrorMessage(null);
           setSpeechAccuracy(null);
+          setIsReadingHintShown(false);
         }
       })
       .catch((error: unknown) => {
@@ -183,6 +186,17 @@ function ThemeLearningPage() {
     setFeedback(null);
     setSpeechErrorMessage(null);
     setSpeechAccuracy(null);
+    setIsReadingHintShown(false);
+  }
+
+  /** "모르겠어요": 읽는 법을 보여 주고 소리로 들려준다. 읽는 법이 없으면 표기 자체를 읽는다. */
+  function handleShowReadingHint() {
+    if (!currentQuizItem) {
+      return;
+    }
+
+    setIsReadingHintShown(true);
+    speakJapanese(currentQuizItem.reading ?? currentQuizItem.prompt);
   }
 
   function handleStartListening() {
@@ -311,6 +325,36 @@ function ThemeLearningPage() {
                   >
                     {isListening ? '듣고 있어요…' : '🎤 말하기'}
                   </button>
+                  {feedback !== 'correct' && (
+                    <button
+                      type="button"
+                      className={styles.unknownButton}
+                      disabled={isListening}
+                      onClick={handleShowReadingHint}
+                    >
+                      모르겠어요
+                    </button>
+                  )}
+                  {isReadingHintShown && feedback !== 'correct' && (
+                    <div className={styles.readingHint}>
+                      <span className={styles.readingText}>
+                        {currentQuizItem.reading ?? currentQuizItem.prompt}
+                      </span>
+                      {isSpeechSynthesisSupported() ? (
+                        <button
+                          type="button"
+                          className={styles.listenButton}
+                          onClick={handleShowReadingHint}
+                        >
+                          🔊 다시 듣기
+                        </button>
+                      ) : (
+                        <span className={styles.quizFeedbackHint}>
+                          이 브라우저는 소리 재생을 지원하지 않습니다.
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {!speechSupported && (
                     <p className={styles.error} role="alert">
                       이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 이용해주세요.
