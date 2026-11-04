@@ -355,7 +355,7 @@ function ThemeLearningPage() {
               )}
               {!isReviewStage && isReadingHintShown && currentQuizItem.reading && (
                 <p className={styles.readingText}>
-                  {currentQuizItem.reading} / {toKatakana(currentQuizItem.reading)}
+                  {toHiragana(currentQuizItem.reading)} / {toKatakana(currentQuizItem.reading)}
                 </p>
               )}
 
@@ -374,7 +374,7 @@ function ThemeLearningPage() {
                     <div className={styles.readingHint}>
                       <span className={styles.readingText}>
                         {currentQuizItem.reading
-                          ? `${currentQuizItem.reading} / ${toKatakana(currentQuizItem.reading)}`
+                          ? `${toHiragana(currentQuizItem.reading)} / ${toKatakana(currentQuizItem.reading)}`
                           : currentQuizItem.prompt}
                       </span>
                       {isSpeechSynthesisSupported() ? (
