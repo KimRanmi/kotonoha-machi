@@ -8,6 +8,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class TtsService {
 
+  private static final Logger log = LoggerFactory.getLogger(TtsService.class);
   static final int MAX_TEXT_LENGTH = 300;
   static final int DAILY_SYNTHESIS_LIMIT = 200;
   private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -72,6 +75,7 @@ public class TtsService {
       ttsAudioRepository.save(new TtsAudio(voice, text, audio));
     } catch (DataIntegrityViolationException e) {
       // 같은 문장을 동시에 요청한 다른 사용자가 먼저 저장한 경우다. 이미 저장돼 있으니 그대로 쓴다.
+      log.info("동시 요청으로 이미 저장된 음성이라 저장을 건너뜁니다: voice={}", voice);
     }
     return audio;
   }
