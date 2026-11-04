@@ -349,3 +349,17 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 한계: 백엔드는 jar를 이미지에 굽기 때문에 코드 수정 후에는 `docker compose up --build
     backend`가 필요하다(핫 리로드 없음). 이전 `backend/docker-compose.yml`의 DB 볼륨
     (`backend_kotonoha-machi-db`)은 새 스택과 별개라 기존 로컬 DB 데이터는 이어지지 않는다.
+
+- 테마 학습 읽기·듣기 개선 (2026-11-04).
+  - 복습(말하기) 단계에 "分からない 🥺" 힌트(카드 오른쪽 위), 말하기 중 취소 버튼, 한 글자 항목 제외를 추가했다.
+  - 한자·단어·표현·예문 단계에 "🔊 듣기"와 "あ/ア 읽는 법"(히라가나/가타카나) 버튼을 추가했고, 읽는 법을
+    복습 단계에서만 내려주던 API(`ThemeQuizItemResponse.reading`)를 독해를 제외한 모든 단계로 넓혔다.
+  - 음성은 `docs/decisions/0013-tts-google-cloud.md`대로 백엔드 `tts` 패키지(`GET /api/tts`, Google Cloud
+    TTS Neural2, `tts_audio` 캐시, 사용자당 하루 200회 제한)를 추가하고 프런트 🔊가 이를 우선 쓰게 했다.
+    실패하면 브라우저 내장 음성으로 대신한다.
+  - 검증: `./gradlew spotlessApply && ./gradlew test` 통과(`TtsServiceTest` 포함, Flyway V11 적용 포함),
+    `npm run lint`, `npm run build` 통과. **실제 Google 호출과 소리는 아직 확인하지 못했다**(API 키 설정 전).
+  - 새 `.env` 키: `GOOGLE_TTS_API_KEY`, `GOOGLE_TTS_VOICE`(`backend/.env.example`에 추가함).
+  - 다음 할 일: API 키를 `backend/.env`에 넣고 백엔드를 다시 빌드한 뒤 소리 확인, Google 콘솔의 예산 알림·API
+    할당량 제한 설정, 독해 지문 읽는 법 데이터 추가, 하루 제한을 DB 기준으로 옮길지 검토.
+
