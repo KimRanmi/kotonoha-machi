@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
-import { isSpeechRecognitionSupported, recognizeJapaneseSpeech } from '../lib/speechRecognition';
+import {
+  cancelSpeechRecognition,
+  isSpeechRecognitionSupported,
+  recognizeJapaneseSpeech,
+  SpeechCancelledError,
+} from '../lib/speechRecognition';
 import { isSpeechSynthesisSupported, speakJapanese } from '../lib/speechSynthesis';
 import { calculateTextSimilarity, toHiragana, toKatakana } from '../lib/textSimilarity';
 import {
@@ -200,6 +205,7 @@ function ThemeLearningPage() {
       return;
     }
 
+    cancelSpeechRecognition();
     setIsReadingHintShown(true);
     speakJapanese(currentQuizItem.reading ?? currentQuizItem.prompt);
   }
@@ -221,6 +227,9 @@ function ThemeLearningPage() {
       })
       .catch((error: unknown) => {
         setIsListening(false);
+        if (error instanceof SpeechCancelledError) {
+          return;
+        }
         setSpeechErrorMessage(error instanceof Error ? error.message : '음성 인식에 실패했습니다.');
       });
   }
@@ -356,7 +365,6 @@ function ThemeLearningPage() {
                     <button
                       type="button"
                       className={styles.unknownButton}
-                      disabled={isListening}
                       onClick={handleShowReadingHint}
                     >
                       分からない 🥺
@@ -387,10 +395,10 @@ function ThemeLearningPage() {
                   <button
                     type="button"
                     className={styles.speakButton}
-                    disabled={!speechSupported || isListening || feedback === 'correct'}
-                    onClick={handleStartListening}
+                    disabled={!speechSupported || feedback === 'correct'}
+                    onClick={isListening ? cancelSpeechRecognition : handleStartListening}
                   >
-                    {isListening ? '듣고 있어요…' : '🎤 말하기'}
+                    {isListening ? '⏹ 듣는 중… (누르면 취소)' : '🎤 말하기'}
                   </button>
                   {!speechSupported && (
                     <p className={styles.error} role="alert">
