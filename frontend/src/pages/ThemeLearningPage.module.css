@@ -50,6 +50,7 @@
 }
 
 .card {
+  position: relative;
   min-height: 280px;
   display: flex;
   flex-direction: column;
@@ -160,6 +161,11 @@
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 700;
+}
+.unknownButton {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
 }
 .unknownButton:disabled {
   opacity: 0.6;

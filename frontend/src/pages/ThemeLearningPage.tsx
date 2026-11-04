@@ -121,8 +121,13 @@ function ThemeLearningPage() {
     setContentErrorMessage(null);
 
     getStageContent(theme.id, theme.currentStage)
-      .then((items) => {
+      .then((fetchedItems) => {
         if (!cancelled) {
+          // 복습(말하기)에선 한 글자짜리 항목(한자 등)은 읽기 연습에서 뺀다.
+          const items =
+            theme.currentStage === 'REVIEW'
+              ? fetchedItems.filter((item) => Array.from(item.prompt).length > 1)
+              : fetchedItems;
           setQuizItems(items);
           setCurrentIndex(0);
           setWrongCount(0);
