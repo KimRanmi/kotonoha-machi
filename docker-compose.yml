@@ -1,0 +1,57 @@
+# 프런트엔드 + 백엔드 + DB를 한 번에 띄운다: docker compose up --build
+# 프런트엔드 http://localhost:5173 / 백엔드 http://localhost:8080 / DB localhost:5432
+name: kotonoha-machi
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: kotonoha_machi
+      POSTGRES_USER: kotonoha_machi
+      POSTGRES_PASSWORD: kotonoha_machi
+    ports:
+      - '5432:5432'
+    volumes:
+      - kotonoha-machi-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kotonoha_machi -d kotonoha_machi']
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    # 이메일/소셜 로그인 키 등은 backend/.env에서 읽는다. 파일이 없어도 기동은 된다.
+    env_file:
+      - path: ./backend/.env
+        required: false
+    # environment가 env_file보다 우선하므로, .env에 DB_HOST=localhost가 있어도
+    # 컨테이너 안에서는 db 서비스로 연결된다.
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      FRONTEND_ORIGIN: http://localhost:5173
+      # 로컬은 HTTP라 Secure 쿠키를 끈다(운영은 기본값 true).
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    ports:
+      - '8080:8080'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      # 브라우저가 호스트에서 호출하는 주소라 컨테이너 이름이 아니라 localhost다.
+      VITE_API_BASE_URL: http://localhost:8080
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./frontend:/app
+      # 호스트(macOS)의 node_modules가 컨테이너(Linux)의 것을 덮어쓰지 않도록 분리한다.
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  kotonoha-machi-db:
