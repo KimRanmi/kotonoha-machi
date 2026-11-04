@@ -359,3 +359,9 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
     로그 확인. 로그인/이메일 발송 동작 자체는 확인하지 않았다.
   - 남은 것: Gemini 키(`scripts/import-theme-content/.env`)는 compose가 읽지 않아 이 방식으로는
     워크트리에 안 따라온다(`.worktreeinclude` 등 별도 방법 필요, 미결정).
+
+- `scripts/import-theme-content`의 `propose`가 워크트리에서도 Gemini 키를 찾도록 `--env-file-if-exists`
+  두 개(메인 저장소 `.env` 먼저, 워크트리 `.env` 나중이라 후자가 우선)로 바꿨다. 파일이 없어도
+  Node가 에러를 내지 않고, 키가 없으면 기존 `GEMINI_API_KEY가 없습니다` 메시지가 나온다.
+  - 검증: 워크트리(자체 `.env` 없음)에서 같은 플래그로 `GEMINI_API_KEY`가 설정되는 것을 확인했다
+    (값은 출력하지 않음). Gemini 실제 호출(`npm run propose`)은 하지 않았다.

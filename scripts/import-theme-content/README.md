@@ -22,6 +22,9 @@ npm install
 cp .env.example .env   # GEMINI_API_KEY를 채워넣는다
 ```
 
+워크트리에서 실행하면 `propose`가 메인 저장소의 `scripts/import-theme-content/.env`도 함께 읽는다
+(워크트리의 `.env`가 있으면 그 값이 우선). 그래서 워크트리마다 `.env`를 복사할 필요가 없다.
+
 ## 사용법
 
 1. 후보 제안 + 검증:
