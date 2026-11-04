@@ -12,7 +12,12 @@ import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.tts.TtsAudio;
 import com.kotonohamachi.tts.TtsErrorCode;
 import com.kotonohamachi.tts.repository.TtsAudioRepository;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -97,6 +102,37 @@ class TtsServiceTest {
           catchThrowableOfType(ApiException.class, () -> ttsService.getAudio(1L, "失敗"));
       assertThat(failed.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
+  }
+
+  @Test
+  void getAudio_같은_사용자가_동시에_요청해도_하루_한도를_넘지_못한다() throws Exception {
+    when(ttsAudioRepository.findByVoiceAndText(any(), any())).thenReturn(Optional.empty());
+    when(googleTtsClient.synthesize(any(), any())).thenReturn(new byte[] {1});
+    int requestCount = TtsService.DAILY_SYNTHESIS_LIMIT + 50;
+    ExecutorService executor = Executors.newFixedThreadPool(16);
+
+    List<Future<Boolean>> results = new ArrayList<>();
+    for (int i = 0; i < requestCount; i++) {
+      String text = "並列" + i;
+      results.add(executor.submit(() -> {
+        try {
+          ttsService.getAudio(1L, text);
+          return true;
+        } catch (ApiException e) {
+          return false;
+        }
+      }));
+    }
+    int succeeded = 0;
+    for (Future<Boolean> result : results) {
+      if (result.get()) {
+        succeeded++;
+      }
+    }
+    executor.shutdown();
+
+    assertThat(succeeded).isEqualTo(TtsService.DAILY_SYNTHESIS_LIMIT);
+    verify(googleTtsClient, times(TtsService.DAILY_SYNTHESIS_LIMIT)).synthesize(any(), any());
   }
 
   @Test

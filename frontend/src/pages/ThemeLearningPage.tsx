@@ -125,6 +125,7 @@ function ThemeLearningPage() {
   }, [numericThemeId]);
 
   useEffect(() => {
+    stopSpeaking();
     if (!theme || theme.completed) {
       setQuizItems(null);
       return;

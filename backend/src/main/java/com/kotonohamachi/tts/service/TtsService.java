@@ -69,9 +69,15 @@ public class TtsService {
   }
 
   private byte[] synthesizeAndStore(Long userId, String text) {
-    ensureWithinDailyQuota(userId);
-    byte[] audio = googleTtsClient.synthesize(text, voice);
-    recordSynthesis(userId);
+    reserveDailyQuota(userId);
+    byte[] audio;
+    try {
+      audio = googleTtsClient.synthesize(text, voice);
+    } catch (RuntimeException e) {
+      // 합성에 실패했으니 미리 잡아 둔 횟수를 돌려준다.
+      releaseDailyQuota(userId);
+      throw e;
+    }
     try {
       ttsAudioRepository.save(new TtsAudio(voice, text, audio));
     } catch (DataIntegrityViolationException e) {
@@ -81,24 +87,27 @@ public class TtsService {
     return audio;
   }
 
-  /** 오늘 이미 하루 한도만큼 합성했으면 거부한다. 합성이 실패해도 횟수가 줄지 않도록 세는 건 성공한 뒤에 한다. */
-  private void ensureWithinDailyQuota(Long userId) {
-    DailyCount current = dailyCounts.get(userId);
-    if (current != null
-        && current.date().equals(LocalDate.now(KST))
-        && current.count() >= DAILY_SYNTHESIS_LIMIT) {
+  /**
+   * 합성하기 전에 횟수를 하나 먼저 잡아 둔다. 검사와 증가를 한 번에 하므로, 한 사용자가 서로 다른 문장을 동시에
+   * 여러 개 보내도 한도를 넘지 못한다. 한도를 넘으면 잡았던 횟수를 되돌리고 거부한다.
+   */
+  private void reserveDailyQuota(Long userId) {
+    LocalDate today = LocalDate.now(KST);
+    dailyCounts.values().removeIf(count -> !count.date().equals(today));
+    DailyCount reserved = dailyCounts.merge(
+        userId,
+        new DailyCount(today, 1),
+        (current, added) -> new DailyCount(today, current.count() + 1));
+    if (reserved.count() > DAILY_SYNTHESIS_LIMIT) {
+      releaseDailyQuota(userId);
       throw new ApiException(TtsErrorCode.DAILY_LIMIT_EXCEEDED);
     }
   }
 
-  /** 합성에 성공한 횟수를 하나 올리고, 어제 이전 기록은 정리한다. */
-  private void recordSynthesis(Long userId) {
-    LocalDate today = LocalDate.now(KST);
-    dailyCounts.values().removeIf(count -> !count.date().equals(today));
-    dailyCounts.merge(
-        userId,
-        new DailyCount(today, 1),
-        (current, added) -> new DailyCount(today, current.count() + 1));
+  /** 잡아 둔 횟수를 하나 돌려준다(합성에 실패했거나 한도를 넘었을 때). */
+  private void releaseDailyQuota(Long userId) {
+    dailyCounts.computeIfPresent(
+        userId, (id, current) -> new DailyCount(current.date(), Math.max(0, current.count() - 1)));
   }
 
   /** 사용자 한 명의 하루 합성 횟수. */
