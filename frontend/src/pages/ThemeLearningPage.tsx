@@ -60,6 +60,15 @@ function calculateSpeechAccuracy(transcript: string, quizItem: QuizItem): number
   return Math.max(surfaceAccuracy, readingAccuracy);
 }
 
+/**
+ * 소리로 읽어 줄 글자를 정한다. 한자 한 글자는 문맥이 없어 엔진이 잘못 읽기 쉬우니 읽는 법을 쓰고, 단어·표현·
+ * 문장은 한자가 섞인 원문을 그대로 넘긴다 — 히라가나만 넘기면 단어 경계와 악센트 정보가 사라져 억양이 평평해진다.
+ */
+function getSpokenText(quizItem: QuizItem): string {
+  const isSingleCharacter = Array.from(quizItem.prompt).length === 1;
+  return isSingleCharacter ? (quizItem.reading ?? quizItem.prompt) : quizItem.prompt;
+}
+
 function ThemeLearningPage() {
   const { themeId } = useParams<{ themeId: string }>();
   const numericThemeId = Number(themeId);
@@ -207,7 +216,7 @@ function ThemeLearningPage() {
 
     cancelSpeechRecognition();
     setIsReadingHintShown(true);
-    speakJapanese(currentQuizItem.reading ?? currentQuizItem.prompt);
+    speakJapanese(getSpokenText(currentQuizItem));
   }
 
   function handleStartListening() {
@@ -335,9 +344,7 @@ function ThemeLearningPage() {
                     <button
                       type="button"
                       className={styles.listenButton}
-                      onClick={() =>
-                        speakJapanese(currentQuizItem.reading ?? currentQuizItem.prompt)
-                      }
+                      onClick={() => speakJapanese(getSpokenText(currentQuizItem))}
                     >
                       🔊 듣기
                     </button>
