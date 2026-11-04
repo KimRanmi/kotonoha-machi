@@ -215,4 +215,24 @@ class CustomOAuth2UserServiceTest {
     assertThatThrownBy(() -> authService.loadUser(userRequest("google")))
         .isInstanceOf(OAuth2AuthenticationException.class);
   }
+
+  @Test
+  void 탈퇴한_계정과_같은_이메일로_처음_소셜_연결을_시도하면_연결을_저장하지_않고_즉시_예외를_던진다() {
+    User withdrawnUser =
+        new User("a@test.com", "hash", "nick", "000000", OffsetDateTime.now().plusMinutes(10));
+    withdrawnUser.withdraw();
+    OAuth2User googleUser = new DefaultOAuth2User(
+        List.of(), Map.of("sub", "google-123", "email", "a@test.com", "name", "테스트"), "sub");
+    when(delegate.loadUser(any())).thenReturn(googleUser);
+    when(socialAccountRepository.findByProviderAndProviderUserId(
+            SocialProvider.GOOGLE, "google-123"))
+        .thenReturn(Optional.empty());
+    when(userRepository.findByEmail("a@test.com")).thenReturn(Optional.of(withdrawnUser));
+
+    assertThatThrownBy(() -> authService.loadUser(userRequest("google")))
+        .isInstanceOf(OAuth2AuthenticationException.class);
+
+    verify(socialAccountRepository, never()).save(any());
+    verify(userRepository, never()).save(any());
+  }
 }
