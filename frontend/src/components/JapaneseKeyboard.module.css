@@ -1,0 +1,99 @@
+.key {
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  user-select: none;
+}
+.key:hover {
+  border-color: var(--color-primary);
+}
+.key:active {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+/* 플릭 키보드 */
+.flickGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-areas:
+    'k0 k1 k2 delete'
+    'k3 k4 k5 space'
+    'k6 k7 k8 space'
+    'modify k9 k10 space';
+  gap: var(--space-1);
+}
+
+.flickKey {
+  position: relative;
+  height: 52px;
+  /* 키 위에서 손가락을 밀 때 화면이 스크롤되지 않게 한다. */
+  touch-action: none;
+}
+
+.sideKey {
+  height: 52px;
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* 키를 누른 동안 키 위에 3배 크기로 겹쳐 뜨는 십자 모양 후보 */
+.flickPopup {
+  position: absolute;
+  inset: -100%;
+  z-index: 1;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+
+.flickChoice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  font-size: 1.2rem;
+}
+
+.flickChoiceActive {
+  border-radius: var(--radius-sm);
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+/* QWERTY 키보드 */
+.qwerty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.qwertyRow {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.letterKey {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 36px;
+  height: 44px;
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.spaceKey {
+  flex: 5;
+  height: 44px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}

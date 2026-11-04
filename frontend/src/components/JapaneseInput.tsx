@@ -1,42 +1,58 @@
 import { useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { toKana, toKatakana } from 'wanakana';
+import { toHiragana, toKana, toKatakana } from 'wanakana';
+import FlickKeyboard from './FlickKeyboard';
+import QwertyKeyboard from './QwertyKeyboard';
 import styles from './JapaneseInput.module.css';
 
 type KanaMode = 'toHiragana' | 'toKatakana';
 
-/** 가상 키보드 키. 공백 문자는 빈 칸이고, 히라가나로 적고 가타카나 모드에서 변환해 보여 준다. */
-const KEY_ROWS = [
-  'あいうえお',
-  'かきくけこ',
-  'さしすせそ',
-  'たちつてと',
-  'なにぬねの',
-  'はひふへほ',
-  'まみむめも',
-  'やゆよ',
-  'らりるれろ',
-  'わをんー',
-  'がぎぐげご',
-  'ざじずぜぞ',
-  'だぢづでど',
-  'ばびぶべぼ',
-  'ぱぴぷぺぽ',
-  'ぁぃぅぇぉ',
-  'ゃゅょっ',
+/** `゛゜` 키가 직전 글자를 순서대로 바꿀 때 쓰는 묶음(か → が → か, は → ば → ぱ → は ...). */
+const MODIFY_CYCLES = [
+  'あぁ',
+  'いぃ',
+  'うぅ',
+  'えぇ',
+  'おぉ',
+  'かが',
+  'きぎ',
+  'くぐ',
+  'けげ',
+  'こご',
+  'さざ',
+  'しじ',
+  'すず',
+  'せぜ',
+  'そぞ',
+  'ただ',
+  'ちぢ',
+  'つっづ',
+  'てで',
+  'とど',
+  'はばぱ',
+  'ひびぴ',
+  'ふぶぷ',
+  'へべぺ',
+  'ほぼぽ',
+  'やゃ',
+  'ゆゅ',
+  'よょ',
 ];
+
+type KeyboardType = 'flick' | 'qwerty';
 
 interface JapaneseInputProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  keyboard?: KeyboardType;
 }
 
 /**
  * 영문 키보드로 친 로마자를 히라가나(또는 가타카나)로 바꿔 주는 입력란.
  * 히라가나/가타카나는 사용자가 버튼으로 직접 전환한다. 화면 가상 키보드로도 입력할 수 있다.
  */
-function JapaneseInput({ value, onChange, placeholder }: JapaneseInputProps) {
+function JapaneseInput({ value, onChange, placeholder, keyboard = 'flick' }: JapaneseInputProps) {
   const [mode, setMode] = useState<KanaMode>('toHiragana');
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
@@ -45,8 +61,31 @@ function JapaneseInput({ value, onChange, placeholder }: JapaneseInputProps) {
     onChange(toKana(event.target.value, { IMEMode: mode }));
   }
 
-  function pressKey(kana: string) {
-    onChange(value + (mode === 'toKatakana' ? toKatakana(kana) : kana));
+  function appendKana(kana: string) {
+    onChange(value + kana);
+  }
+
+  function appendLetter(letter: string) {
+    onChange(toKana(value + letter, { IMEMode: mode }));
+  }
+
+  function modifyLast() {
+    const chars = Array.from(value);
+    const last = chars.pop();
+    if (last === undefined) {
+      return;
+    }
+    const hiragana = toHiragana(last);
+    const cycle = MODIFY_CYCLES.find((group) => group.includes(hiragana));
+    if (cycle === undefined) {
+      return;
+    }
+    const next = cycle[(cycle.indexOf(hiragana) + 1) % cycle.length];
+    onChange(chars.join('') + (mode === 'toKatakana' ? toKatakana(next) : next));
+  }
+
+  function appendSpace() {
+    onChange(`${value} `);
   }
 
   function deleteLast() {
@@ -80,23 +119,17 @@ function JapaneseInput({ value, onChange, placeholder }: JapaneseInputProps) {
       </div>
       {isKeyboardOpen && (
         <div className={styles.keyboard}>
-          {KEY_ROWS.map((row) => (
-            <div key={row} className={styles.keyRow}>
-              {Array.from(row).map((kana) => (
-                <button
-                  key={kana}
-                  type="button"
-                  className={styles.key}
-                  onClick={() => pressKey(kana)}
-                >
-                  {mode === 'toKatakana' ? toKatakana(kana) : kana}
-                </button>
-              ))}
-            </div>
-          ))}
-          <button type="button" className={styles.deleteKey} onClick={deleteLast}>
-            ⌫ 지우기
-          </button>
+          {keyboard === 'flick' ? (
+            <FlickKeyboard
+              isKatakana={mode === 'toKatakana'}
+              onKana={appendKana}
+              onModify={modifyLast}
+              onSpace={appendSpace}
+              onDelete={deleteLast}
+            />
+          ) : (
+            <QwertyKeyboard onLetter={appendLetter} onSpace={appendSpace} onDelete={deleteLast} />
+          )}
         </div>
       )}
     </div>
