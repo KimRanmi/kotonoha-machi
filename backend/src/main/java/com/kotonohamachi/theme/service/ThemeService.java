@@ -102,19 +102,21 @@ public class ThemeService {
   }
 
   /**
-   * "오늘의 학습" 배너에 추천할 테마를 조회한다. 오늘(한국 시간) 안에 테마를 하나라도 완료했으면 그날은 더 이상
-   * 추천하지 않는다(빈 값). 그렇지 않으면 아직 완료하지 않은 테마 중 첫 번째를 추천한다.
+   * "오늘의 학습" 배너에 보여 줄 테마를 조회한다. 오늘(한국 시간) 안에 테마를 완료했으면 그날은 새 테마를 추천하지
+   * 않고(하루 1개), 방금 완료한 그 테마를 완료 상태로 돌려줘 당일엔 단계별 내용을 다시 볼 수 있게 한다. 그렇지
+   * 않으면 아직 완료하지 않은 테마 중 첫 번째를 추천한다.
    *
    * @param userId 조회할 사용자 ID(로그인한 본인)
-   * @return 추천할 테마(오늘 이미 완료했거나 모든 테마를 끝냈으면 빈 값)
+   * @return 보여 줄 테마(오늘 완료한 테마, 없으면 추천 테마, 모든 테마를 끝냈으면 빈 값)
    */
   @Transactional(readOnly = true)
   public Optional<ThemeResponse> getTodayRecommendedTheme(Long userId) {
     List<ThemeProgress> progressList = themeProgressRepository.findAllByUserId(userId);
-    boolean completedToday = progressList.stream()
-        .anyMatch(progress -> progress.isCompleted() && isToday(progress.getUpdatedAt()));
-    if (completedToday) {
-      return Optional.empty();
+    Optional<ThemeProgress> completedToday = progressList.stream()
+        .filter(progress -> progress.isCompleted() && isToday(progress.getUpdatedAt()))
+        .findFirst();
+    if (completedToday.isPresent()) {
+      return Optional.of(toThemeResponse(completedToday.get().getTheme(), completedToday.get()));
     }
 
     Map<Long, ThemeProgress> progressByThemeId = progressList.stream()

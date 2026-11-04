@@ -74,6 +74,8 @@ function ThemeLearningPage() {
   const numericThemeId = Number(themeId);
 
   const [theme, setTheme] = useState<Theme | null>(null);
+  // 완료한 테마를 다시 볼 때 고른 단계. 완료 전에는 쓰이지 않는다.
+  const [viewStage, setViewStage] = useState<ThemeStage>('KANJI');
   const [isLoading, setIsLoading] = useState(true);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [isAdvancing, setIsAdvancing] = useState(false);
@@ -124,9 +126,12 @@ function ThemeLearningPage() {
     };
   }, [numericThemeId]);
 
+  // 진행 중이면 지금 단계, 완료한 테마면 사용자가 고른 단계의 내용을 보여 준다.
+  const activeStage = theme ? (theme.completed ? viewStage : theme.currentStage) : null;
+
   useEffect(() => {
     stopSpeaking();
-    if (!theme || theme.completed) {
+    if (!theme || !activeStage) {
       setQuizItems(null);
       return;
     }
@@ -135,12 +140,12 @@ function ThemeLearningPage() {
     setIsContentLoading(true);
     setContentErrorMessage(null);
 
-    getStageContent(theme.id, theme.currentStage)
+    getStageContent(theme.id, activeStage)
       .then((fetchedItems) => {
         if (!cancelled) {
           // 복습(말하기)에선 한 글자짜리 항목(한자 등)은 읽기 연습에서 뺀다.
           const items =
-            theme.currentStage === 'REVIEW'
+            activeStage === 'REVIEW'
               ? fetchedItems.filter((item) => Array.from(item.prompt).length > 1)
               : fetchedItems;
           setQuizItems(items);
@@ -170,7 +175,7 @@ function ThemeLearningPage() {
     return () => {
       cancelled = true;
     };
-  }, [theme]);
+  }, [theme, activeStage]);
 
   // 페이지를 떠날 때 재생 중인 소리와 켜져 있는 마이크 인식을 멈춘다.
   useEffect(() => {
@@ -306,7 +311,7 @@ function ThemeLearningPage() {
   }
 
   const currentStageIndex = STAGE_ORDER.indexOf(theme.currentStage);
-  const isReviewStage = theme.currentStage === 'REVIEW';
+  const isReviewStage = activeStage === 'REVIEW';
   const speechSupported = isSpeechRecognitionSupported();
 
   return (
@@ -321,17 +326,31 @@ function ThemeLearningPage() {
             <li
               key={stage}
               className={styles.step}
-              data-active={theme.completed || index <= currentStageIndex}
+              data-active={theme.completed ? stage === viewStage : index <= currentStageIndex}
             >
-              {STAGE_LABELS[stage]}
+              {theme.completed ? (
+                <button
+                  type="button"
+                  className={styles.stepButton}
+                  onClick={() => setViewStage(stage)}
+                >
+                  {STAGE_LABELS[stage]}
+                </button>
+              ) : (
+                STAGE_LABELS[stage]
+              )}
             </li>
           ))}
         </ol>
 
+        {theme.completed && (
+          <p className={styles.completedNotice}>
+            테마를 모두 완료했습니다! 오늘은 단계를 눌러 다시 볼 수 있어요.
+          </p>
+        )}
+
         <div className={styles.card}>
-          {theme.completed ? (
-            <p className={styles.cardMessage}>테마를 모두 완료했습니다!</p>
-          ) : isContentLoading ? (
+          {isContentLoading ? (
             <p className={styles.cardMessage}>콘텐츠를 불러오는 중입니다…</p>
           ) : contentErrorMessage ? (
             <p className={styles.error} role="alert">
@@ -339,7 +358,9 @@ function ThemeLearningPage() {
             </p>
           ) : allQuizItemsAnswered ? (
             <p className={styles.cardMessage}>
-              이 단계의 문제를 모두 맞혔습니다! 아래 "다음" 버튼으로 진행하세요.
+              {theme.completed
+                ? '이 단계를 모두 마쳤습니다! 위에서 다른 단계를 골라 다시 볼 수 있어요.'
+                : '이 단계의 문제를 모두 맞혔습니다! 아래 "다음" 버튼으로 진행하세요.'}
             </p>
           ) : currentQuizItem ? (
             <div className={styles.quiz}>

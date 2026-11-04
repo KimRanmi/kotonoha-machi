@@ -41,7 +41,8 @@ export async function getThemes(): Promise<Theme[]> {
 }
 
 /**
- * "오늘의 학습" 배너에 추천할 테마를 가져온다. 오늘(한국 시간) 안에 테마를 하나라도 완료했으면 `null`이다.
+ * "오늘의 학습" 배너에 보여 줄 테마를 가져온다. 오늘(한국 시간) 안에 테마를 완료했으면 새 테마 대신 그
+ * 완료한 테마(`completed: true`)를 돌려주고, 모든 테마를 끝냈으면 `null`이다.
  */
 export async function getTodayRecommendation(): Promise<Theme | null> {
   const response = await apiFetch('/api/themes/today-recommendation');
