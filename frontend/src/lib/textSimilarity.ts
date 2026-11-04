@@ -31,6 +31,20 @@ export function toHiragana(text: string): string {
     .join('');
 }
 
+/** 히라가나를 가타카나로 바꾼다(그 외 문자는 그대로 둔다). 읽는 법을 가타카나로도 보여줄 때 쓴다. */
+export function toKatakana(text: string): string {
+  return Array.from(text)
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      const hiraganaStart = KATAKANA_START - KATAKANA_TO_HIRAGANA_OFFSET;
+      const hiraganaEnd = KATAKANA_END - KATAKANA_TO_HIRAGANA_OFFSET;
+      return codePoint >= hiraganaStart && codePoint <= hiraganaEnd
+        ? String.fromCodePoint(codePoint + KATAKANA_TO_HIRAGANA_OFFSET)
+        : character;
+    })
+    .join('');
+}
+
 function levenshteinDistance(a: string, b: string): number {
   const rows = a.length + 1;
   const columns = b.length + 1;

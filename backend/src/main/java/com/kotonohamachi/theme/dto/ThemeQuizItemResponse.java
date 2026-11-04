@@ -11,8 +11,8 @@ import java.util.List;
  * @param options 보기 목록(정답 포함, 뒤섞인 순서). 데이터가 부족하면 4개보다 적을 수 있고, REVIEW는 항상
  *     빈 목록이다.
  * @param correctAnswer 정답 보기(뜻 또는 번역). REVIEW는 예외적으로 {@code prompt}와 같은 값이다.
- * @param reading REVIEW 전용 히라가나 읽는 법(음성 인식 결과가 한자 표기 대신 가나로 나올 때 비교할
- *     기준 문자열). 다른 단계는 쓰지 않아 항상 null이다.
+ * @param reading 히라가나 읽는 법. 학습 화면의 읽는 법 보기·소리 재생과 REVIEW의 음성 인식 비교(결과가 한자
+ *     대신 가나로 나올 때)에 쓴다. 독해 지문(READING)은 읽는 법 데이터가 없어 null이다.
  * @param jlptLevel JLPT 레벨(5=N5 ~ 1=N1). 예문(EXAMPLE) 단계는 레벨 데이터가 없어 null이다.
  */
 public record ThemeQuizItemResponse(

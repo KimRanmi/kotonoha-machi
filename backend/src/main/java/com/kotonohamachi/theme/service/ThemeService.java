@@ -189,8 +189,12 @@ public class ThemeService {
     List<String> answerPool =
         themeKanjiRepository.findAll().stream().map(ThemeKanji::getMeaning).toList();
     return kanjiList.stream()
-        .map(kanji ->
-            toQuizItem(kanji.getKanji(), kanji.getMeaning(), answerPool, kanji.getJlptLevel()))
+        .map(kanji -> toQuizItem(
+            kanji.getKanji(),
+            kanji.getMeaning(),
+            answerPool,
+            firstReading(kanji.getOnReading()),
+            kanji.getJlptLevel()))
         .toList();
   }
 
@@ -204,6 +208,7 @@ public class ThemeService {
             vocabulary.getSurfaceForm(),
             vocabulary.getMeaning(),
             answerPool,
+            vocabulary.getReading(),
             vocabulary.getJlptLevel()))
         .toList();
   }
@@ -255,8 +260,12 @@ public class ThemeService {
         .map(ThemeExample::getTranslation)
         .toList();
     return exampleList.stream()
-        .map(example ->
-            toQuizItem(example.getJapaneseSentence(), example.getTranslation(), answerPool, null))
+        .map(example -> toQuizItem(
+            example.getJapaneseSentence(),
+            example.getTranslation(),
+            answerPool,
+            example.getReading(),
+            null))
         .toList();
   }
 
@@ -266,7 +275,11 @@ public class ThemeService {
         .toList();
     return passages.stream()
         .map(passage -> toQuizItem(
-            passage.getPassage(), passage.getTranslation(), answerPool, passage.getJlptLevel()))
+            passage.getPassage(),
+            passage.getTranslation(),
+            answerPool,
+            null,
+            passage.getJlptLevel()))
         .toList();
   }
 
@@ -275,7 +288,11 @@ public class ThemeService {
    * #MAX_OPTIONS}-1개 무작위로 골라 오답으로 섞는다. 풀에 다른 값이 부족하면 보기가 그만큼 적게 나온다.
    */
   private ThemeQuizItemResponse toQuizItem(
-      String prompt, String correctAnswer, List<String> answerPool, Integer jlptLevel) {
+      String prompt,
+      String correctAnswer,
+      List<String> answerPool,
+      String reading,
+      Integer jlptLevel) {
     List<String> distractors = answerPool.stream()
         .filter(candidate -> !candidate.equals(correctAnswer))
         .distinct()
@@ -287,7 +304,7 @@ public class ThemeService {
     options.addAll(distractors.subList(0, Math.min(MAX_OPTIONS - 1, distractors.size())));
     Collections.shuffle(options, ThreadLocalRandom.current());
 
-    return new ThemeQuizItemResponse(prompt, options, correctAnswer, null, jlptLevel);
+    return new ThemeQuizItemResponse(prompt, options, correctAnswer, reading, jlptLevel);
   }
 
   private Theme findThemeOrThrow(Long themeId) {

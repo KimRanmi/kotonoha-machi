@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { isSpeechRecognitionSupported, recognizeJapaneseSpeech } from '../lib/speechRecognition';
 import { isSpeechSynthesisSupported, speakJapanese } from '../lib/speechSynthesis';
-import { calculateTextSimilarity, toHiragana } from '../lib/textSimilarity';
+import { calculateTextSimilarity, toHiragana, toKatakana } from '../lib/textSimilarity';
 import {
   completeStage,
   getStageContent,
@@ -315,6 +315,36 @@ function ThemeLearningPage() {
               )}
               <p className={styles.prompt}>{currentQuizItem.prompt}</p>
 
+              {!isReviewStage && (
+                <div className={styles.promptTools}>
+                  {isSpeechSynthesisSupported() && (
+                    <button
+                      type="button"
+                      className={styles.listenButton}
+                      onClick={() =>
+                        speakJapanese(currentQuizItem.reading ?? currentQuizItem.prompt)
+                      }
+                    >
+                      🔊 듣기
+                    </button>
+                  )}
+                  {currentQuizItem.reading && (
+                    <button
+                      type="button"
+                      className={styles.listenButton}
+                      onClick={() => setIsReadingHintShown((shown) => !shown)}
+                    >
+                      あ/ア 읽는 법
+                    </button>
+                  )}
+                </div>
+              )}
+              {!isReviewStage && isReadingHintShown && currentQuizItem.reading && (
+                <p className={styles.readingText}>
+                  {currentQuizItem.reading} / {toKatakana(currentQuizItem.reading)}
+                </p>
+              )}
+
               {isReviewStage ? (
                 <div className={styles.speechPractice}>
                   {feedback !== 'correct' && (
@@ -330,7 +360,9 @@ function ThemeLearningPage() {
                   {isReadingHintShown && feedback !== 'correct' && (
                     <div className={styles.readingHint}>
                       <span className={styles.readingText}>
-                        {currentQuizItem.reading ?? currentQuizItem.prompt}
+                        {currentQuizItem.reading
+                          ? `${currentQuizItem.reading} / ${toKatakana(currentQuizItem.reading)}`
+                          : currentQuizItem.prompt}
                       </span>
                       {isSpeechSynthesisSupported() ? (
                         <button
