@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { toKana, toKatakana } from 'wanakana';
+import styles from './JapaneseInput.module.css';
 
 type KanaMode = 'toHiragana' | 'toKatakana';
 
@@ -54,29 +55,46 @@ function JapaneseInput({ value, onChange, placeholder }: JapaneseInputProps) {
   }
 
   return (
-    <div>
-      <input value={value} onChange={handleChange} placeholder={placeholder} />
-      <button
-        type="button"
-        onClick={() => setMode(mode === 'toHiragana' ? 'toKatakana' : 'toHiragana')}
-      >
-        {mode === 'toHiragana' ? 'あ 히라가나' : 'ア 가타카나'}
-      </button>
-      <button type="button" onClick={() => setIsKeyboardOpen(!isKeyboardOpen)}>
-        키보드
-      </button>
+    <div className={styles.wrapper}>
+      <div className={styles.inputRow}>
+        <input
+          className={styles.input}
+          value={value}
+          onChange={handleChange}
+          placeholder={placeholder}
+        />
+        <button
+          type="button"
+          className={`${styles.toolButton} ${mode === 'toKatakana' ? styles.toolButtonActive : ''}`}
+          onClick={() => setMode(mode === 'toHiragana' ? 'toKatakana' : 'toHiragana')}
+        >
+          {mode === 'toHiragana' ? 'あ 히라가나' : 'ア 가타카나'}
+        </button>
+        <button
+          type="button"
+          className={`${styles.toolButton} ${isKeyboardOpen ? styles.toolButtonActive : ''}`}
+          onClick={() => setIsKeyboardOpen(!isKeyboardOpen)}
+        >
+          키보드
+        </button>
+      </div>
       {isKeyboardOpen && (
-        <div>
+        <div className={styles.keyboard}>
           {KEY_ROWS.map((row) => (
-            <div key={row}>
+            <div key={row} className={styles.keyRow}>
               {Array.from(row).map((kana) => (
-                <button key={kana} type="button" onClick={() => pressKey(kana)}>
+                <button
+                  key={kana}
+                  type="button"
+                  className={styles.key}
+                  onClick={() => pressKey(kana)}
+                >
                   {mode === 'toKatakana' ? toKatakana(kana) : kana}
                 </button>
               ))}
             </div>
           ))}
-          <button type="button" onClick={deleteLast}>
+          <button type="button" className={styles.deleteKey} onClick={deleteLast}>
             ⌫ 지우기
           </button>
         </div>

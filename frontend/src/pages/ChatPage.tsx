@@ -10,7 +10,7 @@ function ChatPage() {
   return (
     <main>
       <h1>주민과의 대화: {residentId}</h1>
-      <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
+      <JapaneseInput value={text} onChange={setText} placeholder="영어 → かな" />
     </main>
   );
 }
