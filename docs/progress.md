@@ -412,3 +412,9 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 브라우저에서 직접 눌러 보는
     확인과 이 동작을 직접 겨냥한 자동 테스트는 하지 않았다.
   - 한계: 다음 날 0시(한국 시간)가 지나면 완료한 테마는 배너에서 사라지고 다음 테마가 추천된다.
+- 코드 리뷰(REVIEW_PASSED) 권고를 반영했다.
+  - 오늘 완료한 테마가 여러 개면 `updatedAt`이 가장 최근인 것을 고른다(순서가 임의이던 `findFirst` 대체).
+  - 단계 전환 시 `cancelSpeechRecognition()`을 호출해, 열람 모드에서 이전 단계의 마이크 인식 결과가 새 단계에
+    반영되지 않게 했다.
+  - 하루 1개 제한이 서버 강제가 아니라 추천 로직뿐이라는 한계를 `docs/decisions/0014-...md`에 적었다.
+  - 검증: 아래 명령 통과 확인(backend spotless·test, frontend prettier·lint·build).

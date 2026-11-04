@@ -25,6 +25,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -114,7 +115,7 @@ public class ThemeService {
     List<ThemeProgress> progressList = themeProgressRepository.findAllByUserId(userId);
     Optional<ThemeProgress> completedToday = progressList.stream()
         .filter(progress -> progress.isCompleted() && isToday(progress.getUpdatedAt()))
-        .findFirst();
+        .max(Comparator.comparing(ThemeProgress::getUpdatedAt));
     if (completedToday.isPresent()) {
       return Optional.of(toThemeResponse(completedToday.get().getTheme(), completedToday.get()));
     }

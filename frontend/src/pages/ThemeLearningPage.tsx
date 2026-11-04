@@ -131,6 +131,8 @@ function ThemeLearningPage() {
 
   useEffect(() => {
     stopSpeaking();
+    // 단계를 바꿀 때 이전 단계에서 듣고 있던 마이크 인식이 새 단계 문제에 반영되지 않게 멈춘다.
+    cancelSpeechRecognition();
     if (!theme || !activeStage) {
       setQuizItems(null);
       return;
