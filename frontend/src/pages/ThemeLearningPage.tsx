@@ -317,14 +317,6 @@ function ThemeLearningPage() {
 
               {isReviewStage ? (
                 <div className={styles.speechPractice}>
-                  <button
-                    type="button"
-                    className={styles.speakButton}
-                    disabled={!speechSupported || isListening || feedback === 'correct'}
-                    onClick={handleStartListening}
-                  >
-                    {isListening ? '듣고 있어요…' : '🎤 말하기'}
-                  </button>
                   {feedback !== 'correct' && (
                     <button
                       type="button"
@@ -332,7 +324,7 @@ function ThemeLearningPage() {
                       disabled={isListening}
                       onClick={handleShowReadingHint}
                     >
-                      모르겠어요
+                      모르겠어요 🥺
                     </button>
                   )}
                   {isReadingHintShown && feedback !== 'correct' && (
@@ -355,6 +347,14 @@ function ThemeLearningPage() {
                       )}
                     </div>
                   )}
+                  <button
+                    type="button"
+                    className={styles.speakButton}
+                    disabled={!speechSupported || isListening || feedback === 'correct'}
+                    onClick={handleStartListening}
+                  >
+                    {isListening ? '듣고 있어요…' : '🎤 말하기'}
+                  </button>
                   {!speechSupported && (
                     <p className={styles.error} role="alert">
                       이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 이용해주세요.
