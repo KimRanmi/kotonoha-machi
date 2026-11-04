@@ -21,7 +21,7 @@
 
 - 백엔드의 `tts` 패키지가 `GET /api/tts?text=...`로 MP3를 돌려준다. Google 호출은 백엔드에서만 하고 키는
   `backend/.env`(`GOOGLE_TTS_API_KEY`)에만 둔다. 새 라이브러리 없이 Spring `RestClient`로 REST 호출한다.
-- 음성은 `ja-JP-Neural2-C`가 기본값이고 `GOOGLE_TTS_VOICE`로 바꾼다. 음성을 바꾸면 이미 저장한 음성은
+- 음성은 `ja-JP-Neural2-B`가 기본값이고 `GOOGLE_TTS_VOICE`로 바꾼다. 음성을 바꾸면 이미 저장한 음성은
   쓰이지 않고 새로 합성한다.
 - 합성한 MP3는 `tts_audio` 테이블(음성 + 문장 기준 유일)에 저장하고 모든 사용자가 재사용한다. 학습
   콘텐츠는 모두가 같은 문장을 보므로 사실상 콘텐츠당 한 번만 비용이 든다.

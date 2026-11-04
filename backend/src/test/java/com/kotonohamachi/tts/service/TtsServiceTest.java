@@ -23,7 +23,7 @@ import org.springframework.http.HttpStatus;
 @ExtendWith(MockitoExtension.class)
 class TtsServiceTest {
 
-  private static final String VOICE = "ja-JP-Neural2-C";
+  private static final String VOICE = "ja-JP-Neural2-B";
 
   @Mock
   private TtsAudioRepository ttsAudioRepository;

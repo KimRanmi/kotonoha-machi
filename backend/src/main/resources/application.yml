@@ -42,4 +42,4 @@ app:
     # 기본 음성으로 대신한다.
     google-api-key: ${GOOGLE_TTS_API_KEY:}
     # 합성에 쓸 일본어 음성. 바꾸면 이미 저장해 둔 음성은 쓰이지 않고 새로 합성한다.
-    voice: ${GOOGLE_TTS_VOICE:ja-JP-Neural2-C}
+    voice: ${GOOGLE_TTS_VOICE:ja-JP-Neural2-B}
