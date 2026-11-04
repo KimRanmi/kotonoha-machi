@@ -152,7 +152,8 @@
 }
 
 .unknownButton,
-.listenButton {
+.listenButton,
+.cancelButton {
   height: 28px;
   padding: 0 var(--space-3);
   color: var(--color-primary);
