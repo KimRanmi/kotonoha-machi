@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -399,7 +400,8 @@ class AuthControllerIntegrationTest {
             .session(session)
             .contentType(MediaType.APPLICATION_JSON)
             .content(withdrawJson(password)))
-        .andExpect(status().isNoContent());
+        .andExpect(status().isNoContent())
+        .andExpect(cookie().maxAge("JSESSIONID", 0));
 
     // 탈퇴 즉시 세션이 무효화되어 같은 세션으로는 더 이상 인증된 요청을 할 수 없다.
     mockMvc.perform(get("/api/auth/me").session(session)).andExpect(status().isUnauthorized());
