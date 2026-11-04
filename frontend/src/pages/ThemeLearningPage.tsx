@@ -189,7 +189,7 @@ function ThemeLearningPage() {
     setIsReadingHintShown(false);
   }
 
-  /** "わからない"(모르겠어요): 읽는 법을 보여 주고 소리로 들려준다. 읽는 법이 없으면 표기 자체를 읽는다. */
+  /** "分からない"(모르겠어요): 읽는 법을 보여 주고 소리로 들려준다. 읽는 법이 없으면 표기 자체를 읽는다. */
   function handleShowReadingHint() {
     if (!currentQuizItem) {
       return;
@@ -354,7 +354,7 @@ function ThemeLearningPage() {
                       disabled={isListening}
                       onClick={handleShowReadingHint}
                     >
-                      わからない 🥺
+                      分からない 🥺
                     </button>
                   )}
                   {isReadingHintShown && feedback !== 'correct' && (
