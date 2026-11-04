@@ -25,6 +25,10 @@ services:
     env_file:
       - path: ./backend/.env
         required: false
+      # 워크트리(<메인>/.claude/worktrees/<이름>)에서 실행하면 메인 저장소의 .env를 읽는다.
+      # 메인에서 실행할 땐 저장소 밖을 가리켜 없는 파일이라 무시된다.
+      - path: ../../../backend/.env
+        required: false
     # environment가 env_file보다 우선하므로, .env에 DB_HOST=localhost가 있어도
     # 컨테이너 안에서는 db 서비스로 연결된다.
     environment:

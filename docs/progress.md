@@ -349,3 +349,13 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 한계: 백엔드는 jar를 이미지에 굽기 때문에 코드 수정 후에는 `docker compose up --build
     backend`가 필요하다(핫 리로드 없음). 이전 `backend/docker-compose.yml`의 DB 볼륨
     (`backend_kotonoha-machi-db`)은 새 스택과 별개라 기존 로컬 DB 데이터는 이어지지 않는다.
+
+- `docker-compose.yml`의 백엔드 `env_file`에 `../../../backend/.env`를 추가했다. 워크트리에는
+  git이 추적하지 않는 `backend/.env`가 없어서 이메일/소셜 로그인 키가 컨테이너에 안 들어가던 문제를
+  고친다. 워크트리(`<메인>/.claude/worktrees/<이름>`)에서 실행하면 메인의 `.env`를 읽고,
+  메인에서 실행하면 저장소 밖 경로라 무시된다(둘 다 `required: false`).
+  - 검증: `docker compose config` 통과, 백엔드 재기동 후 컨테이너 환경변수에 Resend/구글/카카오/
+    네이버 키가 들어온 것(값은 출력하지 않고 설정 여부만)과 `Started KotonohaMachiApplication`
+    로그 확인. 로그인/이메일 발송 동작 자체는 확인하지 않았다.
+  - 남은 것: Gemini 키(`scripts/import-theme-content/.env`)는 compose가 읽지 않아 이 방식으로는
+    워크트리에 안 따라온다(`.worktreeinclude` 등 별도 방법 필요, 미결정).
