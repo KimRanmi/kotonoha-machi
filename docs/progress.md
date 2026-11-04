@@ -150,3 +150,19 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 다음 할 일: 섹션 5의 2번 항목(한자·단어·표현의 실제 뜻/읽는 법을 DB에서 가져오기) —
     콘텐츠 출처(자체 제작 vs 공개 JLPT 리스트)가 아직 미정이라 구현 전에 논의 필요. 이번
     게이트 API를 쓰는 프런트엔드 화면은 아직 없다.
+
+## 2026-11-04
+
+- 프런트엔드·백엔드·DB를 로컬 직접 실행 대신 Docker로 실행하도록 바꿨다.
+  - 루트 `docker-compose.yml`(db/backend/frontend 3개 서비스)로 통합하고, DB만 있던
+    `backend/docker-compose.yml`은 삭제했다. 백엔드는 멀티 스테이지 Dockerfile(JDK 25 빌드 →
+    JRE 25 실행), 프런트엔드는 Vite 개발 서버 컨테이너(소스 볼륨 마운트로 HMR 유지)다.
+  - 브라우저가 `localhost:8080`을 직접 호출하는 구조라 프런트 코드/CORS 설정은 그대로다.
+    컨테이너 안에서는 compose의 `environment`가 `DB_HOST=db`로 `.env` 값을 덮어쓴다.
+  - 검증: `docker compose up --build`로 3개 컨테이너 기동, Flyway 마이그레이션 8건 검증/적용,
+    `localhost:5173` 200, `localhost:8080/api/auth/me`가 401 + CORS 헤더(`Origin: 5173` 허용)
+    응답 확인. 자동화 테스트(`./gradlew test`, `npm run test`)는 이번 변경 범위가 아니라
+    실행하지 않았다.
+  - 한계: 백엔드는 jar를 이미지에 굽기 때문에 코드 수정 후에는 `docker compose up --build
+    backend`가 필요하다(핫 리로드 없음). 이전 `backend/docker-compose.yml`의 DB 볼륨
+    (`backend_kotonoha-machi-db`)은 새 스택과 별개라 기존 로컬 DB 데이터는 이어지지 않는다.

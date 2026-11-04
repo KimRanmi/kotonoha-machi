@@ -20,7 +20,8 @@
     [`docs/decisions/0003-package-structure.md`](docs/decisions/0003-package-structure.md)
     참고.
 - **데이터베이스**: PostgreSQL + Flyway (스키마 변경 이력 관리)
-  - 로컬 개발용 DB는 `backend/docker-compose.yml`로 띄운다(`cd backend && docker compose up -d`).
+  - 로컬 개발은 루트 `docker-compose.yml`로 프런트엔드·백엔드·DB를 함께 띄운다
+    (`docker compose up --build`). DB만 필요하면 `docker compose up -d db`.
     `kotonoha_machi`/`kotonoha_machi`(DB명/계정) 기준이며, `application.yml`의 기본값과
     맞춰져 있다.
 - **AI**: Gemini API는 백엔드에서만 호출한다. API 키를 프런트엔드에 노출하지 않는다.
