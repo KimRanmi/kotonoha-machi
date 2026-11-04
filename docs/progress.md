@@ -349,3 +349,14 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 한계: 백엔드는 jar를 이미지에 굽기 때문에 코드 수정 후에는 `docker compose up --build
     backend`가 필요하다(핫 리로드 없음). 이전 `backend/docker-compose.yml`의 DB 볼륨
     (`backend_kotonoha-machi-db`)은 새 스택과 별개라 기존 로컬 DB 데이터는 이어지지 않는다.
+
+- 일본어 입력 도우미(로마자 → 히라가나 변환 + 히라/가타카나 토글)를 만들었다.
+  - `frontend/src/components/JapaneseInput.tsx`: `wanakana`의 `toKana(..., { IMEMode })`로 입력값을
+    매번 변환한다. IMEMode라서 끝의 `n`은 다음 글자가 오기 전까지 `ん`으로 바뀌지 않는다
+    (`nn` → `ん`, 실제 IME와 같다). 히라/가타카나는 버튼으로 직접 전환한다.
+  - `ChatPage.tsx`에 확인용 입력란을 임시로 붙였다. 대화 기능이 생기면 교체한다.
+  - 검증: `prettier`, `npm run lint`, `npm run build` 통과. `toKana` 변환 결과는 node로 확인했다.
+    브라우저에서 직접 입력해 보는 확인은 하지 않았다(로그인이 필요한 화면).
+  - 한계: 입력란 중간을 편집하면 변환 후 커서가 끝으로 갈 수 있다. 토글을 바꿔도 이미 입력한
+    글자는 변환하지 않는다. 가상 키보드는 아직 없다.
+  - 다음 할 일: 일본어 가상 키보드(요구사항 7번 마지막 항목), 학습 단어장 백엔드.
