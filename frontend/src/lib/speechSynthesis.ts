@@ -4,7 +4,7 @@ export function isSpeechSynthesisSupported(): boolean {
 }
 
 /** 학습용이라 기본(1.0)보다 천천히 읽는다. */
-const SPEECH_RATE = 0.5;
+const SPEECH_RATE = 0.75;
 
 /** 텍스트를 일본어 음성으로 읽어 준다. 재생 중인 음성이 있으면 끊고 새로 읽는다. */
 export function speakJapanese(text: string): void {
