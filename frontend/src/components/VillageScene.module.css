@@ -7,4 +7,6 @@
 
 .scene canvas {
   display: block;
+  cursor: grab; /* 끌어서 시점을 돌린다. 간판 위에서는 손가락 모양으로 바뀐다 */
+  touch-action: none; /* 터치로 끌 때 페이지가 스크롤되지 않게 */
 }

@@ -113,7 +113,7 @@ function scatterBushes(trees: Plant[]): Plant[] {
 
 /** 숲이 시작되는 거리. 캐릭터가 걸어 다니는 땅(±17) 바로 바깥부터 나무를 심는다. */
 const FOREST_START = 18.5;
-const FOREST_END = 48;
+const FOREST_END = 60;
 const FOREST_SPACING = 6.5;
 
 /** 걸어 다닐 수 있는 땅 바깥을 둘러싼 숲. 캐릭터가 들어갈 수 없는 곳이라 충돌 판정은 없다. */
