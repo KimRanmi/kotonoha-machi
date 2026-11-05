@@ -523,3 +523,6 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 서버 팔레트에 없는 색 이름은 회색으로 칠한다. 저장 성공 시 불필요한 상태 갱신을 없앴다.
   - `ProfileController` 생성자 Javadoc을 현재 역할에 맞게 고쳤다.
   - 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 화면에서 직접 확인하지는 않았다.
+- 오늘 테마를 완료하면 마을 화면의 "오늘의 학습" 배너를 숨기게 했다. 완료한 테마는 완료한 테마 목록(`/town/themes`)에서만
+  본다. 프런트 `TownPage`가 `completed`인 테마를 배너 상태에 넣지 않으며, 백엔드 응답은 그대로다.
+  - 검증: frontend prettier·lint·build 통과. 화면에서 직접 확인하지는 않았다.
