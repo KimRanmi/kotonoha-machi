@@ -16,7 +16,7 @@ interface VillageSceneProps {
 const WALK_SPEED = 4; // 초당 이동 거리
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
 const MAP_HALF_SIZE = 18; // 이동 가능한 정사각형 땅의 절반 크기
-const VIEW_HEIGHT = 9; // 화면에 세로로 보이는 월드 길이(직교 카메라)
+const VIEW_HEIGHT = 20; // 화면에 세로로 보이는 월드 길이(직교 카메라). 건물 3개가 한 화면에 들어오는 크기
 const CAMERA_OFFSET = new THREE.Vector3(10, 10, 10); // 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다
 
 /**
