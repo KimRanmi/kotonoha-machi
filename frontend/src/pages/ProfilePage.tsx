@@ -44,7 +44,6 @@ function ProfilePage() {
   );
   const [isAvatarSubmitting, setIsAvatarSubmitting] = useState(false);
   const [avatarErrorMessage, setAvatarErrorMessage] = useState<string | null>(null);
-  const [avatarSuccessMessage, setAvatarSuccessMessage] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -116,13 +115,11 @@ function ProfilePage() {
     }
 
     setAvatarErrorMessage(null);
-    setAvatarSuccessMessage(null);
     setIsAvatarSubmitting(true);
 
     try {
-      const profile = await updateAvatar(avatar);
-      setAvatar(avatarFromProfile(profile));
-      setAvatarSuccessMessage('캐릭터 꾸미기를 저장했습니다.');
+      await updateAvatar(avatar);
+      navigate('/town');
     } catch (error) {
       setAvatarErrorMessage(
         error instanceof ApiError ? error.message : '캐릭터 꾸미기 저장에 실패했습니다.',
@@ -315,7 +312,6 @@ function ProfilePage() {
                     {avatarErrorMessage}
                   </p>
                 )}
-                {avatarSuccessMessage && <p className={styles.success}>{avatarSuccessMessage}</p>}
                 <button type="submit" className={styles.submit} disabled={isAvatarSubmitting}>
                   캐릭터 꾸미기 저장
                 </button>
