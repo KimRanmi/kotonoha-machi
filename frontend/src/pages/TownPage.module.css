@@ -115,13 +115,3 @@
 .content {
   padding: var(--space-5);
 }
-
-.completedThemesLink {
-  display: inline-block;
-  margin: var(--space-3) var(--space-5) 0;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-}
-.completedThemesLink:hover {
-  color: var(--color-primary);
-}
