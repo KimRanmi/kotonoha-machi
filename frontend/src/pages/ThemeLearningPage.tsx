@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import {
   cancelSpeechRecognition,
@@ -73,6 +73,7 @@ function getSpokenText(quizItem: QuizItem): string {
 function ThemeLearningPage() {
   const { themeId } = useParams<{ themeId: string }>();
   const numericThemeId = Number(themeId);
+  const navigate = useNavigate();
 
   const [theme, setTheme] = useState<Theme | null>(null);
   // 완료한 테마를 다시 볼 때 고른 단계. 완료 전에는 쓰이지 않는다.
@@ -82,6 +83,8 @@ function ThemeLearningPage() {
   const [todayTheme, setTodayTheme] = useState<Theme | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+  // 마지막 단계를 막 끝낸 직후에만 true. 완료 확인 화면을 보여 주고 확인하면 /town으로 보낸다.
+  const [justCompleted, setJustCompleted] = useState(false);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [advanceErrorMessage, setAdvanceErrorMessage] = useState<string | null>(null);
 
@@ -282,6 +285,9 @@ function ThemeLearningPage() {
         currentStage: progress.currentStage,
         completed: progress.completed,
       });
+      if (progress.completed) {
+        setJustCompleted(true);
+      }
     } catch (error) {
       setAdvanceErrorMessage(
         error instanceof ApiError ? error.message : '단계를 완료하지 못했습니다.',
@@ -314,6 +320,23 @@ function ThemeLearningPage() {
           <p className={styles.error} role="alert">
             {loadErrorMessage ?? '테마를 찾을 수 없습니다.'}
           </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (justCompleted) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.container}>
+          <div className={styles.card}>
+            <p className={styles.cardMessage}>오늘 테마를 완료했습니다! 🎉</p>
+          </div>
+          <div className={styles.actions}>
+            <button type="button" className={styles.nextButton} onClick={() => navigate('/town')}>
+              확인
+            </button>
+          </div>
         </div>
       </main>
     );
