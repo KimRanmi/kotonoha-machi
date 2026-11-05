@@ -428,3 +428,9 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
     완료했다면 퀴즈를 불러오지 않고 안내 문구("내일 이어서 진행")와 "오늘 완료한 테마 다시 보기" 링크,
     "마을로 돌아가기"만 보여 준다. 조회가 실패하면 그냥 열고, 서버 409 메시지가 기존 에러 영역에 나온다.
   - 검증: prettier·lint·build 통과. 브라우저에서 직접 눌러 보는 확인은 하지 않았다.
+- 오늘의 테마가 아닌 테마는 주소로 들어가도 진행·열람하지 못하게 했다.
+  - 서버: `completeStage`가 오늘의 테마가 아니면 `NOT_TODAY_THEME`(409), 오늘 이미 완료했으면 `DAILY_THEME_LIMIT_REACHED`(409).
+    `ThemeServiceTest`·`ThemeControllerIntegrationTest`에 테스트 추가.
+  - 화면: `ThemeLearningPage`가 "오늘의 테마가 아닙니다" 안내와 오늘의 테마로 가는 링크를 보여 주고 퀴즈를 불러오지 않는다.
+  - 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 브라우저 확인은 하지 않았다.
+  - 한계: 테마 순서가 ID 순으로 고정된다. 이전에 완료한 테마도 오늘은 다시 볼 수 없다. 동시 요청 경합은 막지 않는다.

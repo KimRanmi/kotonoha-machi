@@ -77,8 +77,9 @@ function ThemeLearningPage() {
   const [theme, setTheme] = useState<Theme | null>(null);
   // 완료한 테마를 다시 볼 때 고른 단계. 완료 전에는 쓰이지 않는다.
   const [viewStage, setViewStage] = useState<ThemeStage>('KANJI');
-  // 오늘 이미 완료한 테마. 하루 1개만 완료할 수 있어서, 이게 다른 테마면 이 테마는 내일부터 진행한다.
-  const [completedTodayTheme, setCompletedTodayTheme] = useState<Theme | null>(null);
+  // 오늘의 테마(오늘 완료했으면 그 테마, 아니면 추천 테마). 오늘은 이 테마만 진행할 수 있다.
+  // `null`은 오늘의 테마가 없다는 뜻이고, `undefined`는 아직 모르는 상태(조회 전·실패)다.
+  const [todayTheme, setTodayTheme] = useState<Theme | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [isAdvancing, setIsAdvancing] = useState(false);
@@ -99,13 +100,13 @@ function ThemeLearningPage() {
   useEffect(() => {
     let cancelled = false;
 
-    // 오늘 완료한 테마 조회는 보조 정보라 실패해도 학습 화면은 열어 준다(서버가 완료 시점에 한 번 더 막는다).
-    Promise.all([getThemes(), getTodayRecommendation().catch(() => null)])
-      .then(([themes, todayTheme]) => {
+    // 오늘의 테마 조회는 보조 정보라 실패해도 학습 화면은 열어 준다(서버가 단계 완료 시점에 한 번 더 막는다).
+    Promise.all([getThemes(), getTodayRecommendation().catch(() => undefined)])
+      .then(([themes, fetchedTodayTheme]) => {
         if (cancelled) {
           return;
         }
-        setCompletedTodayTheme(todayTheme?.completed ? todayTheme : null);
+        setTodayTheme(fetchedTodayTheme);
         const found = themes.find((candidate) => candidate.id === numericThemeId);
         if (!found) {
           setLoadErrorMessage('테마를 찾을 수 없습니다.');
@@ -133,17 +134,13 @@ function ThemeLearningPage() {
 
   // 진행 중이면 지금 단계, 완료한 테마면 사용자가 고른 단계의 내용을 보여 준다.
   const activeStage = theme ? (theme.completed ? viewStage : theme.currentStage) : null;
-  const isBlockedByDailyLimit =
-    theme !== null &&
-    !theme.completed &&
-    completedTodayTheme !== null &&
-    completedTodayTheme.id !== theme.id;
+  const isNotTodayTheme = theme !== null && todayTheme !== undefined && todayTheme?.id !== theme.id;
 
   useEffect(() => {
     stopSpeaking();
     // 단계를 바꿀 때 이전 단계에서 듣고 있던 마이크 인식이 새 단계 문제에 반영되지 않게 멈춘다.
     cancelSpeechRecognition();
-    if (!theme || !activeStage || isBlockedByDailyLimit) {
+    if (!theme || !activeStage || isNotTodayTheme) {
       setQuizItems(null);
       return;
     }
@@ -187,7 +184,7 @@ function ThemeLearningPage() {
     return () => {
       cancelled = true;
     };
-  }, [theme, activeStage, isBlockedByDailyLimit]);
+  }, [theme, activeStage, isNotTodayTheme]);
 
   // 페이지를 떠날 때 재생 중인 소리와 켜져 있는 마이크 인식을 멈춘다.
   useEffect(() => {
@@ -361,21 +358,27 @@ function ThemeLearningPage() {
           </p>
         )}
 
-        {isBlockedByDailyLimit && completedTodayTheme && (
+        {isNotTodayTheme && (
           <div className={styles.limitNotice} role="status">
             <p className={styles.limitNoticeText}>
-              오늘은 이미 "{completedTodayTheme.title}" 테마를 완료했어요. 이 테마는 내일 이어서
-              진행할 수 있어요.
+              오늘의 테마가 아닙니다.{' '}
+              {todayTheme?.completed
+                ? `오늘은 이미 "${todayTheme.title}" 테마를 완료했어요. 이 테마는 내일 진행할 수 있어요.`
+                : todayTheme
+                  ? `오늘의 테마는 "${todayTheme.title}"예요.`
+                  : '모든 테마를 완료했어요.'}
             </p>
-            <Link to={`/town/themes/${completedTodayTheme.id}`} className={styles.limitNoticeLink}>
-              오늘 완료한 테마 다시 보기
-            </Link>
+            {todayTheme && (
+              <Link to={`/town/themes/${todayTheme.id}`} className={styles.limitNoticeLink}>
+                {todayTheme.completed ? '오늘 완료한 테마 다시 보기' : '오늘의 테마로 가기'}
+              </Link>
+            )}
           </div>
         )}
 
         <div className={styles.card}>
-          {isBlockedByDailyLimit ? (
-            <p className={styles.cardMessage}>내일 다시 만나요!</p>
+          {isNotTodayTheme ? (
+            <p className={styles.cardMessage}>이 테마는 오늘 진행할 수 없어요.</p>
           ) : isContentLoading ? (
             <p className={styles.cardMessage}>콘텐츠를 불러오는 중입니다…</p>
           ) : contentErrorMessage ? (
@@ -544,7 +547,7 @@ function ThemeLearningPage() {
         )}
 
         <div className={styles.actions}>
-          {theme.completed || isBlockedByDailyLimit ? (
+          {theme.completed || isNotTodayTheme ? (
             <Link to="/town" className={styles.nextButton}>
               마을로 돌아가기
             </Link>

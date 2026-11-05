@@ -139,8 +139,8 @@ public class ThemeService {
 
   /**
    * 테마의 한 단계를 완료 처리하고 다음 단계로 진행한다. 지금 진행해야 할 단계가 아닌 단계를 요청하면(건너뛰기나 이미 끝난
-   * 단계 재요청) 거부한다. 하루(한국 시간)에 테마는 하나만 완료할 수 있어서, 오늘 이미 다른 테마를 완료했다면
-   * 어떤 단계든 거부한다. 아직 시작하지 않은 테마라면 이 호출로 진행 상태를 새로 만든다.
+   * 단계 재요청) 거부한다. 하루(한국 시간)에 "오늘의 테마"({@link #getTodayRecommendedTheme})만 진행할 수 있어서, 다른
+   * 테마의 단계는 거부한다(오늘 이미 다른 테마를 완료했다면 한도 초과, 아니면 오늘의 테마가 아님). 아직 시작하지 않은 테마라면 이 호출로 진행 상태를 새로 만든다.
    *
    * @param userId 진행할 사용자 ID(로그인한 본인)
    * @param themeId 진행할 테마 ID
@@ -150,12 +150,12 @@ public class ThemeService {
   @Transactional
   public ThemeProgressResponse completeStage(Long userId, Long themeId, ThemeStage stage) {
     Theme theme = findThemeOrThrow(themeId);
-    boolean otherThemeCompletedToday = findLatestCompletedToday(
-            themeProgressRepository.findAllByUserId(userId))
-        .filter(completed -> !completed.getTheme().getId().equals(themeId))
-        .isPresent();
-    if (otherThemeCompletedToday) {
-      throw new ApiException(ThemeErrorCode.DAILY_THEME_LIMIT_REACHED);
+    Optional<ThemeResponse> todayTheme = getTodayRecommendedTheme(userId);
+    if (todayTheme.isPresent() && !todayTheme.get().id().equals(themeId)) {
+      throw new ApiException(
+          todayTheme.get().completed()
+              ? ThemeErrorCode.DAILY_THEME_LIMIT_REACHED
+              : ThemeErrorCode.NOT_TODAY_THEME);
     }
     ThemeProgress progress = themeProgressRepository
         .findByUserIdAndThemeId(userId, themeId)
