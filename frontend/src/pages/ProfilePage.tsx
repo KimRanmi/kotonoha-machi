@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   changePassword,
@@ -9,21 +9,15 @@ import {
   withdraw,
   type Avatar,
   type AvatarOptions,
+  type ColorOption,
 } from '../api/user';
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import {
   avatarFromProfile,
-  CLOTHES_COLOR_HEX,
-  CLOTHES_COLOR_LABELS,
+  buildAvatarPalette,
   CLOTHES_STYLE_LABELS,
-  HAIR_COLOR_HEX,
-  HAIR_COLOR_LABELS,
   HAIR_STYLE_LABELS,
-  SHOES_COLOR_HEX,
-  SHOES_COLOR_LABELS,
-  SKIN_COLOR_HEX,
-  SKIN_COLOR_LABELS,
 } from '../lib/avatarPreview';
 import styles from './ProfilePage.module.css';
 
@@ -44,6 +38,10 @@ function ProfilePage() {
 
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [avatarOptions, setAvatarOptions] = useState<AvatarOptions | null>(null);
+  const avatarPalette = useMemo(
+    () => (avatarOptions ? buildAvatarPalette(avatarOptions) : null),
+    [avatarOptions],
+  );
   const [isAvatarSubmitting, setIsAvatarSubmitting] = useState(false);
   const [avatarErrorMessage, setAvatarErrorMessage] = useState<string | null>(null);
   const [avatarSuccessMessage, setAvatarSuccessMessage] = useState<string | null>(null);
@@ -186,9 +184,7 @@ function ProfilePage() {
   function renderColorAxis<K extends 'skinColor' | 'hairColor' | 'clothesColor' | 'shoesColor'>(
     axis: K,
     legend: string,
-    options: Avatar[K][],
-    labels: Record<string, string>,
-    hexByOption: Record<string, string>,
+    options: ColorOption<Avatar[K]>[],
   ) {
     if (!avatar) {
       return null;
@@ -200,16 +196,16 @@ function ProfilePage() {
         <div className={styles.swatchGroup} role="radiogroup" aria-label={legend}>
           {options.map((option) => (
             <button
-              key={String(option)}
+              key={option.value}
               type="button"
               role="radio"
-              aria-checked={avatar[axis] === option}
-              aria-label={labels[String(option)]}
-              title={labels[String(option)]}
+              aria-checked={avatar[axis] === option.value}
+              aria-label={option.label}
+              title={option.label}
               className={styles.swatch}
-              data-selected={avatar[axis] === option ? '' : undefined}
-              style={{ backgroundColor: `#${hexByOption[String(option)]}` }}
-              onClick={() => handleAvatarFieldChange(axis, option)}
+              data-selected={avatar[axis] === option.value ? '' : undefined}
+              style={{ backgroundColor: `#${option.hex}` }}
+              onClick={() => handleAvatarFieldChange(axis, option.value)}
             />
           ))}
         </div>
@@ -289,24 +285,16 @@ function ProfilePage() {
 
         {activeSection === 'character' ? (
           <>
-            {avatar && avatarOptions && (
+            {avatar && avatarOptions && avatarPalette && (
               <form onSubmit={handleAvatarSubmit}>
-                <AvatarPreview avatar={avatar} className={styles.avatarPreview} />
+                <AvatarPreview
+                  avatar={avatar}
+                  palette={avatarPalette}
+                  className={styles.avatarPreview}
+                />
                 <div className={styles.axisList}>
-                  {renderColorAxis(
-                    'skinColor',
-                    '피부색',
-                    avatarOptions.skinColors,
-                    SKIN_COLOR_LABELS,
-                    SKIN_COLOR_HEX,
-                  )}
-                  {renderColorAxis(
-                    'hairColor',
-                    '머리색',
-                    avatarOptions.hairColors,
-                    HAIR_COLOR_LABELS,
-                    HAIR_COLOR_HEX,
-                  )}
+                  {renderColorAxis('skinColor', '피부색', avatarOptions.skinColors)}
+                  {renderColorAxis('hairColor', '머리색', avatarOptions.hairColors)}
                   {renderStyleAxis(
                     'hairStyle',
                     '헤어스타일',
@@ -319,20 +307,8 @@ function ProfilePage() {
                     avatarOptions.clothesStyles,
                     CLOTHES_STYLE_LABELS,
                   )}
-                  {renderColorAxis(
-                    'clothesColor',
-                    '옷 색',
-                    avatarOptions.clothesColors,
-                    CLOTHES_COLOR_LABELS,
-                    CLOTHES_COLOR_HEX,
-                  )}
-                  {renderColorAxis(
-                    'shoesColor',
-                    '신발색',
-                    avatarOptions.shoesColors,
-                    SHOES_COLOR_LABELS,
-                    SHOES_COLOR_HEX,
-                  )}
+                  {renderColorAxis('clothesColor', '옷 색', avatarOptions.clothesColors)}
+                  {renderColorAxis('shoesColor', '신발색', avatarOptions.shoesColors)}
                 </div>
                 {avatarErrorMessage && (
                   <p className={styles.error} role="alert">

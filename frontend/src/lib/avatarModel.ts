@@ -1,11 +1,6 @@
 import * as THREE from 'three';
 import type { Avatar } from '../api/user';
-import {
-  CLOTHES_COLOR_HEX,
-  HAIR_COLOR_HEX,
-  SHOES_COLOR_HEX,
-  SKIN_COLOR_HEX,
-} from './avatarPreview';
+import type { AvatarPalette } from './avatarPreview';
 
 /**
  * 캐릭터 꾸미기 여섯 축 값으로 동물의 숲 같은 둥근 3D 캐릭터를 만든다(구/원통을 납작하게 눌러 조합).
@@ -337,12 +332,12 @@ function addHeadAndFace(parent: THREE.Object3D, skin: THREE.Color) {
 }
 
 /** 여섯 축 값으로 캐릭터 한 명을 만든다. 쓰고 나면 `disposeAvatarModel`로 정리해야 한다. */
-export function createAvatarModel(avatar: Avatar): THREE.Group {
+export function createAvatarModel(avatar: Avatar, palette: AvatarPalette): THREE.Group {
   const root = new THREE.Group();
-  const skin = hex(SKIN_COLOR_HEX[avatar.skinColor]);
-  const hair = hex(HAIR_COLOR_HEX[avatar.hairColor]);
-  const shoes = hex(SHOES_COLOR_HEX[avatar.shoesColor]);
-  const clothesColor = hex(CLOTHES_COLOR_HEX[avatar.clothesColor]);
+  const skin = hex(palette.skin[avatar.skinColor]);
+  const hair = hex(palette.hair[avatar.hairColor]);
+  const shoes = hex(palette.shoes[avatar.shoesColor]);
+  const clothesColor = hex(palette.clothes[avatar.clothesColor]);
   const look = clothesLook(avatar.clothesStyle, clothesColor);
 
   // 짧고 통통한 다리와 둥근 신발

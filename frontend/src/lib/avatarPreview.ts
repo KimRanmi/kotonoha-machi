@@ -1,11 +1,8 @@
 import type {
   Avatar,
-  AvatarClothesColor,
+  AvatarOptions,
   AvatarClothesStyle,
-  AvatarHairColor,
   AvatarHairStyle,
-  AvatarShoesColor,
-  AvatarSkinColor,
   Profile,
 } from '../api/user';
 
@@ -20,22 +17,6 @@ export function avatarFromProfile(profile: Profile): Avatar {
     shoesColor: profile.avatarShoesColor,
   };
 }
-
-export const SKIN_COLOR_LABELS: Record<AvatarSkinColor, string> = {
-  LIGHT: '연한',
-  FAIR: '밝은',
-  TAN: '구릿빛',
-  BROWN: '갈색',
-  DARK: '어두운',
-};
-
-export const HAIR_COLOR_LABELS: Record<AvatarHairColor, string> = {
-  BLACK: '흑발',
-  BROWN: '갈색',
-  BLONDE: '금발',
-  RED: '빨강',
-  GRAY: '은발',
-};
 
 export const HAIR_STYLE_LABELS: Record<AvatarHairStyle, string> = {
   SHORT: '숏컷',
@@ -61,56 +42,23 @@ export const CLOTHES_STYLE_LABELS: Record<AvatarClothesStyle, string> = {
   TIE: '넥타이',
 };
 
-export const CLOTHES_COLOR_LABELS: Record<AvatarClothesColor, string> = {
-  CREAM: '크림',
-  PINK: '분홍',
-  CORAL: '코랄',
-  PEACH: '복숭아',
-  YELLOW: '노랑',
-  MINT: '민트',
-  SKY: '하늘',
-  LAVENDER: '라벤더',
-};
+/** 캐릭터를 그릴 때 쓰는 색상값 모음(축별로 선택지 이름 → '#' 없는 16진 색상값). 서버의 선택지 응답에서 만든다. */
+export interface AvatarPalette {
+  skin: Record<string, string>;
+  hair: Record<string, string>;
+  clothes: Record<string, string>;
+  shoes: Record<string, string>;
+}
 
-export const SHOES_COLOR_LABELS: Record<AvatarShoesColor, string> = {
-  WHITE: '흰색',
-  BLACK: '검정',
-  BROWN: '갈색',
-  RED: '빨강',
-  BLUE: '파랑',
-};
+function hexByValue(options: { value: string; hex: string }[]): Record<string, string> {
+  return Object.fromEntries(options.map((option) => [option.value, option.hex]));
+}
 
-export const SKIN_COLOR_HEX: Record<AvatarSkinColor, string> = {
-  LIGHT: 'ffdbb4',
-  FAIR: 'edb98a',
-  TAN: 'd08b5b',
-  BROWN: 'ae5d29',
-  DARK: '614335',
-};
-
-export const HAIR_COLOR_HEX: Record<AvatarHairColor, string> = {
-  BLACK: '2c1b18',
-  BROWN: '724133',
-  BLONDE: 'd6b370',
-  RED: 'a55728',
-  GRAY: 'cccccc',
-};
-
-export const CLOTHES_COLOR_HEX: Record<AvatarClothesColor, string> = {
-  CREAM: 'fff1d6',
-  PINK: 'ffc2d4',
-  CORAL: 'ffb3a7',
-  PEACH: 'ffd0a8',
-  YELLOW: 'fff0a0',
-  MINT: 'b5ead7',
-  SKY: 'b5d8f7',
-  LAVENDER: 'd4c4f0',
-};
-
-export const SHOES_COLOR_HEX: Record<AvatarShoesColor, string> = {
-  WHITE: 'ffffff',
-  BLACK: '000000',
-  BROWN: '6b4423',
-  RED: 'c0392b',
-  BLUE: '2e4a8e',
-};
+export function buildAvatarPalette(options: AvatarOptions): AvatarPalette {
+  return {
+    skin: hexByValue(options.skinColors),
+    hair: hexByValue(options.hairColors),
+    clothes: hexByValue(options.clothesColors),
+    shoes: hexByValue(options.shoesColors),
+  };
+}

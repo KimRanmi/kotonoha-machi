@@ -2,10 +2,12 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
+import type { AvatarPalette } from '../lib/avatarPreview';
 import styles from './VillageScene.module.css';
 
 interface VillageSceneProps {
   avatar: Avatar;
+  palette: AvatarPalette;
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
@@ -51,7 +53,7 @@ function createGroundTexture(): THREE.CanvasTexture {
 }
 
 /** 위에서 내려다보는 고정 쿼터뷰 마을. 방향키/WASD로 내 캐릭터를 자유롭게 걷게 한다. */
-function VillageScene({ avatar }: VillageSceneProps) {
+function VillageScene({ avatar, palette }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,7 +77,7 @@ function VillageScene({ avatar }: VillageSceneProps) {
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
-    const player = createAvatarModel(avatar);
+    const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(1.2);
     scene.add(player);
 
@@ -173,7 +175,7 @@ function VillageScene({ avatar }: VillageSceneProps) {
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [avatar]);
+  }, [avatar, palette]);
 
   return <div ref={containerRef} className={styles.scene} aria-label="마을 화면" />;
 }

@@ -492,3 +492,13 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 파스텔은 밝아서 무늬·타이 보정 기준을 더 밝은 색(크림 정도)에만 걸리게 조정했다.
   - 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 임시 페이지에서 8색을 눈으로
     확인했다.
+- 색 팔레트를 백엔드 한 곳에서만 관리하도록 바꿨다(색을 바꿀 때 프런트까지 고치지 않기 위해).
+  - 백엔드: 피부색·머리색·옷 색·신발 색 enum이 한글 이름(`label`)과 색상값(`hex`)을 가진다(`AvatarColor`
+    인터페이스). `GET /api/users/me/avatar/options`의 색 목록이 `{value, label, hex}` 배열로 바뀌었다
+    (`ColorOption`). 저장 값(enum 이름)과 DB는 그대로다.
+  - 프런트: 색 이름·색상값 상수를 지우고, 선택지 응답으로 팔레트(`buildAvatarPalette`)를 만들어 프로필 선택 UI와
+    3D 모델(`createAvatarModel(avatar, palette)`)에 쓴다. 마을 화면도 선택지를 같이 불러온다.
+  - 이제 색 추가·삭제·이름·색상 변경은 백엔드 enum만 고치면 된다. 옷/헤어 "모양"은 여전히 프런트 모델 코드가 필요하다.
+  - 정리: 어디선가 생긴 `이름 2.tsx` 같은 중복 파일 7개가 이전 커밋에 섞여 들어가 있어 지웠다(원본과 동일했다).
+  - 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 바뀐 API 응답을 실제 서버로 호출해
+    프로필→마을을 보는 확인은 하지 않았다(Docker 재빌드 필요).

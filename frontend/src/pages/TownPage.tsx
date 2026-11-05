@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
-import { getProfile, type Avatar } from '../api/user';
+import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
 import { getTodayRecommendation, type Theme } from '../api/theme';
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import VillageScene from '../components/VillageScene';
-import { avatarFromProfile } from '../lib/avatarPreview';
+import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
 
 function TownPage() {
   const navigate = useNavigate();
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
+  const [palette, setPalette] = useState<AvatarPalette | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutErrorMessage, setLogoutErrorMessage] = useState<string | null>(null);
   const [todayTheme, setTodayTheme] = useState<Theme | null>(null);
@@ -20,9 +21,10 @@ function TownPage() {
   useEffect(() => {
     let cancelled = false;
 
-    getProfile()
-      .then((profile) => {
+    Promise.all([getProfile(), getAvatarOptions()])
+      .then(([profile, options]) => {
         if (!cancelled) {
+          setPalette(buildAvatarPalette(options));
           setNickname(profile.nickname);
           setAvatar(avatarFromProfile(profile));
         }
@@ -81,8 +83,13 @@ function TownPage() {
             className={styles.avatarButton}
             aria-label="캐릭터 설정"
           >
-            {avatar ? (
-              <AvatarPreview avatar={avatar} variant="face" className={styles.avatarThumb} />
+            {avatar && palette ? (
+              <AvatarPreview
+                avatar={avatar}
+                palette={palette}
+                variant="face"
+                className={styles.avatarThumb}
+              />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="8" r="3.4" stroke="currentColor" strokeWidth="1.6" />
@@ -146,7 +153,7 @@ function TownPage() {
           </span>
         </Link>
       )}
-      {avatar && <VillageScene avatar={avatar} />}
+      {avatar && palette && <VillageScene avatar={avatar} palette={palette} />}
       {logoutErrorMessage && (
         <p className={styles.content} role="alert">
           {logoutErrorMessage}

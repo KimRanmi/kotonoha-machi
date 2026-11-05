@@ -4,6 +4,7 @@ import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.common.PasswordVerifier;
 import com.kotonohamachi.user.AvatarClothesColor;
 import com.kotonohamachi.user.AvatarClothesStyle;
+import com.kotonohamachi.user.AvatarColor;
 import com.kotonohamachi.user.AvatarHairColor;
 import com.kotonohamachi.user.AvatarHairStyle;
 import com.kotonohamachi.user.AvatarShoesColor;
@@ -11,8 +12,10 @@ import com.kotonohamachi.user.AvatarSkinColor;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.UserErrorCode;
 import com.kotonohamachi.user.dto.AvatarOptionsResponse;
+import com.kotonohamachi.user.dto.ColorOption;
 import com.kotonohamachi.user.dto.ProfileResponse;
 import com.kotonohamachi.user.repository.UserRepository;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -125,12 +128,18 @@ public class ProfileService {
    */
   public AvatarOptionsResponse getAvatarOptions() {
     return new AvatarOptionsResponse(
-        List.of(AvatarSkinColor.values()),
-        List.of(AvatarHairColor.values()),
+        toColorOptions(AvatarSkinColor.values()),
+        toColorOptions(AvatarHairColor.values()),
         List.of(AvatarHairStyle.values()),
         List.of(AvatarClothesStyle.values()),
-        List.of(AvatarClothesColor.values()),
-        List.of(AvatarShoesColor.values()));
+        toColorOptions(AvatarClothesColor.values()),
+        toColorOptions(AvatarShoesColor.values()));
+  }
+
+  private static <E extends Enum<E> & AvatarColor> List<ColorOption> toColorOptions(E[] values) {
+    return Arrays.stream(values)
+        .map(color -> new ColorOption(color.name(), color.label(), color.hex()))
+        .toList();
   }
 
   private User findUserOrThrow(Long userId) {

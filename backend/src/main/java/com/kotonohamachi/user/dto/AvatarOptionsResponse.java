@@ -1,11 +1,7 @@
 package com.kotonohamachi.user.dto;
 
-import com.kotonohamachi.user.AvatarClothesColor;
 import com.kotonohamachi.user.AvatarClothesStyle;
-import com.kotonohamachi.user.AvatarHairColor;
 import com.kotonohamachi.user.AvatarHairStyle;
-import com.kotonohamachi.user.AvatarShoesColor;
-import com.kotonohamachi.user.AvatarSkinColor;
 import java.util.List;
 
 /**
@@ -20,9 +16,9 @@ import java.util.List;
  * @param shoesColors 고를 수 있는 신발 색 목록
  */
 public record AvatarOptionsResponse(
-    List<AvatarSkinColor> skinColors,
-    List<AvatarHairColor> hairColors,
+    List<ColorOption> skinColors,
+    List<ColorOption> hairColors,
     List<AvatarHairStyle> hairStyles,
     List<AvatarClothesStyle> clothesStyles,
-    List<AvatarClothesColor> clothesColors,
-    List<AvatarShoesColor> shoesColors) {}
+    List<ColorOption> clothesColors,
+    List<ColorOption> shoesColors) {}

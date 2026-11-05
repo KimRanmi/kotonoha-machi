@@ -29,14 +29,21 @@ export interface Avatar {
   shoesColor: AvatarShoesColor;
 }
 
+/** 색 선택지 하나. 한글 이름과 색상값('#' 없는 6자리 16진)은 서버가 내려준다. */
+export interface ColorOption<T extends string> {
+  value: T;
+  label: string;
+  hex: string;
+}
+
 /** 캐릭터 꾸미기 화면에서 고를 수 있는 축별 선택지 전체 목록. */
 export interface AvatarOptions {
-  skinColors: AvatarSkinColor[];
-  hairColors: AvatarHairColor[];
+  skinColors: ColorOption<AvatarSkinColor>[];
+  hairColors: ColorOption<AvatarHairColor>[];
   hairStyles: AvatarHairStyle[];
   clothesStyles: AvatarClothesStyle[];
-  clothesColors: AvatarClothesColor[];
-  shoesColors: AvatarShoesColor[];
+  clothesColors: ColorOption<AvatarClothesColor>[];
+  shoesColors: ColorOption<AvatarShoesColor>[];
 }
 
 export interface Profile {
