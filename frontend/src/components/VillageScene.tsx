@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
-import { collidesWithBuildings, ROOF_HEIGHT, VILLAGE_BUILDINGS } from '../lib/villageBuildings';
+import { collidesWithBuildings } from '../lib/villageBuildings';
 import { collidesWithTrees } from '../lib/villageScenery';
 import { createVillageWorld } from '../lib/villageScenery3d';
 import styles from './VillageScene.module.css';
@@ -100,22 +100,6 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
     const world = createVillageWorld();
     scene.add(world.group);
 
-    // 건물 라벨은 3D가 아니라 화면 위 HTML 버튼이다. 매 프레임 건물 지붕 위 위치를 화면 좌표로 바꿔 따라붙인다.
-    const labels = VILLAGE_BUILDINGS.map((building) => {
-      const label = document.createElement('button');
-      label.type = 'button';
-      label.className = building.locked ? `${styles.label} ${styles.labelLocked}` : styles.label;
-      label.textContent = building.locked ? `🔒 ${building.label} (나중에)` : building.label;
-      if (building.locked) {
-        label.disabled = true;
-      } else {
-        label.addEventListener('click', () => onEnterRef.current(building.id));
-      }
-      container.appendChild(label);
-      return { building, label };
-    });
-    const labelPosition = new THREE.Vector3();
-
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
     scene.add(player);
@@ -136,6 +120,40 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
       camera.updateProjectionMatrix();
     };
     resize();
+
+    // 간판은 3D 물체라서, 마우스 위치에서 화면 안쪽으로 광선을 쏘아 맞은 간판을 찾는다(raycaster).
+    // 열려 있는 건물 간판만 반응하고, 잠긴 건물 간판은 눌러도 아무 일도 없다.
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const findSign = (event: MouseEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(
+        world.signs.map((sign) => sign.object),
+        true,
+      )[0];
+      return world.signs.find((sign) => hit && sign.object.getObjectById(hit.object.id));
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      const hovered = findSign(event);
+      for (const sign of world.signs) {
+        sign.setHighlight(sign === hovered && !sign.building.locked);
+      }
+      renderer.domElement.style.cursor = hovered && !hovered.building.locked ? 'pointer' : '';
+    };
+    const handleClick = (event: MouseEvent) => {
+      const clicked = findSign(event);
+      if (clicked && !clicked.building.locked) {
+        onEnterRef.current(clicked.building.id);
+      }
+    };
+    renderer.domElement.addEventListener('pointermove', handlePointerMove);
+    renderer.domElement.addEventListener('click', handleClick);
+
     const observer = new ResizeObserver(resize);
     observer.observe(container);
 
@@ -208,14 +226,6 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
       camera.lookAt(player.position);
       renderer.render(scene, camera);
 
-      for (const { building, label } of labels) {
-        labelPosition
-          .set(building.x, building.height + ROOF_HEIGHT + 0.5, building.z)
-          .project(camera);
-        const left = ((labelPosition.x + 1) / 2) * container.clientWidth;
-        const top = ((1 - labelPosition.y) / 2) * container.clientHeight;
-        label.style.transform = `translate(${left}px, ${top}px) translate(-50%, -100%)`;
-      }
       frameId = requestAnimationFrame(animate);
     };
     frameId = requestAnimationFrame(animate);
@@ -230,7 +240,8 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();
-      labels.forEach(({ label }) => label.remove());
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove);
+      renderer.domElement.removeEventListener('click', handleClick);
       world.dispose();
       renderer.dispose();
       renderer.forceContextLoss();

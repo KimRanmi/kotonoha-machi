@@ -11,8 +11,16 @@ import {
 
 const FLOWER_COLORS = ['#f4a3b8', '#fff3a8', '#ffffff', '#b9a4f0', '#f7b267'];
 
+/** 건물 처마에 달린 간판. 마우스로 가리키거나 누를 수 있게 호출한 쪽이 object를 raycast한다. */
+export interface VillageSign {
+  building: VillageBuilding;
+  object: THREE.Object3D;
+  setHighlight: (on: boolean) => void;
+}
+
 export interface VillageWorld {
   group: THREE.Group;
+  signs: VillageSign[];
   dispose: () => void;
 }
 
@@ -21,6 +29,8 @@ export function createVillageWorld(): VillageWorld {
   const group = new THREE.Group();
   const geometries: THREE.BufferGeometry[] = [];
   const materials: THREE.Material[] = [];
+  const textures: THREE.Texture[] = [];
+  const signs: VillageSign[] = [];
 
   // 같은 모양/색은 하나씩만 만들어 여러 물체가 나눠 쓴다(정리할 때도 한 번만 지우면 된다).
   const geometry = <T extends THREE.BufferGeometry>(created: T): T => {
@@ -249,6 +259,80 @@ export function createVillageWorld(): VillageWorld {
     }
   };
 
+  // 간판: 나무 테두리 + 글씨를 그린 캔버스 판. 글씨는 3D 글자가 아니라 캔버스에 그린 그림을 판에 붙인다.
+  const SIGN_STYLES: Record<string, { background: string; text: string; accent: string }> = {
+    cafe: { background: '#4a2f1e', text: '#fbf1dc', accent: '#e0a95a' },
+    shop: { background: '#1f3d6b', text: '#ffffff', accent: '#f2c230' },
+    hall: { background: '#24402f', text: '#f3e9c6', accent: '#d9b25a' },
+  };
+  const DEFAULT_SIGN_STYLE = { background: '#3a2a1c', text: '#ffffff', accent: '#e0a95a' };
+  const SIGN_WIDTH = 3.2;
+  const SIGN_HEIGHT = 0.9;
+  const SIGN_FONT = '"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
+  const SIGN_BOTTOM: Record<string, number> = { hall: 3.85 }; // 도서관은 박공 위로 올린다
+
+  const createSignTexture = (building: VillageBuilding) => {
+    const style = SIGN_STYLES[building.id] ?? DEFAULT_SIGN_STYLE;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 144;
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.fillStyle = style.background;
+      context.fillRect(0, 0, 512, 144);
+      context.strokeStyle = style.accent;
+      context.lineWidth = 6;
+      context.strokeRect(10, 10, 492, 124);
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillStyle = style.text;
+      context.font = `bold ${building.locked ? 68 : 78}px ${SIGN_FONT}`;
+      context.fillText(building.label, 256, building.locked ? 58 : 74);
+      if (building.locked) {
+        context.fillStyle = style.accent;
+        context.font = `bold 28px ${SIGN_FONT}`;
+        context.fillText('준비 중', 256, 112);
+      }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    textures.push(texture);
+    return texture;
+  };
+
+  const createSign = (building: VillageBuilding): VillageSign => {
+    const object = new THREE.Group();
+    object.userData.buildingId = building.id;
+    const bottom = SIGN_BOTTOM[building.id] ?? building.height + 0.05;
+    const z = building.depth / 2 + 0.5;
+    place(
+      box(SIGN_WIDTH + 0.2, SIGN_HEIGHT + 0.2, 0.12, '#6b4a32'),
+      0,
+      bottom + SIGN_HEIGHT / 2,
+      z,
+      object,
+    );
+    const faceMaterial = new THREE.MeshBasicMaterial({ map: createSignTexture(building) });
+    materials.push(faceMaterial);
+    const face = new THREE.Mesh(
+      geometry(new THREE.PlaneGeometry(SIGN_WIDTH, SIGN_HEIGHT)),
+      faceMaterial,
+    );
+    place(face, 0, bottom + SIGN_HEIGHT / 2, z + 0.065, object);
+    if (bottom > building.height + 0.1) {
+      // 지붕에서 간판을 받치는 기둥 두 개
+      for (const x of [-SIGN_WIDTH / 2 + 0.3, SIGN_WIDTH / 2 - 0.3]) {
+        const post = cylinder(0.05, 0.05, bottom - building.height, '#6b4a32');
+        place(post, x, building.height + (bottom - building.height) / 2, z, object);
+      }
+    }
+    return {
+      building,
+      object,
+      setHighlight: (on) => faceMaterial.color.setScalar(on ? 1.3 : 1),
+    };
+  };
+
   const DECORATORS: Record<string, (house: THREE.Group, building: VillageBuilding) => void> = {
     cafe: addCafe,
     shop: addShop,
@@ -302,6 +386,9 @@ export function createVillageWorld(): VillageWorld {
       sideWindow.rotation.y = Math.PI / 2;
       place(sideWindow, building.width / 2 + 0.03, 1.5, 0, house);
     }
+    const sign = createSign(building);
+    house.add(sign.object);
+    signs.push(sign);
     return house;
   }
 
@@ -382,7 +469,9 @@ export function createVillageWorld(): VillageWorld {
 
   return {
     group,
+    signs,
     dispose: () => {
+      textures.forEach((created) => created.dispose());
       instancedMeshes.forEach((instanced) => instanced.dispose());
       geometries.forEach((created) => created.dispose());
       materials.forEach((created) => created.dispose());
