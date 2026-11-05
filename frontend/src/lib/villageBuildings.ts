@@ -14,6 +14,9 @@ export interface VillageBuilding {
 
 export const PLAYER_RADIUS = 0.5;
 
+/** 벽 위에 얹는 뾰족 지붕의 높이. */
+export const ROOF_HEIGHT = 1.6;
+
 export const VILLAGE_BUILDINGS: VillageBuilding[] = [
   {
     id: 'cafe',

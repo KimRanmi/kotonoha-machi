@@ -3,7 +3,9 @@ import * as THREE from 'three';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
-import { collidesWithBuildings, VILLAGE_BUILDINGS } from '../lib/villageBuildings';
+import { collidesWithBuildings, ROOF_HEIGHT, VILLAGE_BUILDINGS } from '../lib/villageBuildings';
+import { collidesWithTrees } from '../lib/villageScenery';
+import { createVillageWorld } from '../lib/villageScenery3d';
 import styles from './VillageScene.module.css';
 
 interface VillageSceneProps {
@@ -33,6 +35,11 @@ const KEY_DIRECTIONS: Record<string, [number, number]> = {
   ArrowRight: [1, -1],
   KeyD: [1, -1],
 };
+
+/** 캐릭터가 (x, z)에 설 수 없는 자리(건물이나 나무 줄기)인지. */
+function isBlocked(x: number, z: number): boolean {
+  return collidesWithBuildings(x, z) || collidesWithTrees(x, z);
+}
 
 function createGroundTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -85,25 +92,9 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
-    // 건물은 몸체 상자 위에 조금 더 넓고 어두운 지붕 상자를 얹은 단순한 모양이다.
-    const buildingGeometries: THREE.BufferGeometry[] = [];
-    const buildingMaterials: THREE.Material[] = [];
-    for (const building of VILLAGE_BUILDINGS) {
-      const bodyMaterial = new THREE.MeshLambertMaterial({ color: building.color });
-      const roofMaterial = new THREE.MeshLambertMaterial({
-        color: new THREE.Color(building.color).multiplyScalar(0.75),
-      });
-      const bodyGeometry = new THREE.BoxGeometry(building.width, building.height, building.depth);
-      const roofGeometry = new THREE.BoxGeometry(building.width + 0.6, 0.4, building.depth + 0.6);
-      buildingMaterials.push(bodyMaterial, roofMaterial);
-      buildingGeometries.push(bodyGeometry, roofGeometry);
-
-      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-      body.position.set(building.x, building.height / 2, building.z);
-      const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-      roof.position.set(building.x, building.height + 0.2, building.z);
-      scene.add(body, roof);
-    }
+    // 건물, 길, 나무, 꽃 같은 풍경은 lib/villageScenery3d.ts가 만든다.
+    const world = createVillageWorld();
+    scene.add(world.group);
 
     // 건물 라벨은 3D가 아니라 화면 위 HTML 버튼이다. 매 프레임 건물 지붕 위 위치를 화면 좌표로 바꿔 따라붙인다.
     const labels = VILLAGE_BUILDINGS.map((building) => {
@@ -190,7 +181,7 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
           -limit,
           limit,
         );
-        if (!collidesWithBuildings(nextX, player.position.z)) {
+        if (!isBlocked(nextX, player.position.z)) {
           player.position.x = nextX;
         }
         const nextZ = THREE.MathUtils.clamp(
@@ -198,7 +189,7 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
           -limit,
           limit,
         );
-        if (!collidesWithBuildings(player.position.x, nextZ)) {
+        if (!isBlocked(player.position.x, nextZ)) {
           player.position.z = nextZ;
         }
         targetAngle = Math.atan2(dx, dz);
@@ -214,7 +205,9 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
       renderer.render(scene, camera);
 
       for (const { building, label } of labels) {
-        labelPosition.set(building.x, building.height + 0.6, building.z).project(camera);
+        labelPosition
+          .set(building.x, building.height + ROOF_HEIGHT + 0.5, building.z)
+          .project(camera);
         const left = ((labelPosition.x + 1) / 2) * container.clientWidth;
         const top = ((1 - labelPosition.y) / 2) * container.clientHeight;
         label.style.transform = `translate(${left}px, ${top}px) translate(-50%, -100%)`;
@@ -234,8 +227,7 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();
       labels.forEach(({ label }) => label.remove());
-      buildingGeometries.forEach((geometry) => geometry.dispose());
-      buildingMaterials.forEach((material) => material.dispose());
+      world.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
