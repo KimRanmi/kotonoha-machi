@@ -2,7 +2,12 @@ spring:
   config:
     # 로컬 개발 시 backend/.env에 적어둔 값을 환경변수처럼 읽어온다(새 라이브러리 없이
     # Spring Boot 표준 기능으로 처리). 파일이 없어도(운영 환경 등) 에러 없이 넘어간다.
-    import: 'optional:file:.env[.properties]'
+    # 둘째 줄은 .claude/worktrees/<이름>/backend에서 실행할 때 메인 체크아웃의 backend/.env를 읽는
+    # 경로다(.env는 git에 안 올라가 워크트리에 복사되지 않는다). 뒤에 오는 항목이 앞을 덮어쓰므로
+    # 워크트리 자신의 .env가 있으면 그쪽이 우선한다.
+    import:
+      - 'optional:file:../../../../backend/.env[.properties]'
+      - 'optional:file:.env[.properties]'
   application:
     name: kotonoha-machi
   datasource:
