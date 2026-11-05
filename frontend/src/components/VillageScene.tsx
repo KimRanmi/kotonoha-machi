@@ -16,7 +16,7 @@ interface VillageSceneProps {
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
-const PLAYER_SCALE = 0.7; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
+const PLAYER_SCALE = 0.5; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
 const MAP_HALF_SIZE = 18; // 이동 가능한 정사각형 땅의 절반 크기
 const GROUND_HALF_SIZE = 60; // 눈에 보이는 풀밭의 절반 크기. 화면 어디를 봐도 땅이 보이게 이동 범위보다 훨씬 크다
