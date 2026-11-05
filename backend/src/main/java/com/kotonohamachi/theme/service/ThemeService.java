@@ -113,9 +113,7 @@ public class ThemeService {
   @Transactional(readOnly = true)
   public Optional<ThemeResponse> getTodayRecommendedTheme(Long userId) {
     List<ThemeProgress> progressList = themeProgressRepository.findAllByUserId(userId);
-    Optional<ThemeProgress> completedToday = progressList.stream()
-        .filter(progress -> progress.isCompleted() && isToday(progress.getUpdatedAt()))
-        .max(Comparator.comparing(ThemeProgress::getUpdatedAt));
+    Optional<ThemeProgress> completedToday = findLatestCompletedToday(progressList);
     if (completedToday.isPresent()) {
       return Optional.of(toThemeResponse(completedToday.get().getTheme(), completedToday.get()));
     }
@@ -128,13 +126,21 @@ public class ThemeService {
         .findFirst();
   }
 
+  /** 오늘(한국 시간) 완료한 테마 진행 중 가장 최근 것을 찾는다. */
+  private Optional<ThemeProgress> findLatestCompletedToday(List<ThemeProgress> progressList) {
+    return progressList.stream()
+        .filter(progress -> progress.isCompleted() && isToday(progress.getUpdatedAt()))
+        .max(Comparator.comparing(ThemeProgress::getUpdatedAt));
+  }
+
   private boolean isToday(OffsetDateTime dateTime) {
     return dateTime.atZoneSameInstant(KOREA_ZONE).toLocalDate().equals(LocalDate.now(KOREA_ZONE));
   }
 
   /**
    * 테마의 한 단계를 완료 처리하고 다음 단계로 진행한다. 지금 진행해야 할 단계가 아닌 단계를 요청하면(건너뛰기나 이미 끝난
-   * 단계 재요청) 거부한다. 아직 시작하지 않은 테마라면 이 호출로 진행 상태를 새로 만든다.
+   * 단계 재요청) 거부한다. 하루(한국 시간)에 테마는 하나만 완료할 수 있어서, 오늘 이미 다른 테마를 완료했다면
+   * 어떤 단계든 거부한다. 아직 시작하지 않은 테마라면 이 호출로 진행 상태를 새로 만든다.
    *
    * @param userId 진행할 사용자 ID(로그인한 본인)
    * @param themeId 진행할 테마 ID
@@ -144,6 +150,13 @@ public class ThemeService {
   @Transactional
   public ThemeProgressResponse completeStage(Long userId, Long themeId, ThemeStage stage) {
     Theme theme = findThemeOrThrow(themeId);
+    boolean otherThemeCompletedToday = findLatestCompletedToday(
+            themeProgressRepository.findAllByUserId(userId))
+        .filter(completed -> !completed.getTheme().getId().equals(themeId))
+        .isPresent();
+    if (otherThemeCompletedToday) {
+      throw new ApiException(ThemeErrorCode.DAILY_THEME_LIMIT_REACHED);
+    }
     ThemeProgress progress = themeProgressRepository
         .findByUserIdAndThemeId(userId, themeId)
         .orElseGet(

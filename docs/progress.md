@@ -418,3 +418,8 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
     반영되지 않게 했다.
   - 하루 1개 제한이 서버 강제가 아니라 추천 로직뿐이라는 한계를 `docs/decisions/0014-...md`에 적었다.
   - 검증: 아래 명령 통과 확인(backend spotless·test, frontend prettier·lint·build).
+- 하루 1개 테마 완료 제한을 서버에서 강제했다.
+  - `ThemeService.completeStage`: 오늘 다른 테마를 이미 완료했으면 `DAILY_THEME_LIMIT_REACHED`(409)로 거부한다.
+    `ThemeServiceTest`에 오늘 완료(거부)·어제 완료(허용) 테스트를 추가했다.
+  - 검증: backend `spotlessApply`·`test` 통과. 프런트는 바꾸지 않았다(기존 에러 표시가 서버 메시지를 보여 준다).
+  - 한계: 동시 요청 경합은 막지 않는다. 막힌 테마도 퀴즈는 풀 수 있고 "다음"에서 메시지를 본다.
