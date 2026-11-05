@@ -32,11 +32,11 @@ function AvatarPreview({ avatar, variant = 'full', className }: AvatarPreviewPro
 
     const camera = new THREE.PerspectiveCamera(variant === 'face' ? 30 : 35, 1, 0.1, 50);
     if (variant === 'face') {
-      camera.position.set(0, 1.65, 4.2);
-      camera.lookAt(0, 1.65, 0);
+      camera.position.set(0, 1.4, 3.8);
+      camera.lookAt(0, 1.4, 0);
     } else {
-      camera.position.set(0, 1.25, 5.6);
-      camera.lookAt(0, 1.0, 0);
+      camera.position.set(0, 1.2, 5);
+      camera.lookAt(0, 0.98, 0);
     }
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });

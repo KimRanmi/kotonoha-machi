@@ -11,7 +11,7 @@ interface VillageSceneProps {
 const WALK_SPEED = 4; // 초당 이동 거리
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
 const MAP_HALF_SIZE = 18; // 이동 가능한 정사각형 땅의 절반 크기
-const VIEW_HEIGHT = 12; // 화면에 세로로 보이는 월드 길이(직교 카메라)
+const VIEW_HEIGHT = 9; // 화면에 세로로 보이는 월드 길이(직교 카메라)
 const CAMERA_OFFSET = new THREE.Vector3(10, 10, 10); // 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다
 
 /**
@@ -76,7 +76,7 @@ function VillageScene({ avatar }: VillageSceneProps) {
     scene.add(ground);
 
     const player = createAvatarModel(avatar);
-    player.scale.setScalar(0.9);
+    player.scale.setScalar(1.2);
     scene.add(player);
 
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
