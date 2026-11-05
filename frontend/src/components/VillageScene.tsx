@@ -19,8 +19,11 @@ const WALK_SPEED = 4; // 초당 이동 거리
 const PLAYER_SCALE = 0.7; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
 const MAP_HALF_SIZE = 18; // 이동 가능한 정사각형 땅의 절반 크기
+const GROUND_HALF_SIZE = 60; // 눈에 보이는 풀밭의 절반 크기. 화면 어디를 봐도 땅이 보이게 이동 범위보다 훨씬 크다
 const VIEW_HEIGHT = 18; // 화면에 세로로 보이는 월드 길이(직교 카메라). 건물 3개가 한 화면에 들어오는 크기
-const CAMERA_OFFSET = new THREE.Vector3(10, 10, 10); // 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다
+// 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다. 직교 카메라라 멀리 둬도 크기는 같고, 카메라 앞쪽의 나무가
+// 시야 앞면에 잘리지 않게 숲(최대 48) 바깥까지 물러나 있다.
+const CAMERA_OFFSET = new THREE.Vector3(50, 50, 50);
 
 /**
  * 화면 기준 방향키 → 월드 방향. 카메라가 (+x, +y, +z)에서 원점을 내려다보므로 화면 위쪽은 월드의
@@ -59,7 +62,7 @@ function createGroundTexture(): THREE.CanvasTexture {
   texture.magFilter = THREE.NearestFilter;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(MAP_HALF_SIZE, MAP_HALF_SIZE);
+  texture.repeat.set(GROUND_HALF_SIZE, GROUND_HALF_SIZE);
   return texture;
 }
 
@@ -79,7 +82,7 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
     }
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#cfeaf5');
+    scene.background = new THREE.Color('#9fd28a'); // 풀밭 색. 혹시 땅 끝이 보여도 하늘색 틈이 생기지 않게
     scene.add(new THREE.AmbientLight(0xffffff, 1.5));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(6, 12, 4);
@@ -87,7 +90,7 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
 
     const groundTexture = createGroundTexture();
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(MAP_HALF_SIZE * 2, MAP_HALF_SIZE * 2),
+      new THREE.PlaneGeometry(GROUND_HALF_SIZE * 2, GROUND_HALF_SIZE * 2),
       new THREE.MeshLambertMaterial({ map: groundTexture }),
     );
     ground.rotation.x = -Math.PI / 2;
@@ -117,7 +120,7 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
     player.scale.setScalar(PLAYER_SCALE);
     scene.add(player);
 
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);

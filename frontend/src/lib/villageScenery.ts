@@ -111,7 +111,30 @@ function scatterBushes(trees: Plant[]): Plant[] {
   return bushes;
 }
 
+/** 숲이 시작되는 거리. 캐릭터가 걸어 다니는 땅(±17) 바로 바깥부터 나무를 심는다. */
+const FOREST_START = 18.5;
+const FOREST_END = 48;
+const FOREST_SPACING = 5;
+
+/** 걸어 다닐 수 있는 땅 바깥을 둘러싼 숲. 캐릭터가 들어갈 수 없는 곳이라 충돌 판정은 없다. */
+function scatterForest(): Plant[] {
+  const random = createRandom(2024);
+  const forest: Plant[] = [];
+  for (let gx = -FOREST_END; gx <= FOREST_END; gx += FOREST_SPACING) {
+    for (let gz = -FOREST_END; gz <= FOREST_END; gz += FOREST_SPACING) {
+      // 격자에서 조금씩 흔들어 심어야 줄 맞춰 선 것처럼 보이지 않는다.
+      const x = gx + (random() * 2 - 1) * 1.6;
+      const z = gz + (random() * 2 - 1) * 1.6;
+      if (Math.max(Math.abs(x), Math.abs(z)) > FOREST_START) {
+        forest.push({ x, z, variant: random() < 0.5 ? 0 : 1 });
+      }
+    }
+  }
+  return forest;
+}
+
 export const VILLAGE_TREES = scatterTrees();
+export const VILLAGE_FOREST = scatterForest();
 export const VILLAGE_FLOWERS = scatterFlowers(VILLAGE_TREES);
 export const VILLAGE_BUSHES = scatterBushes(VILLAGE_TREES);
 

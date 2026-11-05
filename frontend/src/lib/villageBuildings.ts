@@ -42,7 +42,7 @@ export const VILLAGE_BUILDINGS: VillageBuilding[] = [
   },
   {
     id: 'hall',
-    label: '마을회관',
+    label: '도서관',
     x: 10,
     z: 2,
     width: 6,

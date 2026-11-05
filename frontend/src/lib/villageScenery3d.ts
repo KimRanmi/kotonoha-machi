@@ -4,6 +4,7 @@ import {
   TREE_RADIUS,
   VILLAGE_BUSHES,
   VILLAGE_FLOWERS,
+  VILLAGE_FOREST,
   VILLAGE_PATHS,
   VILLAGE_TREES,
 } from './villageScenery';
@@ -122,6 +123,32 @@ export function createVillageWorld(): VillageWorld {
     group.add(holder);
   }
 
+  // 숲: 수백 그루라서 나무를 하나씩 만들지 않고, 같은 부품(줄기·잎)을 한 번에 여러 개 그리는
+  // InstancedMesh로 만든다. 위에서 만든 나무 모양·재질을 그대로 나눠 쓴다.
+  const roundTrees = VILLAGE_FOREST.filter((tree) => tree.variant === 0);
+  const pineTrees = VILLAGE_FOREST.filter((tree) => tree.variant === 1);
+  const instancedMeshes: THREE.InstancedMesh[] = [];
+  const matrix = new THREE.Matrix4();
+  const addInstances = (
+    part: THREE.BufferGeometry,
+    partMaterial: THREE.Material,
+    trees: typeof VILLAGE_FOREST,
+    height: number,
+    scale: number,
+  ) => {
+    const instanced = new THREE.InstancedMesh(part, partMaterial, trees.length);
+    trees.forEach((tree, index) => {
+      matrix.makeScale(scale, scale, scale).setPosition(tree.x, height * scale, tree.z);
+      instanced.setMatrixAt(index, matrix);
+    });
+    instancedMeshes.push(instanced);
+    group.add(instanced);
+  };
+  addInstances(trunkGeometry, trunkMaterial, VILLAGE_FOREST, 0.6, 1.4);
+  addInstances(roundLeafGeometry, roundLeafMaterial, roundTrees, 2.3, 1.4);
+  addInstances(pineLowGeometry, pineMaterial, pineTrees, 2, 1.4);
+  addInstances(pineHighGeometry, pineMaterial, pineTrees, 3.1, 1.4);
+
   // 덤불
   const bushGeometry = geometry(new THREE.IcosahedronGeometry(0.6, 0));
   const bushMaterial = material('#6dbb62', true);
@@ -150,6 +177,7 @@ export function createVillageWorld(): VillageWorld {
   return {
     group,
     dispose: () => {
+      instancedMeshes.forEach((instanced) => instanced.dispose());
       geometries.forEach((created) => created.dispose());
       materials.forEach((created) => created.dispose());
     },
