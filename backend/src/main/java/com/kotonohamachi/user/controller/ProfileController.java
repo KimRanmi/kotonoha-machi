@@ -25,7 +25,7 @@ public class ProfileController {
   /**
    * 생성자.
    *
-   * @param profileService 닉네임 변경 서비스
+   * @param profileService 프로필·닉네임·캐릭터 꾸미기 서비스
    */
   public ProfileController(ProfileService profileService) {
     this.profileService = profileService;

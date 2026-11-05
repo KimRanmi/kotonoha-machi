@@ -102,6 +102,9 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
 
     const pressed = new Set<string>();
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        return; // Cmd+A, Ctrl+S 같은 브라우저 단축키는 막지 않는다.
+      }
       const target = event.target;
       if (target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) {
         return;
@@ -123,7 +126,7 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
     let previousTime = performance.now();
     let frameId = 0;
     const animate = (time: number) => {
-      const delta = Math.min((time - previousTime) / 1000, 0.1);
+      const delta = Math.min(Math.max((time - previousTime) / 1000, 0), 0.1);
       previousTime = time;
 
       let dx = 0;
@@ -173,6 +176,7 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     };
   }, [avatar, palette]);

@@ -1,14 +1,17 @@
 import { apiFetch } from './client';
 
-export type AvatarSkinColor = 'LIGHT' | 'FAIR' | 'TAN' | 'BROWN' | 'DARK';
-export type AvatarHairColor = 'BLACK' | 'BROWN' | 'BLONDE' | 'RED' | 'GRAY';
+/**
+ * 색 축(피부색/머리색/옷 색/신발 색)은 서버가 내려주는 선택지 이름을 그대로 쓰므로 목록을 프런트에 따로 두지 않는다.
+ * 색을 추가·삭제해도 서버의 enum만 고치면 된다.
+ */
+export type AvatarSkinColor = string;
+export type AvatarHairColor = string;
 export type AvatarHairStyle =
   'SHORT' | 'BOB' | 'PONYTAIL' | 'AFRO' | 'BRAIDS' | 'CURLY' | 'BUNS' | 'MOHAWK';
 export type AvatarClothesStyle =
   'PLAIN' | 'CARDIGAN' | 'SCHOOL_UNIFORM' | 'ONEPIECE' | 'OVERALLS' | 'STRIPES';
-export type AvatarClothesColor =
-  'CREAM' | 'PINK' | 'CORAL' | 'PEACH' | 'YELLOW' | 'MINT' | 'SKY' | 'LAVENDER';
-export type AvatarShoesColor = 'WHITE' | 'PINK' | 'BEIGE' | 'MINT' | 'SKY' | 'LAVENDER';
+export type AvatarClothesColor = string;
+export type AvatarShoesColor = string;
 
 /** 캐릭터 꾸미기 여섯 축의 선택값. */
 export interface Avatar {
@@ -21,7 +24,7 @@ export interface Avatar {
 }
 
 /** 색 선택지 하나. 한글 이름과 색상값('#' 없는 6자리 16진)은 서버가 내려준다. */
-export interface ColorOption<T extends string> {
+export interface ColorOption<T extends string = string> {
   value: T;
   label: string;
   hex: string;

@@ -516,3 +516,10 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
 - 캐릭터 꾸미기를 저장하면 프로필에 머무르지 않고 마을(`/town`)로 돌아가게 했다. 저장 성공 문구는 화면이 바로
   바뀌므로 지웠고, 저장 실패 시에는 프로필에 남아 오류 문구를 보여 준다. 검증: prettier, lint, build 통과.
   화면에서 직접 눌러 보는 확인은 하지 않았다.
+- 코드 리뷰(`code-reviewer`)는 `REVIEW_PASSED`였고, 권장 사항을 반영했다.
+  - 색 축 타입을 `string`으로 풀었다(색 추가·삭제는 백엔드 enum만 고치면 됨). 결정은 `0015`에 기록했다.
+  - `AvatarPreview`·`VillageScene` 정리 단계에 `forceContextLoss()`를 넣어 WebGL 컨텍스트가 쌓이지 않게 했다.
+  - 마을에서 Ctrl/Cmd/Alt 조합키는 이동으로 막지 않고, 첫 프레임 시간 차이가 음수가 되지 않게 했다.
+  - 서버 팔레트에 없는 색 이름은 회색으로 칠한다. 저장 성공 시 불필요한 상태 갱신을 없앴다.
+  - `ProfileController` 생성자 Javadoc을 현재 역할에 맞게 고쳤다.
+  - 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 화면에서 직접 확인하지는 않았다.

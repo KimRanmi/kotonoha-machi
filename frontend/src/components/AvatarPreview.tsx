@@ -70,6 +70,7 @@ function AvatarPreview({ avatar, palette, variant = 'full', className }: AvatarP
       observer.disconnect();
       disposeAvatarModel(model);
       renderer.dispose();
+      renderer.forceContextLoss(); // 선택을 연타해도 WebGL 컨텍스트가 쌓이지 않게
       renderer.domElement.remove();
     };
   }, [avatar, palette, variant]);

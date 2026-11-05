@@ -124,7 +124,6 @@ function ProfilePage() {
       setAvatarErrorMessage(
         error instanceof ApiError ? error.message : '캐릭터 꾸미기 저장에 실패했습니다.',
       );
-    } finally {
       setIsAvatarSubmitting(false);
     }
   }

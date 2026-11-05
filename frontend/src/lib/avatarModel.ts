@@ -9,6 +9,8 @@ import type { AvatarPalette } from './avatarPreview';
  */
 
 const PANTS_COLOR = '3b4252';
+/** 서버가 준 팔레트에 없는 색 이름이 올 때(배포 불일치 등) 쓰는 기본 회색. */
+const FALLBACK_COLOR = 'cccccc';
 const HEAD_Y = 1.35;
 const HEAD_RADIUS = 0.62;
 const HEAD_SCALE: [number, number, number] = [1, 0.92, 0.95];
@@ -308,10 +310,10 @@ function addHeadAndFace(parent: THREE.Object3D, skin: THREE.Color) {
 /** 여섯 축 값으로 캐릭터 한 명을 만든다. 쓰고 나면 `disposeAvatarModel`로 정리해야 한다. */
 export function createAvatarModel(avatar: Avatar, palette: AvatarPalette): THREE.Group {
   const root = new THREE.Group();
-  const skin = hex(palette.skin[avatar.skinColor]);
-  const hair = hex(palette.hair[avatar.hairColor]);
-  const shoes = hex(palette.shoes[avatar.shoesColor]);
-  const clothesColor = hex(palette.clothes[avatar.clothesColor]);
+  const skin = hex(palette.skin[avatar.skinColor] ?? FALLBACK_COLOR);
+  const hair = hex(palette.hair[avatar.hairColor] ?? FALLBACK_COLOR);
+  const shoes = hex(palette.shoes[avatar.shoesColor] ?? FALLBACK_COLOR);
+  const clothesColor = hex(palette.clothes[avatar.clothesColor] ?? FALLBACK_COLOR);
   const look = clothesLook(avatar.clothesStyle, clothesColor);
 
   // 짧고 통통한 다리와 둥근 신발
