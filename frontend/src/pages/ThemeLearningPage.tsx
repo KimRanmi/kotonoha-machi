@@ -13,6 +13,7 @@ import {
   completeStage,
   getStageContent,
   getThemes,
+  getTodayRecommendation,
   type QuizItem,
   type Theme,
   type ThemeStage,
@@ -76,6 +77,8 @@ function ThemeLearningPage() {
   const [theme, setTheme] = useState<Theme | null>(null);
   // 완료한 테마를 다시 볼 때 고른 단계. 완료 전에는 쓰이지 않는다.
   const [viewStage, setViewStage] = useState<ThemeStage>('KANJI');
+  // 오늘 이미 완료한 테마. 하루 1개만 완료할 수 있어서, 이게 다른 테마면 이 테마는 내일부터 진행한다.
+  const [completedTodayTheme, setCompletedTodayTheme] = useState<Theme | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [isAdvancing, setIsAdvancing] = useState(false);
@@ -96,11 +99,13 @@ function ThemeLearningPage() {
   useEffect(() => {
     let cancelled = false;
 
-    getThemes()
-      .then((themes) => {
+    // 오늘 완료한 테마 조회는 보조 정보라 실패해도 학습 화면은 열어 준다(서버가 완료 시점에 한 번 더 막는다).
+    Promise.all([getThemes(), getTodayRecommendation().catch(() => null)])
+      .then(([themes, todayTheme]) => {
         if (cancelled) {
           return;
         }
+        setCompletedTodayTheme(todayTheme?.completed ? todayTheme : null);
         const found = themes.find((candidate) => candidate.id === numericThemeId);
         if (!found) {
           setLoadErrorMessage('테마를 찾을 수 없습니다.');
@@ -128,12 +133,17 @@ function ThemeLearningPage() {
 
   // 진행 중이면 지금 단계, 완료한 테마면 사용자가 고른 단계의 내용을 보여 준다.
   const activeStage = theme ? (theme.completed ? viewStage : theme.currentStage) : null;
+  const isBlockedByDailyLimit =
+    theme !== null &&
+    !theme.completed &&
+    completedTodayTheme !== null &&
+    completedTodayTheme.id !== theme.id;
 
   useEffect(() => {
     stopSpeaking();
     // 단계를 바꿀 때 이전 단계에서 듣고 있던 마이크 인식이 새 단계 문제에 반영되지 않게 멈춘다.
     cancelSpeechRecognition();
-    if (!theme || !activeStage) {
+    if (!theme || !activeStage || isBlockedByDailyLimit) {
       setQuizItems(null);
       return;
     }
@@ -177,7 +187,7 @@ function ThemeLearningPage() {
     return () => {
       cancelled = true;
     };
-  }, [theme, activeStage]);
+  }, [theme, activeStage, isBlockedByDailyLimit]);
 
   // 페이지를 떠날 때 재생 중인 소리와 켜져 있는 마이크 인식을 멈춘다.
   useEffect(() => {
@@ -351,8 +361,22 @@ function ThemeLearningPage() {
           </p>
         )}
 
+        {isBlockedByDailyLimit && completedTodayTheme && (
+          <div className={styles.limitNotice} role="status">
+            <p className={styles.limitNoticeText}>
+              오늘은 이미 "{completedTodayTheme.title}" 테마를 완료했어요. 이 테마는 내일 이어서
+              진행할 수 있어요.
+            </p>
+            <Link to={`/town/themes/${completedTodayTheme.id}`} className={styles.limitNoticeLink}>
+              오늘 완료한 테마 다시 보기
+            </Link>
+          </div>
+        )}
+
         <div className={styles.card}>
-          {isContentLoading ? (
+          {isBlockedByDailyLimit ? (
+            <p className={styles.cardMessage}>내일 다시 만나요!</p>
+          ) : isContentLoading ? (
             <p className={styles.cardMessage}>콘텐츠를 불러오는 중입니다…</p>
           ) : contentErrorMessage ? (
             <p className={styles.error} role="alert">
@@ -520,7 +544,7 @@ function ThemeLearningPage() {
         )}
 
         <div className={styles.actions}>
-          {theme.completed ? (
+          {theme.completed || isBlockedByDailyLimit ? (
             <Link to="/town" className={styles.nextButton}>
               마을로 돌아가기
             </Link>
