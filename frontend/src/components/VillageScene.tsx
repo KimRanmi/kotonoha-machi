@@ -9,6 +9,8 @@ import styles from './VillageScene.module.css';
 interface VillageSceneProps {
   avatar: Avatar;
   palette: AvatarPalette;
+  /** 열려 있는 건물의 라벨을 눌렀을 때 호출된다. 걸어가지 않고 바로 입장한다. */
+  onEnterBuilding: (buildingId: string) => void;
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
@@ -54,8 +56,13 @@ function createGroundTexture(): THREE.CanvasTexture {
 }
 
 /** 위에서 내려다보는 고정 쿼터뷰 마을. 방향키/WASD로 내 캐릭터를 자유롭게 걷게 한다. */
-function VillageScene({ avatar, palette }: VillageSceneProps) {
+function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // 장면은 avatar/palette가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
+  const onEnterRef = useRef(onEnterBuilding);
+  useEffect(() => {
+    onEnterRef.current = onEnterBuilding;
+  }, [onEnterBuilding]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -97,6 +104,22 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
       roof.position.set(building.x, building.height + 0.2, building.z);
       scene.add(body, roof);
     }
+
+    // 건물 라벨은 3D가 아니라 화면 위 HTML 버튼이다. 매 프레임 건물 지붕 위 위치를 화면 좌표로 바꿔 따라붙인다.
+    const labels = VILLAGE_BUILDINGS.map((building) => {
+      const label = document.createElement('button');
+      label.type = 'button';
+      label.className = building.locked ? `${styles.label} ${styles.labelLocked}` : styles.label;
+      label.textContent = building.locked ? `🔒 ${building.label} (나중에)` : building.label;
+      if (building.locked) {
+        label.disabled = true;
+      } else {
+        label.addEventListener('click', () => onEnterRef.current(building.id));
+      }
+      container.appendChild(label);
+      return { building, label };
+    });
+    const labelPosition = new THREE.Vector3();
 
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(1.2);
@@ -189,6 +212,13 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
       camera.position.copy(player.position).add(CAMERA_OFFSET);
       camera.lookAt(player.position);
       renderer.render(scene, camera);
+
+      for (const { building, label } of labels) {
+        labelPosition.set(building.x, building.height + 0.6, building.z).project(camera);
+        const left = ((labelPosition.x + 1) / 2) * container.clientWidth;
+        const top = ((1 - labelPosition.y) / 2) * container.clientHeight;
+        label.style.transform = `translate(${left}px, ${top}px) translate(-50%, -100%)`;
+      }
       frameId = requestAnimationFrame(animate);
     };
     frameId = requestAnimationFrame(animate);
@@ -203,6 +233,7 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();
+      labels.forEach(({ label }) => label.remove());
       buildingGeometries.forEach((geometry) => geometry.dispose());
       buildingMaterials.forEach((material) => material.dispose());
       renderer.dispose();

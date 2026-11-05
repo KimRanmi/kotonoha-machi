@@ -153,7 +153,14 @@ function TownPage() {
           </span>
         </Link>
       )}
-      {avatar && palette && <VillageScene avatar={avatar} palette={palette} />}
+      {avatar && palette && (
+        <VillageScene
+          avatar={avatar}
+          palette={palette}
+          // 건물 id가 곧 담당 주민 id다(카페 → /chat/cafe). 주민 데이터가 생기면 이 연결을 바꾼다.
+          onEnterBuilding={(buildingId) => navigate(`/chat/${buildingId}`)}
+        />
+      )}
       {logoutErrorMessage && (
         <p className={styles.content} role="alert">
           {logoutErrorMessage}
