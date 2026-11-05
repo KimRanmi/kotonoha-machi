@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import ChatPage from './pages/ChatPage';
+import CompletedThemesPage from './pages/CompletedThemesPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
@@ -19,6 +20,7 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/town" element={<TownPage />} />
+        <Route path="/town/themes" element={<CompletedThemesPage />} />
         <Route path="/town/themes/:themeId" element={<ThemeLearningPage />} />
         <Route path="/chat/:residentId" element={<ChatPage />} />
         <Route path="/vocabulary" element={<VocabularyPage />} />

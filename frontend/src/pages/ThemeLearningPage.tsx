@@ -137,7 +137,9 @@ function ThemeLearningPage() {
 
   // 진행 중이면 지금 단계, 완료한 테마면 사용자가 고른 단계의 내용을 보여 준다.
   const activeStage = theme ? (theme.completed ? viewStage : theme.currentStage) : null;
-  const isNotTodayTheme = theme !== null && todayTheme !== undefined && todayTheme?.id !== theme.id;
+  // 완료한 테마는 오늘의 테마가 아니어도 다시 볼 수 있다(완료 목록에서 들어온다).
+  const isNotTodayTheme =
+    theme !== null && !theme.completed && todayTheme !== undefined && todayTheme?.id !== theme.id;
 
   useEffect(() => {
     stopSpeaking();

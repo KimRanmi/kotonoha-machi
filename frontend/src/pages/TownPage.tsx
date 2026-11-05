@@ -135,6 +135,9 @@ function TownPage() {
           </span>
         </Link>
       )}
+      <Link to="/town/themes" className={styles.completedThemesLink}>
+        완료한 테마 보기 →
+      </Link>
       {logoutErrorMessage && (
         <p className={styles.content} role="alert">
           {logoutErrorMessage}
