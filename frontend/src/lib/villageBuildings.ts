@@ -44,7 +44,7 @@ export const VILLAGE_BUILDINGS: VillageBuilding[] = [
     id: 'hall',
     label: '도서관',
     x: 10,
-    z: 2,
+    z: -4,
     width: 6,
     depth: 4,
     height: 3,

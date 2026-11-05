@@ -10,6 +10,18 @@ import {
 } from './villageScenery';
 
 const FLOWER_COLORS = ['#f4a3b8', '#fff3a8', '#ffffff', '#b9a4f0', '#f7b267'];
+const WINDOW_COLOR = '#cfe8ff';
+
+// 간판: 나무 테두리 + 글씨를 그린 캔버스 판. 글씨는 3D 글자가 아니라 캔버스에 그린 그림을 판에 붙인다.
+const SIGN_STYLES: Record<string, { background: string; text: string; accent: string }> = {
+  cafe: { background: '#4a2f1e', text: '#fbf1dc', accent: '#e0a95a' },
+  shop: { background: '#1f3d6b', text: '#ffffff', accent: '#f2c230' },
+  hall: { background: '#24402f', text: '#f3e9c6', accent: '#d9b25a' },
+};
+const SIGN_WIDTH = 3.2;
+const SIGN_HEIGHT = 0.9;
+const SIGN_FONT = '"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
+const SIGN_BOTTOM: Record<string, number> = { hall: 3.85 }; // 도서관은 박공 위로 올린다
 
 /** 건물 처마에 달린 간판. 마우스로 가리키거나 누를 수 있게 호출한 쪽이 object를 raycast한다. */
 export interface VillageSign {
@@ -64,10 +76,8 @@ export function createVillageWorld(): VillageWorld {
     place(mesh, path.x, 0.02, path.z, group);
   }
 
-  // 건물: 벽 상자 + 뾰족 지붕 + 문 + 창문. 문과 창문은 카메라가 보는 +z, +x 벽에 단다.
+  // 건물: 벽 상자 + 뾰족 지붕 + 문. 창문과 장식은 건물별 함수가 카메라가 보는 +z, +x 벽에 단다.
   const doorMaterial = material('#6b4a32');
-  const windowMaterial = material('#cfe8ff');
-  const windowGeometry = geometry(new THREE.BoxGeometry(0.8, 0.8, 0.1));
   const doorGeometry = geometry(new THREE.BoxGeometry(1.1, 1.8, 0.1));
   const roofGeometry = geometry(new THREE.ConeGeometry(1, ROOF_HEIGHT, 4));
 
@@ -120,7 +130,7 @@ export function createVillageWorld(): VillageWorld {
       building.depth / 2 + 0.02,
       house,
     );
-    place(box(size[0], size[1], 0.1, '#cfe8ff'), x, y, building.depth / 2 + 0.03, house);
+    place(box(size[0], size[1], 0.1, WINDOW_COLOR), x, y, building.depth / 2 + 0.03, house);
   };
 
   const addCafeTable = (house: THREE.Group, x: number, z: number, parasolColor: string) => {
@@ -251,28 +261,16 @@ export function createVillageWorld(): VillageWorld {
     place(box(0.16, 0.04, 0.02, '#3a2a1c'), 0.06, 3.15, front + 1.17, house);
     // 키 큰 창문(앞 기둥 사이, 옆면)
     for (const x of [-1.95, 1.95]) {
-      place(box(0.7, 1.7, 0.1, '#cfe8ff'), x, 1.7, front + 0.03, house);
+      place(box(0.7, 1.7, 0.1, WINDOW_COLOR), x, 1.7, front + 0.03, house);
     }
     for (const z of [-1, 1]) {
-      const tall = box(0.1, 1.7, 0.7, '#cfe8ff');
+      const tall = box(0.1, 1.7, 0.7, WINDOW_COLOR);
       place(tall, building.width / 2 + 0.03, 1.7, z, house);
     }
   };
 
-  // 간판: 나무 테두리 + 글씨를 그린 캔버스 판. 글씨는 3D 글자가 아니라 캔버스에 그린 그림을 판에 붙인다.
-  const SIGN_STYLES: Record<string, { background: string; text: string; accent: string }> = {
-    cafe: { background: '#4a2f1e', text: '#fbf1dc', accent: '#e0a95a' },
-    shop: { background: '#1f3d6b', text: '#ffffff', accent: '#f2c230' },
-    hall: { background: '#24402f', text: '#f3e9c6', accent: '#d9b25a' },
-  };
-  const DEFAULT_SIGN_STYLE = { background: '#3a2a1c', text: '#ffffff', accent: '#e0a95a' };
-  const SIGN_WIDTH = 3.2;
-  const SIGN_HEIGHT = 0.9;
-  const SIGN_FONT = '"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
-  const SIGN_BOTTOM: Record<string, number> = { hall: 3.85 }; // 도서관은 박공 위로 올린다
-
   const createSignTexture = (building: VillageBuilding) => {
-    const style = SIGN_STYLES[building.id] ?? DEFAULT_SIGN_STYLE;
+    const style = SIGN_STYLES[building.id];
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 144;
@@ -302,7 +300,6 @@ export function createVillageWorld(): VillageWorld {
 
   const createSign = (building: VillageBuilding): VillageSign => {
     const object = new THREE.Group();
-    object.userData.buildingId = building.id;
     const bottom = SIGN_BOTTOM[building.id] ?? building.height + 0.05;
     const z = building.depth / 2 + 0.5;
     place(
@@ -333,15 +330,13 @@ export function createVillageWorld(): VillageWorld {
     };
   };
 
-  const DECORATORS: Record<string, (house: THREE.Group, building: VillageBuilding) => void> = {
+  const DECORATORS: Partial<
+    Record<string, (house: THREE.Group, building: VillageBuilding) => void>
+  > = {
     cafe: addCafe,
     shop: addShop,
     hall: addLibrary,
   };
-
-  for (const building of VILLAGE_BUILDINGS) {
-    group.add(createBuilding(building));
-  }
 
   function createBuilding(building: VillageBuilding): THREE.Group {
     const house = new THREE.Group();
@@ -373,23 +368,15 @@ export function createVillageWorld(): VillageWorld {
     place(roof, 0, building.height + ROOF_HEIGHT / 2, 0, house);
 
     place(new THREE.Mesh(doorGeometry, doorMaterial), 0, 0.9, building.depth / 2 + 0.03, house);
-    const decorate = DECORATORS[building.id];
-    if (decorate) {
-      decorate(house, building);
-    } else {
-      // 전용 장식이 없는 건물은 기본 창문만 단다.
-      const front = building.depth / 2 + 0.03;
-      for (const offset of [-building.width * 0.3, building.width * 0.3]) {
-        place(new THREE.Mesh(windowGeometry, windowMaterial), offset, 1.5, front, house);
-      }
-      const sideWindow = new THREE.Mesh(windowGeometry, windowMaterial);
-      sideWindow.rotation.y = Math.PI / 2;
-      place(sideWindow, building.width / 2 + 0.03, 1.5, 0, house);
-    }
+    DECORATORS[building.id]?.(house, building);
     const sign = createSign(building);
     house.add(sign.object);
     signs.push(sign);
     return house;
+  }
+
+  for (const building of VILLAGE_BUILDINGS) {
+    group.add(createBuilding(building));
   }
 
   // 나무: 줄기 + 잎. variant 0은 둥근 나무, 1은 소나무.

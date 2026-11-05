@@ -39,7 +39,7 @@ function isInsideRect(x: number, z: number, rect: Rect, margin: number): boolean
   );
 }
 
-/** 건물이나 길 위, 또는 캐릭터 시작 자리라 식물을 심으면 안 되는 곳인지. */
+/** 건물이나 길 위라서 식물을 심으면 안 되는 곳인지. */
 function isOccupied(x: number, z: number, margin: number): boolean {
   return (
     VILLAGE_BUILDINGS.some((building) => isInsideRect(x, z, building, margin + 1)) ||
@@ -61,7 +61,7 @@ function createRandom(seed: number): () => number {
 function scatterTrees(): Plant[] {
   const random = createRandom(7);
   const trees: Plant[] = [];
-  for (let attempt = 0; attempt < 400 && trees.length < 26; attempt++) {
+  for (let attempt = 0; attempt < 400 && trees.length < 12; attempt++) {
     const x = (random() * 2 - 1) * PLANT_LIMIT;
     const z = (random() * 2 - 1) * PLANT_LIMIT;
     const tooClose = trees.some((tree) => Math.hypot(tree.x - x, tree.z - z) < 4);
@@ -114,7 +114,7 @@ function scatterBushes(trees: Plant[]): Plant[] {
 /** 숲이 시작되는 거리. 캐릭터가 걸어 다니는 땅(±17) 바로 바깥부터 나무를 심는다. */
 const FOREST_START = 18.5;
 const FOREST_END = 48;
-const FOREST_SPACING = 5;
+const FOREST_SPACING = 6.5;
 
 /** 걸어 다닐 수 있는 땅 바깥을 둘러싼 숲. 캐릭터가 들어갈 수 없는 곳이라 충돌 판정은 없다. */
 function scatterForest(): Plant[] {
