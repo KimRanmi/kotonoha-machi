@@ -25,6 +25,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -102,19 +103,19 @@ public class ThemeService {
   }
 
   /**
-   * "오늘의 학습" 배너에 추천할 테마를 조회한다. 오늘(한국 시간) 안에 테마를 하나라도 완료했으면 그날은 더 이상
-   * 추천하지 않는다(빈 값). 그렇지 않으면 아직 완료하지 않은 테마 중 첫 번째를 추천한다.
+   * "오늘의 학습" 배너에 보여 줄 테마를 조회한다. 오늘(한국 시간) 안에 테마를 완료했으면 그날은 새 테마를 추천하지
+   * 않고(하루 1개), 방금 완료한 그 테마를 완료 상태로 돌려줘 당일엔 단계별 내용을 다시 볼 수 있게 한다. 그렇지
+   * 않으면 아직 완료하지 않은 테마 중 첫 번째를 추천한다.
    *
    * @param userId 조회할 사용자 ID(로그인한 본인)
-   * @return 추천할 테마(오늘 이미 완료했거나 모든 테마를 끝냈으면 빈 값)
+   * @return 보여 줄 테마(오늘 완료한 테마, 없으면 추천 테마, 모든 테마를 끝냈으면 빈 값)
    */
   @Transactional(readOnly = true)
   public Optional<ThemeResponse> getTodayRecommendedTheme(Long userId) {
     List<ThemeProgress> progressList = themeProgressRepository.findAllByUserId(userId);
-    boolean completedToday = progressList.stream()
-        .anyMatch(progress -> progress.isCompleted() && isToday(progress.getUpdatedAt()));
-    if (completedToday) {
-      return Optional.empty();
+    Optional<ThemeProgress> completedToday = findLatestCompletedToday(progressList);
+    if (completedToday.isPresent()) {
+      return Optional.of(toThemeResponse(completedToday.get().getTheme(), completedToday.get()));
     }
 
     Map<Long, ThemeProgress> progressByThemeId = progressList.stream()
@@ -125,13 +126,21 @@ public class ThemeService {
         .findFirst();
   }
 
+  /** 오늘(한국 시간) 완료한 테마 진행 중 가장 최근 것을 찾는다. */
+  private Optional<ThemeProgress> findLatestCompletedToday(List<ThemeProgress> progressList) {
+    return progressList.stream()
+        .filter(progress -> progress.isCompleted() && isToday(progress.getUpdatedAt()))
+        .max(Comparator.comparing(ThemeProgress::getUpdatedAt));
+  }
+
   private boolean isToday(OffsetDateTime dateTime) {
     return dateTime.atZoneSameInstant(KOREA_ZONE).toLocalDate().equals(LocalDate.now(KOREA_ZONE));
   }
 
   /**
    * 테마의 한 단계를 완료 처리하고 다음 단계로 진행한다. 지금 진행해야 할 단계가 아닌 단계를 요청하면(건너뛰기나 이미 끝난
-   * 단계 재요청) 거부한다. 아직 시작하지 않은 테마라면 이 호출로 진행 상태를 새로 만든다.
+   * 단계 재요청) 거부한다. 하루(한국 시간)에 "오늘의 테마"({@link #getTodayRecommendedTheme})만 진행할 수 있어서, 다른
+   * 테마의 단계는 거부한다(오늘 이미 다른 테마를 완료했다면 한도 초과, 아니면 오늘의 테마가 아님). 아직 시작하지 않은 테마라면 이 호출로 진행 상태를 새로 만든다.
    *
    * @param userId 진행할 사용자 ID(로그인한 본인)
    * @param themeId 진행할 테마 ID
@@ -141,6 +150,13 @@ public class ThemeService {
   @Transactional
   public ThemeProgressResponse completeStage(Long userId, Long themeId, ThemeStage stage) {
     Theme theme = findThemeOrThrow(themeId);
+    Optional<ThemeResponse> todayTheme = getTodayRecommendedTheme(userId);
+    if (todayTheme.isPresent() && !todayTheme.get().id().equals(themeId)) {
+      throw new ApiException(
+          todayTheme.get().completed()
+              ? ThemeErrorCode.DAILY_THEME_LIMIT_REACHED
+              : ThemeErrorCode.NOT_TODAY_THEME);
+    }
     ThemeProgress progress = themeProgressRepository
         .findByUserIdAndThemeId(userId, themeId)
         .orElseGet(

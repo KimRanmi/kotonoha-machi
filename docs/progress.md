@@ -415,3 +415,41 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
     손가락/우클릭 무시를 포인터 이벤트로 직접 확인했다. 실제 터치 기기는 확인하지 않았다.
   - 남긴 것(수정 안 함): 접근성(`aria-label` 등, Tab/Enter 입력), 주색 위 흰 글자 대비(새 토큰 필요),
     팝업이 가장자리 키에서 잘리는지 확인.
+- 테마를 완료한 당일에도 그 테마를 볼 수 있게 했다(하루 1개 완료 제한은 그대로).
+  - `ThemeService.getTodayRecommendedTheme`: 오늘 완료한 테마가 있으면 빈 값 대신 그 테마(완료 상태)를 돌려준다.
+    새 테마는 여전히 추천하지 않는다.
+  - `TownPage` 배너는 완료 상태면 "오늘 완료 · 복습하기 / 다시 보기"로 바뀐다. `ThemeLearningPage`는 완료한
+    테마에서 한자~복습 단계 칩을 눌러 각 단계 내용을 다시 볼 수 있다(완료 처리는 하지 않는 열람 모드).
+  - 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 브라우저에서 직접 눌러 보는
+    확인과 이 동작을 직접 겨냥한 자동 테스트는 하지 않았다.
+  - 한계: 다음 날 0시(한국 시간)가 지나면 완료한 테마는 배너에서 사라지고 다음 테마가 추천된다.
+- 코드 리뷰(REVIEW_PASSED) 권고를 반영했다.
+  - 오늘 완료한 테마가 여러 개면 `updatedAt`이 가장 최근인 것을 고른다(순서가 임의이던 `findFirst` 대체).
+  - 단계 전환 시 `cancelSpeechRecognition()`을 호출해, 열람 모드에서 이전 단계의 마이크 인식 결과가 새 단계에
+    반영되지 않게 했다.
+  - 하루 1개 제한이 서버 강제가 아니라 추천 로직뿐이라는 한계를 `docs/decisions/0014-...md`에 적었다.
+  - 검증: 아래 명령 통과 확인(backend spotless·test, frontend prettier·lint·build).
+- 하루 1개 테마 완료 제한을 서버에서 강제했다.
+  - `ThemeService.completeStage`: 오늘 다른 테마를 이미 완료했으면 `DAILY_THEME_LIMIT_REACHED`(409)로 거부한다.
+    `ThemeServiceTest`에 오늘 완료(거부)·어제 완료(허용) 테스트를 추가했다.
+  - 검증: backend `spotlessApply`·`test` 통과. 프런트는 바꾸지 않았다(기존 에러 표시가 서버 메시지를 보여 준다).
+  - 한계: 동시 요청 경합은 막지 않는다. 막힌 테마도 퀴즈는 풀 수 있고 "다음"에서 메시지를 본다.
+- 하루 제한에 걸린 테마의 화면을 다듬었다(서버 409만 믿고 끝에서 에러를 보여 주던 흐름 개선).
+  - `ThemeLearningPage`: 열 때 `getTodayRecommendation`으로 오늘 완료한 테마를 확인해, 다른 테마를 오늘 이미
+    완료했다면 퀴즈를 불러오지 않고 안내 문구("내일 이어서 진행")와 "오늘 완료한 테마 다시 보기" 링크,
+    "마을로 돌아가기"만 보여 준다. 조회가 실패하면 그냥 열고, 서버 409 메시지가 기존 에러 영역에 나온다.
+  - 검증: prettier·lint·build 통과. 브라우저에서 직접 눌러 보는 확인은 하지 않았다.
+- 오늘의 테마가 아닌 테마는 주소로 들어가도 진행·열람하지 못하게 했다.
+  - 서버: `completeStage`가 오늘의 테마가 아니면 `NOT_TODAY_THEME`(409), 오늘 이미 완료했으면 `DAILY_THEME_LIMIT_REACHED`(409).
+    `ThemeServiceTest`·`ThemeControllerIntegrationTest`에 테스트 추가.
+  - 화면: `ThemeLearningPage`가 "오늘의 테마가 아닙니다" 안내와 오늘의 테마로 가는 링크를 보여 주고 퀴즈를 불러오지 않는다.
+  - 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 브라우저 확인은 하지 않았다.
+  - 한계: 테마 순서가 ID 순으로 고정된다. 이전에 완료한 테마도 오늘은 다시 볼 수 없다. 동시 요청 경합은 막지 않는다.
+- 테마의 마지막 단계(복습)를 끝내면 "오늘 테마를 완료했습니다!" 확인 화면을 보여 주고, "확인"을 누르면 `/town`으로 이동한다.
+  - `ThemeLearningPage`: 완료 직후에만(`justCompleted`) 이 화면을 보여 준다. 나중에 다시 열면 기존처럼 단계별 열람 화면이다.
+  - 검증: prettier·lint·build 통과. 브라우저 확인은 하지 않았다.
+- 완료한 테마 목록 화면을 추가했다.
+  - `CompletedThemesPage`(`/town/themes`): `GET /api/themes`에서 `completed`인 테마만 보여 주고, 누르면 열람 모드로 연다.
+    마을 화면 헤더(캐릭터 설정 옆)에 "완료한 테마" 아이콘 버튼을 뒀다. 새 API·라이브러리는 없다.
+  - `ThemeLearningPage`: 완료한 테마는 오늘의 테마가 아니어도 막지 않는다(0014 문서의 "이전 완료 테마 못 봄" 부분을 바꿈).
+  - 검증: prettier·lint·build 통과. 브라우저 확인은 하지 않았다.

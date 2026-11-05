@@ -183,6 +183,21 @@ class ThemeControllerIntegrationTest {
   }
 
   @Test
+  void 오늘의_테마가_아닌_테마의_단계를_완료하려_하면_409를_반환한다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    MvcResult result = mockMvc
+        .perform(get("/api/themes").session(session))
+        .andExpect(status().isOk())
+        .andReturn();
+    Number secondThemeId = JsonPath.read(result.getResponse().getContentAsString(), "$[1].id");
+
+    mockMvc
+        .perform(post("/api/themes/" + secondThemeId + "/stages/KANJI/complete").session(session))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").value("오늘의 테마가 아닙니다. 오늘의 테마만 진행할 수 있습니다."));
+  }
+
+  @Test
   void 이미_끝난_단계를_다시_완료하려_하면_409를_반환한다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     Long themeId = firstThemeId(session);

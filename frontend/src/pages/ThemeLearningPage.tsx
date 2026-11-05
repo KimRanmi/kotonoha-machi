@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import {
   cancelSpeechRecognition,
@@ -13,6 +13,7 @@ import {
   completeStage,
   getStageContent,
   getThemes,
+  getTodayRecommendation,
   type QuizItem,
   type Theme,
   type ThemeStage,
@@ -72,10 +73,18 @@ function getSpokenText(quizItem: QuizItem): string {
 function ThemeLearningPage() {
   const { themeId } = useParams<{ themeId: string }>();
   const numericThemeId = Number(themeId);
+  const navigate = useNavigate();
 
   const [theme, setTheme] = useState<Theme | null>(null);
+  // 완료한 테마를 다시 볼 때 고른 단계. 완료 전에는 쓰이지 않는다.
+  const [viewStage, setViewStage] = useState<ThemeStage>('KANJI');
+  // 오늘의 테마(오늘 완료했으면 그 테마, 아니면 추천 테마). 오늘은 이 테마만 진행할 수 있다.
+  // `null`은 오늘의 테마가 없다는 뜻이고, `undefined`는 아직 모르는 상태(조회 전·실패)다.
+  const [todayTheme, setTodayTheme] = useState<Theme | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+  // 마지막 단계를 막 끝낸 직후에만 true. 완료 확인 화면을 보여 주고 확인하면 /town으로 보낸다.
+  const [justCompleted, setJustCompleted] = useState(false);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [advanceErrorMessage, setAdvanceErrorMessage] = useState<string | null>(null);
 
@@ -94,11 +103,13 @@ function ThemeLearningPage() {
   useEffect(() => {
     let cancelled = false;
 
-    getThemes()
-      .then((themes) => {
+    // 오늘의 테마 조회는 보조 정보라 실패해도 학습 화면은 열어 준다(서버가 단계 완료 시점에 한 번 더 막는다).
+    Promise.all([getThemes(), getTodayRecommendation().catch(() => undefined)])
+      .then(([themes, fetchedTodayTheme]) => {
         if (cancelled) {
           return;
         }
+        setTodayTheme(fetchedTodayTheme);
         const found = themes.find((candidate) => candidate.id === numericThemeId);
         if (!found) {
           setLoadErrorMessage('테마를 찾을 수 없습니다.');
@@ -124,9 +135,17 @@ function ThemeLearningPage() {
     };
   }, [numericThemeId]);
 
+  // 진행 중이면 지금 단계, 완료한 테마면 사용자가 고른 단계의 내용을 보여 준다.
+  const activeStage = theme ? (theme.completed ? viewStage : theme.currentStage) : null;
+  // 완료한 테마는 오늘의 테마가 아니어도 다시 볼 수 있다(완료 목록에서 들어온다).
+  const isNotTodayTheme =
+    theme !== null && !theme.completed && todayTheme !== undefined && todayTheme?.id !== theme.id;
+
   useEffect(() => {
     stopSpeaking();
-    if (!theme || theme.completed) {
+    // 단계를 바꿀 때 이전 단계에서 듣고 있던 마이크 인식이 새 단계 문제에 반영되지 않게 멈춘다.
+    cancelSpeechRecognition();
+    if (!theme || !activeStage || isNotTodayTheme) {
       setQuizItems(null);
       return;
     }
@@ -135,12 +154,12 @@ function ThemeLearningPage() {
     setIsContentLoading(true);
     setContentErrorMessage(null);
 
-    getStageContent(theme.id, theme.currentStage)
+    getStageContent(theme.id, activeStage)
       .then((fetchedItems) => {
         if (!cancelled) {
           // 복습(말하기)에선 한 글자짜리 항목(한자 등)은 읽기 연습에서 뺀다.
           const items =
-            theme.currentStage === 'REVIEW'
+            activeStage === 'REVIEW'
               ? fetchedItems.filter((item) => Array.from(item.prompt).length > 1)
               : fetchedItems;
           setQuizItems(items);
@@ -170,7 +189,7 @@ function ThemeLearningPage() {
     return () => {
       cancelled = true;
     };
-  }, [theme]);
+  }, [theme, activeStage, isNotTodayTheme]);
 
   // 페이지를 떠날 때 재생 중인 소리와 켜져 있는 마이크 인식을 멈춘다.
   useEffect(() => {
@@ -268,6 +287,9 @@ function ThemeLearningPage() {
         currentStage: progress.currentStage,
         completed: progress.completed,
       });
+      if (progress.completed) {
+        setJustCompleted(true);
+      }
     } catch (error) {
       setAdvanceErrorMessage(
         error instanceof ApiError ? error.message : '단계를 완료하지 못했습니다.',
@@ -305,8 +327,25 @@ function ThemeLearningPage() {
     );
   }
 
+  if (justCompleted) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.container}>
+          <div className={styles.card}>
+            <p className={styles.cardMessage}>오늘 테마를 완료했습니다! 🎉</p>
+          </div>
+          <div className={styles.actions}>
+            <button type="button" className={styles.nextButton} onClick={() => navigate('/town')}>
+              확인
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const currentStageIndex = STAGE_ORDER.indexOf(theme.currentStage);
-  const isReviewStage = theme.currentStage === 'REVIEW';
+  const isReviewStage = activeStage === 'REVIEW';
   const speechSupported = isSpeechRecognitionSupported();
 
   return (
@@ -321,16 +360,50 @@ function ThemeLearningPage() {
             <li
               key={stage}
               className={styles.step}
-              data-active={theme.completed || index <= currentStageIndex}
+              data-active={theme.completed ? stage === viewStage : index <= currentStageIndex}
             >
-              {STAGE_LABELS[stage]}
+              {theme.completed ? (
+                <button
+                  type="button"
+                  className={styles.stepButton}
+                  onClick={() => setViewStage(stage)}
+                >
+                  {STAGE_LABELS[stage]}
+                </button>
+              ) : (
+                STAGE_LABELS[stage]
+              )}
             </li>
           ))}
         </ol>
 
+        {theme.completed && (
+          <p className={styles.completedNotice}>
+            테마를 모두 완료했습니다! 오늘은 단계를 눌러 다시 볼 수 있어요.
+          </p>
+        )}
+
+        {isNotTodayTheme && (
+          <div className={styles.limitNotice} role="status">
+            <p className={styles.limitNoticeText}>
+              오늘의 테마가 아닙니다.{' '}
+              {todayTheme?.completed
+                ? `오늘은 이미 "${todayTheme.title}" 테마를 완료했어요. 이 테마는 내일 진행할 수 있어요.`
+                : todayTheme
+                  ? `오늘의 테마는 "${todayTheme.title}"예요.`
+                  : '모든 테마를 완료했어요.'}
+            </p>
+            {todayTheme && (
+              <Link to={`/town/themes/${todayTheme.id}`} className={styles.limitNoticeLink}>
+                {todayTheme.completed ? '오늘 완료한 테마 다시 보기' : '오늘의 테마로 가기'}
+              </Link>
+            )}
+          </div>
+        )}
+
         <div className={styles.card}>
-          {theme.completed ? (
-            <p className={styles.cardMessage}>테마를 모두 완료했습니다!</p>
+          {isNotTodayTheme ? (
+            <p className={styles.cardMessage}>이 테마는 오늘 진행할 수 없어요.</p>
           ) : isContentLoading ? (
             <p className={styles.cardMessage}>콘텐츠를 불러오는 중입니다…</p>
           ) : contentErrorMessage ? (
@@ -339,7 +412,9 @@ function ThemeLearningPage() {
             </p>
           ) : allQuizItemsAnswered ? (
             <p className={styles.cardMessage}>
-              이 단계의 문제를 모두 맞혔습니다! 아래 "다음" 버튼으로 진행하세요.
+              {theme.completed
+                ? '이 단계를 모두 마쳤습니다! 위에서 다른 단계를 골라 다시 볼 수 있어요.'
+                : '이 단계의 문제를 모두 맞혔습니다! 아래 "다음" 버튼으로 진행하세요.'}
             </p>
           ) : currentQuizItem ? (
             <div className={styles.quiz}>
@@ -497,7 +572,7 @@ function ThemeLearningPage() {
         )}
 
         <div className={styles.actions}>
-          {theme.completed ? (
+          {theme.completed || isNotTodayTheme ? (
             <Link to="/town" className={styles.nextButton}>
               마을로 돌아가기
             </Link>

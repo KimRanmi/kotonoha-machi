@@ -96,6 +96,23 @@ function TownPage() {
               </svg>
             )}
           </Link>
+          <Link
+            to="/town/themes"
+            className={styles.iconButton}
+            aria-label="완료한 테마"
+            title="완료한 테마"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
+              <path
+                d="M8.5 12.3l2.4 2.4 4.6-5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Link>
           <Link to="/vocabulary" className={styles.iconButton} aria-label="학습 단어장">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -125,10 +142,14 @@ function TownPage() {
       {todayTheme && (
         <Link to={`/town/themes/${todayTheme.id}`} className={styles.todayLearningBanner}>
           <span className={styles.todayLearningText}>
-            <span className={styles.todayLearningLabel}>1순위 · 오늘의 학습</span>
+            <span className={styles.todayLearningLabel}>
+              {todayTheme.completed ? '오늘 완료 · 복습하기' : '1순위 · 오늘의 학습'}
+            </span>
             <span className={styles.todayLearningTitle}>{todayTheme.title}</span>
           </span>
-          <span className={styles.todayLearningCta}>시작하기 →</span>
+          <span className={styles.todayLearningCta}>
+            {todayTheme.completed ? '다시 보기 →' : '시작하기 →'}
+          </span>
         </Link>
       )}
       {logoutErrorMessage && (

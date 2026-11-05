@@ -3,6 +3,8 @@ package com.kotonohamachi.theme.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.kotonohamachi.common.ApiException;
@@ -33,6 +35,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /** {@link ThemeService}의 테마 조회와 단계 완료(게이트) 규칙을 Mockito로 의존성을 대체해 단위 테스트한다. */
 @ExtendWith(MockitoExtension.class)
@@ -159,6 +162,68 @@ class ThemeServiceTest {
     when(themeProgressRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
     ThemeProgressResponse response = themeService.completeStage(1L, 1L, ThemeStage.KANJI);
+
+    assertThat(response.currentStage()).isEqualTo(ThemeStage.WORD);
+  }
+
+  private static ThemeProgress completedProgress(Long themeId, OffsetDateTime completedAt) {
+    Theme theme = new Theme("완료한 테마");
+    ReflectionTestUtils.setField(theme, "id", themeId);
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    for (int i = 0; i < ThemeStage.values().length; i++) {
+      progress.completeCurrentStage();
+    }
+    ReflectionTestUtils.setField(progress, "updatedAt", completedAt);
+    return progress;
+  }
+
+  @Test
+  void completeStage_오늘_다른_테마를_이미_완료했으면_409_예외를_던지고_진행하지_않는다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ReflectionTestUtils.setField(theme, "id", 2L);
+    ThemeProgress doneToday = completedProgress(1L, OffsetDateTime.now());
+    when(themeRepository.findById(2L)).thenReturn(Optional.of(theme));
+    when(themeProgressRepository.findAllByUserId(1L)).thenReturn(List.of(doneToday));
+
+    ApiException exception = catchThrowableOfType(
+        ApiException.class, () -> themeService.completeStage(1L, 2L, ThemeStage.KANJI));
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(exception.getMessage()).contains("오늘은 이미 테마를 하나 완료");
+    verify(themeProgressRepository, never()).save(any());
+  }
+
+  @Test
+  void completeStage_오늘의_테마가_아닌_테마는_409_예외를_던지고_진행하지_않는다() {
+    Theme first = new Theme("첫 번째 테마");
+    ReflectionTestUtils.setField(first, "id", 1L);
+    Theme second = new Theme("두 번째 테마");
+    ReflectionTestUtils.setField(second, "id", 2L);
+    when(themeRepository.findById(2L)).thenReturn(Optional.of(second));
+    when(themeRepository.findAllByOrderById()).thenReturn(List.of(first, second));
+    when(themeProgressRepository.findAllByUserId(1L)).thenReturn(List.of());
+
+    ApiException exception = catchThrowableOfType(
+        ApiException.class, () -> themeService.completeStage(1L, 2L, ThemeStage.KANJI));
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(exception.getMessage()).contains("오늘의 테마가 아닙니다");
+    verify(themeProgressRepository, never()).save(any());
+  }
+
+  @Test
+  void completeStage_다른_테마를_어제_완료했으면_오늘_진행할_수_있다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ReflectionTestUtils.setField(theme, "id", 2L);
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    when(themeRepository.findById(2L)).thenReturn(Optional.of(theme));
+    Theme first = completedProgress(1L, OffsetDateTime.now().minusDays(1)).getTheme();
+    when(themeRepository.findAllByOrderById()).thenReturn(List.of(first, theme));
+    when(themeProgressRepository.findAllByUserId(1L))
+        .thenReturn(List.of(completedProgress(1L, OffsetDateTime.now().minusDays(1))));
+    when(themeProgressRepository.findByUserIdAndThemeId(1L, 2L)).thenReturn(Optional.of(progress));
+
+    ThemeProgressResponse response = themeService.completeStage(1L, 2L, ThemeStage.KANJI);
 
     assertThat(response.currentStage()).isEqualTo(ThemeStage.WORD);
   }
