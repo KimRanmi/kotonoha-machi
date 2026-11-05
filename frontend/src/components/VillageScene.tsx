@@ -16,9 +16,10 @@ interface VillageSceneProps {
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
+const PLAYER_SCALE = 0.7; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
 const MAP_HALF_SIZE = 18; // 이동 가능한 정사각형 땅의 절반 크기
-const VIEW_HEIGHT = 20; // 화면에 세로로 보이는 월드 길이(직교 카메라). 건물 3개가 한 화면에 들어오는 크기
+const VIEW_HEIGHT = 18; // 화면에 세로로 보이는 월드 길이(직교 카메라). 건물 3개가 한 화면에 들어오는 크기
 const CAMERA_OFFSET = new THREE.Vector3(10, 10, 10); // 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다
 
 /**
@@ -113,7 +114,7 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
     const labelPosition = new THREE.Vector3();
 
     const player = createAvatarModel(avatar, palette);
-    player.scale.setScalar(1.2);
+    player.scale.setScalar(PLAYER_SCALE);
     scene.add(player);
 
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
