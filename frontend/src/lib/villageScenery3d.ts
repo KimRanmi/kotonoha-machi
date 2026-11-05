@@ -32,7 +32,13 @@ export function createVillageWorld(): VillageWorld {
     materials.push(created);
     return created;
   };
-  const place = (mesh: THREE.Mesh, x: number, y: number, z: number, parent: THREE.Object3D) => {
+  const place = <T extends THREE.Object3D>(
+    mesh: T,
+    x: number,
+    y: number,
+    z: number,
+    parent: THREE.Object3D,
+  ): T => {
     mesh.position.set(x, y, z);
     parent.add(mesh);
     return mesh;
@@ -54,6 +60,201 @@ export function createVillageWorld(): VillageWorld {
   const windowGeometry = geometry(new THREE.BoxGeometry(0.8, 0.8, 0.1));
   const doorGeometry = geometry(new THREE.BoxGeometry(1.1, 1.8, 0.1));
   const roofGeometry = geometry(new THREE.ConeGeometry(1, ROOF_HEIGHT, 4));
+
+  // 건물마다 컨셉에 맞는 장식을 단다. 좌표는 건물 중심 기준이고 문은 +z 벽 가운데에 있다.
+  // 장식은 눈으로만 보이고 충돌은 없다(캐릭터가 지나다닐 수 있다).
+  const paints = new Map<string, THREE.MeshLambertMaterial>();
+  const paint = (color: string) => {
+    let created = paints.get(color);
+    if (!created) {
+      created = material(color);
+      paints.set(color, created);
+    }
+    return created;
+  };
+  const box = (width: number, height: number, depth: number, color: string) =>
+    new THREE.Mesh(geometry(new THREE.BoxGeometry(width, height, depth)), paint(color));
+  const cylinder = (radiusTop: number, radiusBottom: number, height: number, color: string) =>
+    new THREE.Mesh(
+      geometry(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 12)),
+      paint(color),
+    );
+  const sphere = (radius: number, color: string) =>
+    new THREE.Mesh(geometry(new THREE.SphereGeometry(radius, 8, 6)), paint(color));
+
+  /** 문 앞에 비스듬히 드리우는 줄무늬 차양. */
+  const addAwning = (house: THREE.Group, building: VillageBuilding, colors: [string, string]) => {
+    const stripes = 5;
+    const stripeWidth = building.width / stripes;
+    for (let i = 0; i < stripes; i++) {
+      const stripe = box(stripeWidth, 0.08, 1.1, colors[i % 2]);
+      stripe.rotation.x = 0.35; // 앞쪽이 아래로 처지게
+      const x = -building.width / 2 + stripeWidth * (i + 0.5);
+      place(stripe, x, 2.2, building.depth / 2 + 0.5, house);
+    }
+  };
+
+  /** 테두리가 있는 큰 창문 하나. */
+  const addWindow = (
+    house: THREE.Group,
+    building: VillageBuilding,
+    x: number,
+    y: number,
+    size: [number, number],
+    frameColor: string,
+  ) => {
+    place(
+      box(size[0] + 0.2, size[1] + 0.2, 0.08, frameColor),
+      x,
+      y,
+      building.depth / 2 + 0.02,
+      house,
+    );
+    place(box(size[0], size[1], 0.1, '#cfe8ff'), x, y, building.depth / 2 + 0.03, house);
+  };
+
+  const addCafeTable = (house: THREE.Group, x: number, z: number, parasolColor: string) => {
+    place(cylinder(0.45, 0.45, 0.06, '#f2e6d0'), x, 0.75, z, house);
+    place(cylinder(0.05, 0.05, 0.75, '#6b4a32'), x, 0.375, z, house);
+    place(cylinder(0.04, 0.04, 2, '#6b4a32'), x, 1, z, house); // 파라솔 기둥
+    place(
+      new THREE.Mesh(geometry(new THREE.ConeGeometry(1.1, 0.45, 8)), paint(parasolColor)),
+      x,
+      2.15,
+      z,
+      house,
+    );
+    for (const side of [-1, 1]) {
+      const chairX = x + side * 0.8;
+      place(box(0.4, 0.06, 0.4, '#b8844f'), chairX, 0.42, z, house); // 앉는 판
+      place(box(0.1, 0.4, 0.1, '#8a5a3c'), chairX, 0.2, z, house); // 다리
+      place(box(0.06, 0.4, 0.4, '#b8844f'), chairX + side * 0.2, 0.65, z, house); // 등받이
+    }
+  };
+
+  const addCafe = (house: THREE.Group, building: VillageBuilding) => {
+    const front = building.depth / 2;
+    for (const side of [-1, 1]) {
+      addWindow(house, building, side * 1.55, 1.4, [1.2, 1.2], '#fff4e0');
+    }
+    addAwning(house, building, ['#c8473d', '#fbf1dc']);
+    // 굴뚝
+    place(
+      box(0.5, 1.2, 0.5, '#8c4a3a'),
+      building.width * 0.25,
+      building.height + 1.1,
+      -building.depth * 0.2,
+      house,
+    );
+    // 커피잔 간판: 기둥 위에 커다란 컵을 올린다.
+    const signX = building.width / 2 + 0.6;
+    place(cylinder(0.06, 0.06, 2.8, '#6b4a32'), signX, 1.4, front + 0.3, house);
+    place(cylinder(0.45, 0.3, 0.6, '#ffffff'), signX, 3.1, front + 0.3, house);
+    place(cylinder(0.38, 0.38, 0.04, '#5a3a24'), signX, 3.39, front + 0.3, house); // 커피
+    const handle = new THREE.Mesh(
+      geometry(new THREE.TorusGeometry(0.17, 0.05, 6, 10)),
+      paint('#ffffff'),
+    );
+    place(handle, signX + 0.5, 3.1, front + 0.3, house);
+    // 메뉴 칠판
+    const board = new THREE.Group();
+    board.add(box(0.8, 1, 0.06, '#8a5a3c'));
+    for (const y of [0.25, 0, -0.25]) {
+      place(box(0.45, 0.05, 0.02, '#f5f0e0'), 0, y, 0.04, board);
+    }
+    board.rotation.x = -0.15;
+    place(board, 1.2, 0.5, front + 0.9, house);
+    // 야외 테이블
+    addCafeTable(house, -2.6, front + 1, '#c8473d');
+    addCafeTable(house, 3, front + 0.5, '#f0b94a');
+  };
+
+  const addShop = (house: THREE.Group, building: VillageBuilding) => {
+    const front = building.depth / 2;
+    const itemColors = ['#e4572e', '#f3c13a', '#4aa3a2', '#9b5de5'];
+    for (const side of [-1, 1]) {
+      addWindow(house, building, side * 1.6, 1.4, [1.5, 1.2], '#ffffff');
+      // 창 아래 진열대와 상품
+      place(box(1.5, 0.06, 0.4, '#8a5a3c'), side * 1.6, 0.8, front + 0.15, house);
+      itemColors.forEach((color, i) => {
+        place(
+          box(0.25, 0.25, 0.25, color),
+          side * 1.6 - 0.55 + i * 0.37,
+          0.96,
+          front + 0.15,
+          house,
+        );
+      });
+    }
+    addAwning(house, building, ['#3d6fb5', '#ffffff']);
+    // 과일 상자 두 개와 통
+    for (const [x, fruit] of [
+      [-2.2, '#d9342b'],
+      [-1.4, '#f5921e'],
+    ] as const) {
+      place(box(0.7, 0.45, 0.55, '#b8844f'), x, 0.225, front + 0.8, house);
+      for (const offset of [-0.2, 0, 0.2]) {
+        place(sphere(0.13, fruit), x + offset, 0.52, front + 0.8, house);
+      }
+    }
+    place(cylinder(0.33, 0.33, 0.75, '#7a5230'), 2.2, 0.375, front + 0.8, house);
+    for (const y of [0.2, 0.55]) {
+      place(cylinder(0.345, 0.345, 0.06, '#3a2a1c'), 2.2, y, front + 0.8, house);
+    }
+    // 벽에서 튀어나온 팔에 매단 금화 간판
+    const side = building.width / 2;
+    place(box(1.4, 0.08, 0.08, '#3a2a1c'), side + 0.6, 2.3, front - 0.6, house);
+    place(box(0.04, 0.35, 0.04, '#3a2a1c'), side + 0.3, 2.1, front - 0.6, house);
+    place(box(0.04, 0.35, 0.04, '#3a2a1c'), side + 1.2, 2.1, front - 0.6, house);
+    place(box(1.1, 0.6, 0.08, '#b8844f'), side + 0.75, 1.75, front - 0.6, house);
+    const coin = cylinder(0.2, 0.2, 0.05, '#f2c230');
+    coin.rotation.x = Math.PI / 2;
+    place(coin, side + 0.75, 1.75, front - 0.54, house);
+  };
+
+  const addLibrary = (house: THREE.Group, building: VillageBuilding) => {
+    const front = building.depth / 2;
+    const stone = '#e6dfd0';
+    // 계단과 단
+    place(box(5.2, 0.2, 1.5, stone), 0, 0.1, front + 0.75, house);
+    place(box(5.2, 0.1, 0.4, stone), 0, 0.05, front + 1.7, house);
+    // 기둥 4개와 그 위를 가로지르는 보
+    for (const x of [-2.5, -1.4, 1.4, 2.5]) {
+      place(cylinder(0.18, 0.2, 2.45, stone), x, 1.425, front + 0.85, house);
+    }
+    place(box(5.2, 0.25, 1.1, stone), 0, 2.725, front + 0.55, house);
+    // 삼각 지붕 장식(박공)과 시계
+    const triangle = new THREE.Shape();
+    triangle.moveTo(-2.6, 0);
+    triangle.lineTo(2.6, 0);
+    triangle.lineTo(0, 0.9);
+    triangle.closePath();
+    const pediment = new THREE.Mesh(
+      geometry(new THREE.ExtrudeGeometry(triangle, { depth: 0.25, bevelEnabled: false })),
+      paint(stone),
+    );
+    place(pediment, 0, 2.85, front + 0.85, house);
+    const clock = cylinder(0.32, 0.32, 0.05, '#ffffff');
+    clock.rotation.x = Math.PI / 2;
+    place(clock, 0, 3.15, front + 1.13, house);
+    place(box(0.04, 0.22, 0.02, '#3a2a1c'), 0, 3.24, front + 1.17, house);
+    place(box(0.16, 0.04, 0.02, '#3a2a1c'), 0.06, 3.15, front + 1.17, house);
+    // 키 큰 창문(앞 기둥 사이, 옆면)
+    for (const x of [-1.95, 1.95]) {
+      place(box(0.7, 1.7, 0.1, '#cfe8ff'), x, 1.7, front + 0.03, house);
+    }
+    for (const z of [-1, 1]) {
+      const tall = box(0.1, 1.7, 0.7, '#cfe8ff');
+      place(tall, building.width / 2 + 0.03, 1.7, z, house);
+    }
+  };
+
+  const DECORATORS: Record<string, (house: THREE.Group, building: VillageBuilding) => void> = {
+    cafe: addCafe,
+    shop: addShop,
+    hall: addLibrary,
+  };
+
   for (const building of VILLAGE_BUILDINGS) {
     group.add(createBuilding(building));
   }
@@ -87,15 +288,20 @@ export function createVillageWorld(): VillageWorld {
     );
     place(roof, 0, building.height + ROOF_HEIGHT / 2, 0, house);
 
-    const front = building.depth / 2 + 0.03;
-    const side = building.width / 2 + 0.03;
-    place(new THREE.Mesh(doorGeometry, doorMaterial), 0, 0.9, front, house);
-    for (const offset of [-building.width * 0.3, building.width * 0.3]) {
-      place(new THREE.Mesh(windowGeometry, windowMaterial), offset, 1.5, front, house);
+    place(new THREE.Mesh(doorGeometry, doorMaterial), 0, 0.9, building.depth / 2 + 0.03, house);
+    const decorate = DECORATORS[building.id];
+    if (decorate) {
+      decorate(house, building);
+    } else {
+      // 전용 장식이 없는 건물은 기본 창문만 단다.
+      const front = building.depth / 2 + 0.03;
+      for (const offset of [-building.width * 0.3, building.width * 0.3]) {
+        place(new THREE.Mesh(windowGeometry, windowMaterial), offset, 1.5, front, house);
+      }
+      const sideWindow = new THREE.Mesh(windowGeometry, windowMaterial);
+      sideWindow.rotation.y = Math.PI / 2;
+      place(sideWindow, building.width / 2 + 0.03, 1.5, 0, house);
     }
-    const sideWindow = new THREE.Mesh(windowGeometry, windowMaterial);
-    sideWindow.rotation.y = Math.PI / 2;
-    place(sideWindow, side, 1.5, 0, house);
     return house;
   }
 
