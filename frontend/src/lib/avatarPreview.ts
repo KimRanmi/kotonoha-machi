@@ -62,17 +62,14 @@ export const CLOTHES_STYLE_LABELS: Record<AvatarClothesStyle, string> = {
 };
 
 export const CLOTHES_COLOR_LABELS: Record<AvatarClothesColor, string> = {
-  WHITE: '흰색',
-  BLACK: '검정',
-  RED: '빨강',
+  CREAM: '크림',
   PINK: '분홍',
-  ORANGE: '주황',
+  CORAL: '코랄',
+  PEACH: '복숭아',
   YELLOW: '노랑',
-  GREEN: '초록',
   MINT: '민트',
   SKY: '하늘',
-  BLUE: '파랑',
-  PURPLE: '보라',
+  LAVENDER: '라벤더',
 };
 
 export const SHOES_COLOR_LABELS: Record<AvatarShoesColor, string> = {
@@ -100,17 +97,14 @@ export const HAIR_COLOR_HEX: Record<AvatarHairColor, string> = {
 };
 
 export const CLOTHES_COLOR_HEX: Record<AvatarClothesColor, string> = {
-  WHITE: 'f4f1ec',
-  BLACK: '3a3a42',
-  RED: 'e5534b',
-  PINK: 'f4a3b8',
-  ORANGE: 'f4a259',
-  YELLOW: 'f7d65a',
-  GREEN: '7fc97f',
-  MINT: '9fe0c8',
-  SKY: '7db9e8',
-  BLUE: '4a6fd0',
-  PURPLE: 'a98bd8',
+  CREAM: 'fff1d6',
+  PINK: 'ffc2d4',
+  CORAL: 'ffb3a7',
+  PEACH: 'ffd0a8',
+  YELLOW: 'fff0a0',
+  MINT: 'b5ead7',
+  SKY: 'b5d8f7',
+  LAVENDER: 'd4c4f0',
 };
 
 export const SHOES_COLOR_HEX: Record<AvatarShoesColor, string> = {

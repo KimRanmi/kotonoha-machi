@@ -25,10 +25,10 @@ interface ClothesLook {
   pants: THREE.Color | null;
 }
 
-/** 너무 밝은 색(흰색 등)이면 흰 옷 위에서도 보이게 어둡게 바꾼다. 무늬·넥타이 색에 쓴다. */
+/** 너무 밝은 색(크림 등)이면 흰 옷 위에서도 보이게 어둡게 바꾼다. 무늬·넥타이 색에 쓴다. */
 function visibleOnWhite(color: THREE.Color): THREE.Color {
   const { l } = color.getHSL({ h: 0, s: 0, l: 0 });
-  return l > 0.8 ? color.clone().multiplyScalar(0.55) : color;
+  return l > 0.9 ? color.clone().multiplyScalar(0.75) : color;
 }
 
 function darker(color: THREE.Color, amount = 0.75): THREE.Color {

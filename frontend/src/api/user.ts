@@ -16,17 +16,7 @@ export type AvatarClothesStyle =
   | 'CHECKER'
   | 'TIE';
 export type AvatarClothesColor =
-  | 'WHITE'
-  | 'BLACK'
-  | 'RED'
-  | 'PINK'
-  | 'ORANGE'
-  | 'YELLOW'
-  | 'GREEN'
-  | 'MINT'
-  | 'SKY'
-  | 'BLUE'
-  | 'PURPLE';
+  'CREAM' | 'PINK' | 'CORAL' | 'PEACH' | 'YELLOW' | 'MINT' | 'SKY' | 'LAVENDER';
 export type AvatarShoesColor = 'WHITE' | 'BLACK' | 'BROWN' | 'RED' | 'BLUE';
 
 /** 캐릭터 꾸미기 여섯 축의 선택값. */
