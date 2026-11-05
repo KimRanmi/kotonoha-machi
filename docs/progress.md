@@ -510,3 +510,6 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
     재킷·코트→카디건, 수트→교복, 드레스→원피스, 체크→스트라이프).
   - 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 임시 페이지에서 6종을 눈으로
     확인했다(캐릭터가 좌우로 도는 중이라 앞모습의 단추·리본은 작게 보인다). 임시 페이지는 지웠다.
+- 신발 색을 파스텔 6색(흰색·분홍·베이지·민트·하늘·라벤더)으로 바꿨다(옷 색과 어울리게).
+  `V15__pastel_avatar_shoes_colors.sql`이 저장된 옛 값을 옮긴다(검정→라벤더, 갈색→베이지, 빨강→분홍,
+  파랑→하늘). 검증: backend `spotlessApply`·`test`, frontend prettier·lint·build 통과. 화면으로는 확인하지 않았다.

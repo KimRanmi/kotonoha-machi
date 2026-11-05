@@ -1,12 +1,13 @@
 package com.kotonohamachi.user;
 
-/** 캐릭터 꾸미기의 신발 색 선택지. */
+/** 캐릭터 꾸미기의 신발 색 선택지(파스텔 톤). */
 public enum AvatarShoesColor implements AvatarColor {
-  WHITE("흰색", "ffffff"),
-  BLACK("검정", "000000"),
-  BROWN("갈색", "6b4423"),
-  RED("빨강", "c0392b"),
-  BLUE("파랑", "2e4a8e");
+  WHITE("흰색", "fffaf5"),
+  PINK("분홍", "ffc2d4"),
+  BEIGE("베이지", "e6cfb8"),
+  MINT("민트", "b5ead7"),
+  SKY("하늘", "b5d8f7"),
+  LAVENDER("라벤더", "d4c4f0");
 
   private final String label;
   private final String hex;

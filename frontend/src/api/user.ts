@@ -8,7 +8,7 @@ export type AvatarClothesStyle =
   'PLAIN' | 'CARDIGAN' | 'SCHOOL_UNIFORM' | 'ONEPIECE' | 'OVERALLS' | 'STRIPES';
 export type AvatarClothesColor =
   'CREAM' | 'PINK' | 'CORAL' | 'PEACH' | 'YELLOW' | 'MINT' | 'SKY' | 'LAVENDER';
-export type AvatarShoesColor = 'WHITE' | 'BLACK' | 'BROWN' | 'RED' | 'BLUE';
+export type AvatarShoesColor = 'WHITE' | 'PINK' | 'BEIGE' | 'MINT' | 'SKY' | 'LAVENDER';
 
 /** 캐릭터 꾸미기 여섯 축의 선택값. */
 export interface Avatar {
