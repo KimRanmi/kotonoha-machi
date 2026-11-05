@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
+import { collidesWithBuildings, VILLAGE_BUILDINGS } from '../lib/villageBuildings';
 import styles from './VillageScene.module.css';
 
 interface VillageSceneProps {
@@ -77,6 +78,26 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
+    // 건물은 몸체 상자 위에 조금 더 넓고 어두운 지붕 상자를 얹은 단순한 모양이다.
+    const buildingGeometries: THREE.BufferGeometry[] = [];
+    const buildingMaterials: THREE.Material[] = [];
+    for (const building of VILLAGE_BUILDINGS) {
+      const bodyMaterial = new THREE.MeshLambertMaterial({ color: building.color });
+      const roofMaterial = new THREE.MeshLambertMaterial({
+        color: new THREE.Color(building.color).multiplyScalar(0.75),
+      });
+      const bodyGeometry = new THREE.BoxGeometry(building.width, building.height, building.depth);
+      const roofGeometry = new THREE.BoxGeometry(building.width + 0.6, 0.4, building.depth + 0.6);
+      buildingMaterials.push(bodyMaterial, roofMaterial);
+      buildingGeometries.push(bodyGeometry, roofGeometry);
+
+      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+      body.position.set(building.x, building.height / 2, building.z);
+      const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+      roof.position.set(building.x, building.height + 0.2, building.z);
+      scene.add(body, roof);
+    }
+
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(1.2);
     scene.add(player);
@@ -140,16 +161,23 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
         dx /= length;
         dz /= length;
         const limit = MAP_HALF_SIZE - 1;
-        player.position.x = THREE.MathUtils.clamp(
+        // X, Z를 따로 검사해야 건물에 비스듬히 부딪혀도 벽을 따라 미끄러진다.
+        const nextX = THREE.MathUtils.clamp(
           player.position.x + dx * WALK_SPEED * delta,
           -limit,
           limit,
         );
-        player.position.z = THREE.MathUtils.clamp(
+        if (!collidesWithBuildings(nextX, player.position.z)) {
+          player.position.x = nextX;
+        }
+        const nextZ = THREE.MathUtils.clamp(
           player.position.z + dz * WALK_SPEED * delta,
           -limit,
           limit,
         );
+        if (!collidesWithBuildings(player.position.x, nextZ)) {
+          player.position.z = nextZ;
+        }
         targetAngle = Math.atan2(dx, dz);
       }
 
@@ -175,6 +203,8 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();
+      buildingGeometries.forEach((geometry) => geometry.dispose());
+      buildingMaterials.forEach((material) => material.dispose());
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
