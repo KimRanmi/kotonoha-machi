@@ -5,16 +5,7 @@ export type AvatarHairColor = 'BLACK' | 'BROWN' | 'BLONDE' | 'RED' | 'GRAY';
 export type AvatarHairStyle =
   'SHORT' | 'BOB' | 'PONYTAIL' | 'AFRO' | 'BRAIDS' | 'CURLY' | 'BUNS' | 'MOHAWK';
 export type AvatarClothesStyle =
-  | 'PLAIN'
-  | 'HOODIE'
-  | 'JACKET'
-  | 'COAT'
-  | 'SUIT'
-  | 'DRESS'
-  | 'OVERALLS'
-  | 'STRIPES'
-  | 'CHECKER'
-  | 'TIE';
+  'PLAIN' | 'CARDIGAN' | 'SCHOOL_UNIFORM' | 'ONEPIECE' | 'OVERALLS' | 'STRIPES';
 export type AvatarClothesColor =
   'CREAM' | 'PINK' | 'CORAL' | 'PEACH' | 'YELLOW' | 'MINT' | 'SKY' | 'LAVENDER';
 export type AvatarShoesColor = 'WHITE' | 'BLACK' | 'BROWN' | 'RED' | 'BLUE';

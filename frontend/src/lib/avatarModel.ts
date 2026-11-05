@@ -16,11 +16,11 @@ const HEAD_SCALE: [number, number, number] = [1, 0.92, 0.95];
 interface ClothesLook {
   /** 상의 색(소매 포함). */
   top: THREE.Color;
-  /** 하의 색. null이면 피부(드레스처럼 맨다리)로 둔다. */
+  /** 하의 색. null이면 피부(원피스처럼 맨다리)로 둔다. */
   pants: THREE.Color | null;
 }
 
-/** 너무 밝은 색(크림 등)이면 흰 옷 위에서도 보이게 어둡게 바꾼다. 무늬·넥타이 색에 쓴다. */
+/** 너무 밝은 색(크림 등)이면 흰 옷 위에서도 보이게 어둡게 바꾼다. 줄무늬 색에 쓴다. */
 function visibleOnWhite(color: THREE.Color): THREE.Color {
   const { l } = color.getHSL({ h: 0, s: 0, l: 0 });
   return l > 0.9 ? color.clone().multiplyScalar(0.75) : color;
@@ -32,20 +32,15 @@ function darker(color: THREE.Color, amount = 0.75): THREE.Color {
 
 /** 옷 종류와 고른 색으로 상의·하의 색을 정한다. 색이 옷의 어느 부분에 쓰이는지는 옷마다 다르다. */
 function clothesLook(style: Avatar['clothesStyle'], color: THREE.Color): ClothesLook {
-  const white = hex('f2f2f2');
   const pants = hex(PANTS_COLOR);
   switch (style) {
-    case 'COAT':
-      return { top: color, pants: darker(color, 0.5) };
-    case 'SUIT':
-      return { top: color, pants: color };
-    case 'DRESS':
+    case 'ONEPIECE':
+    case 'SCHOOL_UNIFORM':
       return { top: color, pants: null };
     case 'OVERALLS':
-      return { top: white, pants: color };
+      return { top: hex('f2f2f2'), pants: color };
     case 'STRIPES':
-    case 'TIE':
-      return { top: white, pants };
+      return { top: hex('f2f2f2'), pants };
     default:
       return { top: color, pants };
   }
@@ -64,12 +59,8 @@ function material(color: string | THREE.Color, doubleSided = false): THREE.MeshL
   });
 }
 
-/** 줄무늬/체크 무늬를 그린 작은 캔버스 텍스처(몸통을 한 바퀴 감싼다). */
-function patternTexture(
-  kind: 'STRIPES' | 'CHECKER',
-  base: THREE.Color,
-  stripe: THREE.Color,
-): THREE.CanvasTexture {
+/** 가로 줄무늬를 그린 작은 캔버스 텍스처(몸통을 한 바퀴 감싼다). */
+function stripeTexture(base: THREE.Color, stripe: THREE.Color): THREE.CanvasTexture {
   const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -79,18 +70,8 @@ function patternTexture(
     context.fillStyle = `#${base.getHexString()}`;
     context.fillRect(0, 0, size, size);
     context.fillStyle = `#${stripe.getHexString()}`;
-    if (kind === 'STRIPES') {
-      for (let y = 0; y < size; y += 16) {
-        context.fillRect(0, y, size, 8);
-      }
-    } else {
-      for (let y = 0; y < size; y += 16) {
-        for (let x = 0; x < size; x += 16) {
-          if ((x / 16 + y / 16) % 2 === 1) {
-            context.fillRect(x, y, 16, 16);
-          }
-        }
-      }
+    for (let y = 0; y < size; y += 16) {
+      context.fillRect(0, y, size, 8);
     }
   }
   const texture = new THREE.CanvasTexture(canvas);
@@ -244,12 +225,13 @@ function addBodyAndClothes(
   color: THREE.Color,
 ) {
   const topColor = look.top;
-  const stripeColor = style === 'STRIPES' ? visibleOnWhite(color) : darker(color, 0.65);
+  const stripeColor = visibleOnWhite(color);
   const topMaterial: THREE.Material =
-    style === 'STRIPES' || style === 'CHECKER'
-      ? new THREE.MeshLambertMaterial({ map: patternTexture(style, topColor, stripeColor) })
+    style === 'STRIPES'
+      ? new THREE.MeshLambertMaterial({ map: stripeTexture(topColor, stripeColor) })
       : material(topColor);
   const sleeveColor = style === 'STRIPES' ? stripeColor : topColor;
+  const white = hex('f6f3ee');
 
   addEllipsoid(parent, 1, topMaterial, [0, 0.62, 0], [0.4, 0.42, 0.36]);
 
@@ -260,46 +242,38 @@ function addBodyAndClothes(
   }
 
   switch (style) {
-    case 'HOODIE':
-      addEllipsoid(parent, 0.24, topColor, [0, 0.95, -0.2], [1.3, 0.7, 0.8]);
+    case 'CARDIGAN':
+      // 앞이 열려 안에 입은 흰 셔츠가 가운데로 보이고, 단추가 한 줄 달린다.
+      addEllipsoid(parent, 0.14, white, [0, 0.64, 0.3], [1, 2.3, 0.55]);
+      for (const y of [0.78, 0.64, 0.5]) {
+        addEllipsoid(parent, 0.028, darker(color, 0.55), [0.15, y, 0.33]);
+      }
       break;
-    case 'JACKET': {
-      const collar = new THREE.Mesh(
-        new THREE.TorusGeometry(0.2, 0.06, 8, 20),
-        material(darker(color)),
-      );
-      collar.rotation.x = Math.PI / 2;
-      place(collar, parent, [0, 0.98, 0]);
-      addBox(parent, [0.03, 0.5, 0.02], 'd8d2c0', [0, 0.62, 0.36]);
-      break;
-    }
-    case 'COAT': {
+    case 'SCHOOL_UNIFORM': {
+      // 블레이저(고른 색) 안에 흰 셔츠와 리본, 아래는 주름치마.
+      addEllipsoid(parent, 0.11, white, [0, 0.84, 0.31], [1, 1.7, 0.5]);
+      const ribbon = hex('e8788a');
+      for (const side of [-1, 1]) {
+        addEllipsoid(parent, 0.08, ribbon, [side * 0.09, 0.95, 0.33], [1.5, 1, 0.7]);
+      }
+      addEllipsoid(parent, 0.045, ribbon, [0, 0.95, 0.35]);
       const skirt = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.34, 0.46, 0.34, 20),
-        material(topColor),
+        new THREE.CylinderGeometry(0.34, 0.5, 0.28, 12),
+        material(darker(color, 0.55)),
       );
-      place(skirt, parent, [0, 0.3, 0]);
-      const collar = new THREE.Mesh(
-        new THREE.TorusGeometry(0.2, 0.06, 8, 20),
-        material(darker(color, 0.65)),
-      );
-      collar.rotation.x = Math.PI / 2;
-      place(collar, parent, [0, 0.98, 0]);
+      place(skirt, parent, [0, 0.32, 0]);
       break;
     }
-    case 'SUIT':
-      addBox(parent, [0.16, 0.4, 0.02], 'f2f2f2', [0, 0.74, 0.35]);
-      addBox(parent, [0.06, 0.3, 0.02], darker(color, 0.5), [0, 0.7, 0.365]);
-      break;
-    case 'TIE':
-      addBox(parent, [0.07, 0.32, 0.02], visibleOnWhite(color), [0, 0.7, 0.36]);
-      break;
-    case 'DRESS': {
+    case 'ONEPIECE': {
       const skirt = new THREE.Mesh(
         new THREE.CylinderGeometry(0.3, 0.52, 0.34, 20),
         material(topColor),
       );
       place(skirt, parent, [0, 0.3, 0]);
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.06, 8, 20), material(white));
+      collar.rotation.x = Math.PI / 2;
+      place(collar, parent, [0, 0.98, 0.01]);
+      addEllipsoid(parent, 0.045, darker(color, 0.6), [0, 0.9, 0.355]);
       break;
     }
     case 'OVERALLS': {
