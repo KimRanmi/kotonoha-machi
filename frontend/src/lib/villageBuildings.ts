@@ -1,6 +1,7 @@
 /** 마을에 서 있는 건물 하나. 위치(x, z)는 건물 중심, width는 x 방향, depth는 z 방향 길이다. */
 export interface VillageBuilding {
   id: string;
+  /** 간판에 일본어로 적히는 이름. */
   label: string;
   x: number;
   z: number;
@@ -20,7 +21,7 @@ export const ROOF_HEIGHT = 1.6;
 export const VILLAGE_BUILDINGS: VillageBuilding[] = [
   {
     id: 'cafe',
-    label: '카페',
+    label: 'カフェ',
     x: -8,
     z: -4,
     width: 5,
@@ -31,7 +32,7 @@ export const VILLAGE_BUILDINGS: VillageBuilding[] = [
   },
   {
     id: 'shop',
-    label: '상점',
+    label: 'お店',
     x: 2,
     z: -10,
     width: 5,
@@ -42,7 +43,7 @@ export const VILLAGE_BUILDINGS: VillageBuilding[] = [
   },
   {
     id: 'hall',
-    label: '도서관',
+    label: '図書館',
     x: 10,
     z: -4,
     width: 6,

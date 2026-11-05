@@ -20,7 +20,7 @@ const SIGN_STYLES: Record<string, { background: string; text: string; accent: st
 };
 const SIGN_WIDTH = 3.2;
 const SIGN_HEIGHT = 0.9;
-const SIGN_FONT = '"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
+const SIGN_FONT = '"Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Apple SD Gothic Neo", sans-serif';
 const SIGN_BOTTOM: Record<string, number> = { hall: 3.85 }; // 도서관은 박공 위로 올린다
 
 /** 건물 처마에 달린 간판. 마우스로 가리키거나 누를 수 있게 호출한 쪽이 object를 raycast한다. */
@@ -289,7 +289,7 @@ export function createVillageWorld(): VillageWorld {
       if (building.locked) {
         context.fillStyle = style.accent;
         context.font = `bold 28px ${SIGN_FONT}`;
-        context.fillText('준비 중', 256, 112);
+        context.fillText('準備中', 256, 112);
       }
     }
     const texture = new THREE.CanvasTexture(canvas);
