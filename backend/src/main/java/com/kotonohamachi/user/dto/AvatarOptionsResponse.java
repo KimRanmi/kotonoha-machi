@@ -1,5 +1,6 @@
 package com.kotonohamachi.user.dto;
 
+import com.kotonohamachi.user.AvatarClothesColor;
 import com.kotonohamachi.user.AvatarClothesStyle;
 import com.kotonohamachi.user.AvatarHairColor;
 import com.kotonohamachi.user.AvatarHairStyle;
@@ -15,6 +16,7 @@ import java.util.List;
  * @param hairColors 고를 수 있는 머리색 목록
  * @param hairStyles 고를 수 있는 헤어스타일 목록
  * @param clothesStyles 고를 수 있는 옷 목록
+ * @param clothesColors 고를 수 있는 옷 색 목록
  * @param shoesColors 고를 수 있는 신발 색 목록
  */
 public record AvatarOptionsResponse(
@@ -22,4 +24,5 @@ public record AvatarOptionsResponse(
     List<AvatarHairColor> hairColors,
     List<AvatarHairStyle> hairStyles,
     List<AvatarClothesStyle> clothesStyles,
+    List<AvatarClothesColor> clothesColors,
     List<AvatarShoesColor> shoesColors) {}

@@ -1,5 +1,6 @@
 package com.kotonohamachi.user.dto;
 
+import com.kotonohamachi.user.AvatarClothesColor;
 import com.kotonohamachi.user.AvatarClothesStyle;
 import com.kotonohamachi.user.AvatarHairColor;
 import com.kotonohamachi.user.AvatarHairStyle;
@@ -17,6 +18,7 @@ import com.kotonohamachi.user.AvatarSkinColor;
  * @param avatarHairColor 머리색
  * @param avatarHairStyle 헤어스타일
  * @param avatarClothesStyle 옷
+ * @param avatarClothesColor 옷 색
  * @param avatarShoesColor 신발 색
  */
 public record ProfileResponse(
@@ -28,4 +30,5 @@ public record ProfileResponse(
     AvatarHairColor avatarHairColor,
     AvatarHairStyle avatarHairStyle,
     AvatarClothesStyle avatarClothesStyle,
+    AvatarClothesColor avatarClothesColor,
     AvatarShoesColor avatarShoesColor) {}

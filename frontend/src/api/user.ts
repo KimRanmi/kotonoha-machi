@@ -15,14 +15,27 @@ export type AvatarClothesStyle =
   | 'STRIPES'
   | 'CHECKER'
   | 'TIE';
+export type AvatarClothesColor =
+  | 'WHITE'
+  | 'BLACK'
+  | 'RED'
+  | 'PINK'
+  | 'ORANGE'
+  | 'YELLOW'
+  | 'GREEN'
+  | 'MINT'
+  | 'SKY'
+  | 'BLUE'
+  | 'PURPLE';
 export type AvatarShoesColor = 'WHITE' | 'BLACK' | 'BROWN' | 'RED' | 'BLUE';
 
-/** 캐릭터 꾸미기 다섯 축의 선택값. */
+/** 캐릭터 꾸미기 여섯 축의 선택값. */
 export interface Avatar {
   skinColor: AvatarSkinColor;
   hairColor: AvatarHairColor;
   hairStyle: AvatarHairStyle;
   clothesStyle: AvatarClothesStyle;
+  clothesColor: AvatarClothesColor;
   shoesColor: AvatarShoesColor;
 }
 
@@ -32,6 +45,7 @@ export interface AvatarOptions {
   hairColors: AvatarHairColor[];
   hairStyles: AvatarHairStyle[];
   clothesStyles: AvatarClothesStyle[];
+  clothesColors: AvatarClothesColor[];
   shoesColors: AvatarShoesColor[];
 }
 
@@ -44,6 +58,7 @@ export interface Profile {
   avatarHairColor: AvatarHairColor;
   avatarHairStyle: AvatarHairStyle;
   avatarClothesStyle: AvatarClothesStyle;
+  avatarClothesColor: AvatarClothesColor;
   avatarShoesColor: AvatarShoesColor;
 }
 

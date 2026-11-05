@@ -83,6 +83,10 @@ public class User {
   private AvatarClothesStyle avatarClothesStyle = AvatarClothesStyle.PLAIN;
 
   @Enumerated(EnumType.STRING)
+  @Column(name = "avatar_clothes_color", nullable = false)
+  private AvatarClothesColor avatarClothesColor = AvatarClothesColor.SKY;
+
+  @Enumerated(EnumType.STRING)
   @Column(name = "avatar_shoes_color", nullable = false)
   private AvatarShoesColor avatarShoesColor = AvatarShoesColor.WHITE;
 
@@ -346,6 +350,7 @@ public class User {
    * @param hairColor 머리색
    * @param hairStyle 헤어스타일
    * @param clothesStyle 옷
+   * @param clothesColor 옷 색
    * @param shoesColor 신발 색
    */
   public void updateAvatar(
@@ -353,11 +358,13 @@ public class User {
       AvatarHairColor hairColor,
       AvatarHairStyle hairStyle,
       AvatarClothesStyle clothesStyle,
+      AvatarClothesColor clothesColor,
       AvatarShoesColor shoesColor) {
     this.avatarSkinColor = skinColor;
     this.avatarHairColor = hairColor;
     this.avatarHairStyle = hairStyle;
     this.avatarClothesStyle = clothesStyle;
+    this.avatarClothesColor = clothesColor;
     this.avatarShoesColor = shoesColor;
   }
 
@@ -440,6 +447,15 @@ public class User {
    */
   public AvatarClothesStyle getAvatarClothesStyle() {
     return avatarClothesStyle;
+  }
+
+  /**
+   * 옷 색을 반환한다.
+   *
+   * @return 옷 색
+   */
+  public AvatarClothesColor getAvatarClothesColor() {
+    return avatarClothesColor;
   }
 
   /**

@@ -2,6 +2,7 @@ package com.kotonohamachi.user.service;
 
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.common.PasswordVerifier;
+import com.kotonohamachi.user.AvatarClothesColor;
 import com.kotonohamachi.user.AvatarClothesStyle;
 import com.kotonohamachi.user.AvatarHairColor;
 import com.kotonohamachi.user.AvatarHairStyle;
@@ -99,6 +100,7 @@ public class ProfileService {
    * @param hairColor 머리색
    * @param hairStyle 헤어스타일
    * @param clothesStyle 옷
+   * @param clothesColor 옷 색
    * @param shoesColor 신발 색
    * @return 변경된 프로필 정보
    */
@@ -109,9 +111,10 @@ public class ProfileService {
       AvatarHairColor hairColor,
       AvatarHairStyle hairStyle,
       AvatarClothesStyle clothesStyle,
+      AvatarClothesColor clothesColor,
       AvatarShoesColor shoesColor) {
     User user = findUserOrThrow(userId);
-    user.updateAvatar(skinColor, hairColor, hairStyle, clothesStyle, shoesColor);
+    user.updateAvatar(skinColor, hairColor, hairStyle, clothesStyle, clothesColor, shoesColor);
     return toProfileResponse(user);
   }
 
@@ -126,6 +129,7 @@ public class ProfileService {
         List.of(AvatarHairColor.values()),
         List.of(AvatarHairStyle.values()),
         List.of(AvatarClothesStyle.values()),
+        List.of(AvatarClothesColor.values()),
         List.of(AvatarShoesColor.values()));
   }
 
@@ -145,6 +149,7 @@ public class ProfileService {
         user.getAvatarHairColor(),
         user.getAvatarHairStyle(),
         user.getAvatarClothesStyle(),
+        user.getAvatarClothesColor(),
         user.getAvatarShoesColor());
   }
 }

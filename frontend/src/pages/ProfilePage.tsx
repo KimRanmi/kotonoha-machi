@@ -14,6 +14,8 @@ import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import {
   avatarFromProfile,
+  CLOTHES_COLOR_HEX,
+  CLOTHES_COLOR_LABELS,
   CLOTHES_STYLE_LABELS,
   HAIR_COLOR_HEX,
   HAIR_COLOR_LABELS,
@@ -181,7 +183,7 @@ function ProfilePage() {
     setWithdrawErrorMessage(null);
   }
 
-  function renderColorAxis<K extends 'skinColor' | 'hairColor' | 'shoesColor'>(
+  function renderColorAxis<K extends 'skinColor' | 'hairColor' | 'clothesColor' | 'shoesColor'>(
     axis: K,
     legend: string,
     options: Avatar[K][],
@@ -316,6 +318,13 @@ function ProfilePage() {
                     '옷',
                     avatarOptions.clothesStyles,
                     CLOTHES_STYLE_LABELS,
+                  )}
+                  {renderColorAxis(
+                    'clothesColor',
+                    '옷 색',
+                    avatarOptions.clothesColors,
+                    CLOTHES_COLOR_LABELS,
+                    CLOTHES_COLOR_HEX,
                   )}
                   {renderColorAxis(
                     'shoesColor',

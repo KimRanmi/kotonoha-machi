@@ -101,6 +101,7 @@ public class ProfileController {
         request.hairColor(),
         request.hairStyle(),
         request.clothesStyle(),
+        request.clothesColor(),
         request.shoesColor());
   }
 }

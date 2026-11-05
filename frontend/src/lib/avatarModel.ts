@@ -1,9 +1,14 @@
 import * as THREE from 'three';
 import type { Avatar } from '../api/user';
-import { HAIR_COLOR_HEX, SHOES_COLOR_HEX, SKIN_COLOR_HEX } from './avatarPreview';
+import {
+  CLOTHES_COLOR_HEX,
+  HAIR_COLOR_HEX,
+  SHOES_COLOR_HEX,
+  SKIN_COLOR_HEX,
+} from './avatarPreview';
 
 /**
- * 캐릭터 꾸미기 5축 값으로 동물의 숲 같은 둥근 3D 캐릭터를 만든다(구/원통을 납작하게 눌러 조합).
+ * 캐릭터 꾸미기 여섯 축 값으로 동물의 숲 같은 둥근 3D 캐릭터를 만든다(구/원통을 납작하게 눌러 조합).
  * 큰 머리에 작은 몸, 점 눈과 볼터치가 특징이다. 프로필 미리보기와 마을이 같은 함수를 쓰므로
  * 두 화면의 캐릭터가 항상 똑같다. 캐릭터는 +z 방향을 바라보고, 발바닥이 y=0, 키는 약 1.95다.
  */
@@ -15,23 +20,41 @@ const HEAD_SCALE: [number, number, number] = [1, 0.92, 0.95];
 
 interface ClothesLook {
   /** 상의 색(소매 포함). */
-  top: string;
+  top: THREE.Color;
   /** 하의 색. null이면 피부(드레스처럼 맨다리)로 둔다. */
-  pants: string | null;
+  pants: THREE.Color | null;
 }
 
-const CLOTHES_LOOK: Record<Avatar['clothesStyle'], ClothesLook> = {
-  PLAIN: { top: '6aa5d8', pants: PANTS_COLOR },
-  HOODIE: { top: '8d8d99', pants: PANTS_COLOR },
-  JACKET: { top: '4f6b45', pants: PANTS_COLOR },
-  COAT: { top: 'a0522d', pants: '5a3a22' },
-  SUIT: { top: '2b2f3a', pants: '2b2f3a' },
-  DRESS: { top: 'd94f7a', pants: null },
-  OVERALLS: { top: 'f2f2f2', pants: '3b6fb6' },
-  STRIPES: { top: 'f2f2f2', pants: PANTS_COLOR },
-  CHECKER: { top: 'c0392b', pants: PANTS_COLOR },
-  TIE: { top: 'f2f2f2', pants: PANTS_COLOR },
-};
+/** 너무 밝은 색(흰색 등)이면 흰 옷 위에서도 보이게 어둡게 바꾼다. 무늬·넥타이 색에 쓴다. */
+function visibleOnWhite(color: THREE.Color): THREE.Color {
+  const { l } = color.getHSL({ h: 0, s: 0, l: 0 });
+  return l > 0.8 ? color.clone().multiplyScalar(0.55) : color;
+}
+
+function darker(color: THREE.Color, amount = 0.75): THREE.Color {
+  return color.clone().multiplyScalar(amount);
+}
+
+/** 옷 종류와 고른 색으로 상의·하의 색을 정한다. 색이 옷의 어느 부분에 쓰이는지는 옷마다 다르다. */
+function clothesLook(style: Avatar['clothesStyle'], color: THREE.Color): ClothesLook {
+  const white = hex('f2f2f2');
+  const pants = hex(PANTS_COLOR);
+  switch (style) {
+    case 'COAT':
+      return { top: color, pants: darker(color, 0.5) };
+    case 'SUIT':
+      return { top: color, pants: color };
+    case 'DRESS':
+      return { top: color, pants: null };
+    case 'OVERALLS':
+      return { top: white, pants: color };
+    case 'STRIPES':
+    case 'TIE':
+      return { top: white, pants };
+    default:
+      return { top: color, pants };
+  }
+}
 
 type Vec3 = [number, number, number];
 
@@ -47,16 +70,20 @@ function material(color: string | THREE.Color, doubleSided = false): THREE.MeshL
 }
 
 /** 줄무늬/체크 무늬를 그린 작은 캔버스 텍스처(몸통을 한 바퀴 감싼다). */
-function patternTexture(kind: 'STRIPES' | 'CHECKER'): THREE.CanvasTexture {
+function patternTexture(
+  kind: 'STRIPES' | 'CHECKER',
+  base: THREE.Color,
+  stripe: THREE.Color,
+): THREE.CanvasTexture {
   const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const context = canvas.getContext('2d');
   if (context) {
-    context.fillStyle = kind === 'STRIPES' ? '#f2f2f2' : '#c0392b';
+    context.fillStyle = `#${base.getHexString()}`;
     context.fillRect(0, 0, size, size);
-    context.fillStyle = kind === 'STRIPES' ? '#2e4a8e' : '#7a1f17';
+    context.fillStyle = `#${stripe.getHexString()}`;
     if (kind === 'STRIPES') {
       for (let y = 0; y < size; y += 16) {
         context.fillRect(0, y, size, 8);
@@ -219,13 +246,15 @@ function addBodyAndClothes(
   style: Avatar['clothesStyle'],
   skin: THREE.Color,
   look: ClothesLook,
+  color: THREE.Color,
 ) {
-  const topColor = hex(look.top);
-  const patterned = style === 'STRIPES' || style === 'CHECKER';
-  const topMaterial: THREE.Material = patterned
-    ? new THREE.MeshLambertMaterial({ map: patternTexture(style) })
-    : material(topColor);
-  const sleeveColor = patterned ? (style === 'STRIPES' ? '2e4a8e' : '7a1f17') : topColor;
+  const topColor = look.top;
+  const stripeColor = style === 'STRIPES' ? visibleOnWhite(color) : darker(color, 0.65);
+  const topMaterial: THREE.Material =
+    style === 'STRIPES' || style === 'CHECKER'
+      ? new THREE.MeshLambertMaterial({ map: patternTexture(style, topColor, stripeColor) })
+      : material(topColor);
+  const sleeveColor = style === 'STRIPES' ? stripeColor : topColor;
 
   addEllipsoid(parent, 1, topMaterial, [0, 0.62, 0], [0.4, 0.42, 0.36]);
 
@@ -240,7 +269,10 @@ function addBodyAndClothes(
       addEllipsoid(parent, 0.24, topColor, [0, 0.95, -0.2], [1.3, 0.7, 0.8]);
       break;
     case 'JACKET': {
-      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.06, 8, 20), material('3d5236'));
+      const collar = new THREE.Mesh(
+        new THREE.TorusGeometry(0.2, 0.06, 8, 20),
+        material(darker(color)),
+      );
       collar.rotation.x = Math.PI / 2;
       place(collar, parent, [0, 0.98, 0]);
       addBox(parent, [0.03, 0.5, 0.02], 'd8d2c0', [0, 0.62, 0.36]);
@@ -252,17 +284,20 @@ function addBodyAndClothes(
         material(topColor),
       );
       place(skirt, parent, [0, 0.3, 0]);
-      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.06, 8, 20), material('7a3b1d'));
+      const collar = new THREE.Mesh(
+        new THREE.TorusGeometry(0.2, 0.06, 8, 20),
+        material(darker(color, 0.65)),
+      );
       collar.rotation.x = Math.PI / 2;
       place(collar, parent, [0, 0.98, 0]);
       break;
     }
     case 'SUIT':
       addBox(parent, [0.16, 0.4, 0.02], 'f2f2f2', [0, 0.74, 0.35]);
-      addBox(parent, [0.06, 0.3, 0.02], 'c0392b', [0, 0.7, 0.365]);
+      addBox(parent, [0.06, 0.3, 0.02], darker(color, 0.5), [0, 0.7, 0.365]);
       break;
     case 'TIE':
-      addBox(parent, [0.07, 0.32, 0.02], '2e4a8e', [0, 0.7, 0.36]);
+      addBox(parent, [0.07, 0.32, 0.02], visibleOnWhite(color), [0, 0.7, 0.36]);
       break;
     case 'DRESS': {
       const skirt = new THREE.Mesh(
@@ -273,7 +308,7 @@ function addBodyAndClothes(
       break;
     }
     case 'OVERALLS': {
-      const pants = look.pants ?? PANTS_COLOR;
+      const pants = look.pants ?? color;
       const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.4, 0.3, 20), material(pants));
       place(lower, parent, [0, 0.36, 0]);
       addBox(parent, [0.3, 0.24, 0.02], pants, [0, 0.66, 0.36]);
@@ -301,25 +336,26 @@ function addHeadAndFace(parent: THREE.Object3D, skin: THREE.Color) {
   place(smile, parent, [0, HEAD_Y - 0.1, 0.565]);
 }
 
-/** 5축 값으로 캐릭터 한 명을 만든다. 쓰고 나면 `disposeAvatarModel`로 정리해야 한다. */
+/** 여섯 축 값으로 캐릭터 한 명을 만든다. 쓰고 나면 `disposeAvatarModel`로 정리해야 한다. */
 export function createAvatarModel(avatar: Avatar): THREE.Group {
   const root = new THREE.Group();
   const skin = hex(SKIN_COLOR_HEX[avatar.skinColor]);
   const hair = hex(HAIR_COLOR_HEX[avatar.hairColor]);
   const shoes = hex(SHOES_COLOR_HEX[avatar.shoesColor]);
-  const look = CLOTHES_LOOK[avatar.clothesStyle];
+  const clothesColor = hex(CLOTHES_COLOR_HEX[avatar.clothesColor]);
+  const look = clothesLook(avatar.clothesStyle, clothesColor);
 
   // 짧고 통통한 다리와 둥근 신발
   for (const x of [-0.17, 0.17]) {
     const leg = new THREE.Mesh(
       new THREE.CylinderGeometry(0.1, 0.11, 0.22, 12),
-      material(look.pants ? hex(look.pants) : skin),
+      material(look.pants ?? skin),
     );
     place(leg, root, [x, 0.26, 0]);
     addEllipsoid(root, 0.2, shoes, [x, 0.1, 0.06], [0.85, 0.55, 1.2]);
   }
 
-  addBodyAndClothes(root, avatar.clothesStyle, skin, look);
+  addBodyAndClothes(root, avatar.clothesStyle, skin, look, clothesColor);
   addHeadAndFace(root, skin);
   addHair(root, avatar.hairStyle, hair);
   return root;
