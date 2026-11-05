@@ -4,12 +4,13 @@ import { logout } from '../api/auth';
 import { getProfile, type Avatar } from '../api/user';
 import { getTodayRecommendation, type Theme } from '../api/theme';
 import { ApiError } from '../api/client';
-import { avatarFromProfile, buildAvatarPreviewUrl } from '../lib/avatarPreview';
+import AvatarPreview from '../components/AvatarPreview';
+import VillageScene from '../components/VillageScene';
+import { avatarFromProfile } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
 
 function TownPage() {
   const navigate = useNavigate();
-  const [userId, setUserId] = useState<number | null>(null);
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -22,7 +23,6 @@ function TownPage() {
     getProfile()
       .then((profile) => {
         if (!cancelled) {
-          setUserId(profile.id);
           setNickname(profile.nickname);
           setAvatar(avatarFromProfile(profile));
         }
@@ -82,13 +82,7 @@ function TownPage() {
             aria-label="캐릭터 설정"
           >
             {avatar ? (
-              <img
-                src={buildAvatarPreviewUrl(avatar, String(userId ?? nickname ?? 'guest'))}
-                alt="내 캐릭터"
-                className={styles.avatarThumb}
-                width={32}
-                height={32}
-              />
+              <AvatarPreview avatar={avatar} variant="face" className={styles.avatarThumb} />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="8" r="3.4" stroke="currentColor" strokeWidth="1.6" />
@@ -152,6 +146,7 @@ function TownPage() {
           </span>
         </Link>
       )}
+      {avatar && <VillageScene avatar={avatar} />}
       {logoutErrorMessage && (
         <p className={styles.content} role="alert">
           {logoutErrorMessage}

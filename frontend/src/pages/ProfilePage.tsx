@@ -11,6 +11,7 @@ import {
   type AvatarOptions,
 } from '../api/user';
 import { ApiError } from '../api/client';
+import AvatarPreview from '../components/AvatarPreview';
 import {
   avatarFromProfile,
   CLOTHES_STYLE_LABELS,
@@ -21,7 +22,6 @@ import {
   SHOES_COLOR_LABELS,
   SKIN_COLOR_HEX,
   SKIN_COLOR_LABELS,
-  buildAvatarPreviewUrl,
 } from '../lib/avatarPreview';
 import styles from './ProfilePage.module.css';
 
@@ -31,7 +31,6 @@ function ProfilePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const activeSection: Section = searchParams.get('tab') === 'account' ? 'account' : 'character';
-  const [userId, setUserId] = useState<number | null>(null);
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
@@ -64,7 +63,6 @@ function ProfilePage() {
     Promise.all([getProfile(), getAvatarOptions()])
       .then(([profile, options]) => {
         if (!cancelled) {
-          setUserId(profile.id);
           setEmail(profile.email);
           setNickname(profile.nickname);
           setHasPassword(profile.hasPassword);
@@ -291,13 +289,7 @@ function ProfilePage() {
           <>
             {avatar && avatarOptions && (
               <form onSubmit={handleAvatarSubmit}>
-                <img
-                  src={buildAvatarPreviewUrl(avatar, String(userId ?? nickname))}
-                  alt="캐릭터 미리보기"
-                  className={styles.avatarPreview}
-                  width={96}
-                  height={96}
-                />
+                <AvatarPreview avatar={avatar} className={styles.avatarPreview} />
                 <div className={styles.axisList}>
                   {renderColorAxis(
                     'skinColor',

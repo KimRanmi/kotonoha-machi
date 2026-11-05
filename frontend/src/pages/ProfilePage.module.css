@@ -75,7 +75,8 @@
 }
 
 .avatarPreview {
-  display: block;
+  width: 220px;
+  height: 280px;
   margin: 0 auto var(--space-4);
   border-radius: var(--radius-sm);
   background-color: var(--color-bg);

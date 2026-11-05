@@ -90,20 +90,3 @@ export const SHOES_COLOR_HEX: Record<AvatarShoesColor, string> = {
   RED: 'c0392b',
   BLUE: '2e4a8e',
 };
-
-/**
- * 색상 축(피부색/머리색/신발 색)은 우리 쪽 enum 이름을 미리 정한 16진 색상값으로 매핑하고, 스타일 축
- * (헤어스타일/옷)은 DiceBear voxel-art의 파라미터 값과 이름이 같아 소문자로만 바꾼다. 이렇게 저장 데이터와
- * 렌더링 서비스를 분리해두면, 나중에 DiceBear가 아닌 다른 서비스로 바꿀 때도 이 파일만 고치면 된다.
- */
-export function buildAvatarPreviewUrl(avatar: Avatar, seed: string): string {
-  const params = new URLSearchParams({
-    seed,
-    skinColor: SKIN_COLOR_HEX[avatar.skinColor],
-    hairColor: HAIR_COLOR_HEX[avatar.hairColor],
-    topVariant: avatar.hairStyle.toLowerCase(),
-    outfitVariant: avatar.clothesStyle.toLowerCase(),
-    shoesColor: SHOES_COLOR_HEX[avatar.shoesColor],
-  });
-  return `https://api.dicebear.com/10.x/voxel-art/svg?${params.toString()}`;
-}
