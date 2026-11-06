@@ -16,12 +16,11 @@ const WINDOW_COLOR = '#cfe8ff';
 const SIGN_STYLES: Record<string, { background: string; text: string; accent: string }> = {
   cafe: { background: '#4a2f1e', text: '#fbf1dc', accent: '#e0a95a' },
   shop: { background: '#1f3d6b', text: '#ffffff', accent: '#f2c230' },
-  hall: { background: '#24402f', text: '#f3e9c6', accent: '#d9b25a' },
+  home: { background: '#7a3f3a', text: '#fff4e0', accent: '#f0c987' },
 };
 const SIGN_WIDTH = 3.2;
 const SIGN_HEIGHT = 0.9;
 const SIGN_FONT = '"Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Apple SD Gothic Neo", sans-serif';
-const SIGN_BOTTOM: Record<string, number> = { hall: 3.85 }; // 도서관은 박공 위로 올린다
 
 /** 건물 처마에 달린 간판. 마우스로 가리키거나 누를 수 있게 호출한 쪽이 object를 raycast한다. */
 export interface VillageSign {
@@ -232,41 +231,36 @@ export function createVillageWorld(): VillageWorld {
     place(coin, side + 0.75, 1.75, front - 0.54, house);
   };
 
-  const addLibrary = (house: THREE.Group, building: VillageBuilding) => {
+  const addHome = (house: THREE.Group, building: VillageBuilding) => {
     const front = building.depth / 2;
-    const stone = '#e6dfd0';
-    // 계단과 단
-    place(box(5.2, 0.2, 1.5, stone), 0, 0.1, front + 0.75, house);
-    place(box(5.2, 0.1, 0.4, stone), 0, 0.05, front + 1.7, house);
-    // 기둥 4개와 그 위를 가로지르는 보
-    for (const x of [-2.5, -1.4, 1.4, 2.5]) {
-      place(cylinder(0.18, 0.2, 2.45, stone), x, 1.425, front + 0.85, house);
+    // 창문과 그 아래 화단
+    for (const side of [-1, 1]) {
+      addWindow(house, building, side * 1.3, 1.4, [0.8, 0.8], '#fff4e0');
+      place(box(1, 0.25, 0.3, '#8a5a3c'), side * 1.3, 0.85, front + 0.2, house);
+      for (const offset of [-0.3, 0, 0.3]) {
+        place(
+          sphere(0.1, FLOWER_COLORS[(offset > 0 ? 1 : 0) + (side > 0 ? 2 : 0)]),
+          side * 1.3 + offset,
+          1.05,
+          front + 0.2,
+          house,
+        );
+      }
     }
-    place(box(5.2, 0.25, 1.1, stone), 0, 2.725, front + 0.55, house);
-    // 삼각 지붕 장식(박공)과 시계
-    const triangle = new THREE.Shape();
-    triangle.moveTo(-2.6, 0);
-    triangle.lineTo(2.6, 0);
-    triangle.lineTo(0, 0.9);
-    triangle.closePath();
-    const pediment = new THREE.Mesh(
-      geometry(new THREE.ExtrudeGeometry(triangle, { depth: 0.25, bevelEnabled: false })),
-      paint(stone),
+    place(box(0.1, 0.8, 0.8, WINDOW_COLOR), building.width / 2 + 0.03, 1.4, 0, house);
+    // 현관 계단
+    place(box(1.8, 0.12, 0.7, '#d8cfc0'), 0, 0.06, front + 0.45, house);
+    // 굴뚝
+    place(
+      box(0.5, 1.3, 0.5, '#8c4a3a'),
+      building.width * 0.25,
+      building.height + 1.1,
+      -building.depth * 0.2,
+      house,
     );
-    place(pediment, 0, 2.85, front + 0.85, house);
-    const clock = cylinder(0.32, 0.32, 0.05, '#ffffff');
-    clock.rotation.x = Math.PI / 2;
-    place(clock, 0, 3.15, front + 1.13, house);
-    place(box(0.04, 0.22, 0.02, '#3a2a1c'), 0, 3.24, front + 1.17, house);
-    place(box(0.16, 0.04, 0.02, '#3a2a1c'), 0.06, 3.15, front + 1.17, house);
-    // 키 큰 창문(앞 기둥 사이, 옆면)
-    for (const x of [-1.95, 1.95]) {
-      place(box(0.7, 1.7, 0.1, WINDOW_COLOR), x, 1.7, front + 0.03, house);
-    }
-    for (const z of [-1, 1]) {
-      const tall = box(0.1, 1.7, 0.7, WINDOW_COLOR);
-      place(tall, building.width / 2 + 0.03, 1.7, z, house);
-    }
+    // 우편함
+    place(cylinder(0.04, 0.04, 0.9, '#6b4a32'), 1.2, 0.45, front + 1.6, house);
+    place(box(0.35, 0.25, 0.5, '#d9534f'), 1.2, 1, front + 1.6, house);
   };
 
   const createSignTexture = (building: VillageBuilding) => {
@@ -300,7 +294,7 @@ export function createVillageWorld(): VillageWorld {
 
   const createSign = (building: VillageBuilding): VillageSign => {
     const object = new THREE.Group();
-    const bottom = SIGN_BOTTOM[building.id] ?? building.height + 0.05;
+    const bottom = building.height + 0.05;
     const z = building.depth / 2 + 0.5;
     place(
       box(SIGN_WIDTH + 0.2, SIGN_HEIGHT + 0.2, 0.12, '#6b4a32'),
@@ -316,13 +310,6 @@ export function createVillageWorld(): VillageWorld {
       faceMaterial,
     );
     place(face, 0, bottom + SIGN_HEIGHT / 2, z + 0.065, object);
-    if (bottom > building.height + 0.1) {
-      // 지붕에서 간판을 받치는 기둥 두 개
-      for (const x of [-SIGN_WIDTH / 2 + 0.3, SIGN_WIDTH / 2 - 0.3]) {
-        const post = cylinder(0.05, 0.05, bottom - building.height, '#6b4a32');
-        place(post, x, building.height + (bottom - building.height) / 2, z, object);
-      }
-    }
     return {
       building,
       object,
@@ -335,7 +322,7 @@ export function createVillageWorld(): VillageWorld {
   > = {
     cafe: addCafe,
     shop: addShop,
-    hall: addLibrary,
+    home: addHome,
   };
 
   function createBuilding(building: VillageBuilding): THREE.Group {

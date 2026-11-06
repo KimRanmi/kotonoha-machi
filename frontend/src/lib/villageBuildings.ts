@@ -9,7 +9,7 @@ export interface VillageBuilding {
   depth: number;
   height: number;
   color: string;
-  /** 아직 테마 학습으로 열리지 않은 건물인지 여부. 해금 처리는 다음 단계에서 붙인다. */
+  /** 아직 열리지 않은 건물인지 여부. 지금은 코드에 고정한 값이고, 테마 완료 개수에 따른 서버 해금은 다음 단계에서 붙인다. */
   locked: boolean;
 }
 
@@ -42,15 +42,15 @@ export const VILLAGE_BUILDINGS: VillageBuilding[] = [
     locked: true,
   },
   {
-    id: 'hall',
-    label: '図書館',
+    id: 'home',
+    label: 'わが家',
     x: 10,
     z: -4,
-    width: 6,
+    width: 4,
     depth: 4,
-    height: 3,
-    color: '#9A8FB0',
-    locked: true,
+    height: 2.2,
+    color: '#E8C07D',
+    locked: true, // 처음부터 열려 있어야 하지만 집 내부 화면이 아직 없어서 잠가 둔다
   },
 ];
 
