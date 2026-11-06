@@ -1,7 +1,8 @@
 .scene {
   position: absolute;
-  inset: 64px 0 0 0;
+  inset: 0; /* 화면 전체가 마을이다. 헤더와 배너(z-index 1)가 위에 얹힌다 */
   z-index: 0;
+  overflow: hidden; /* 화면보다 큰 장면 때문에 페이지에 스크롤바가 생기지 않게 */
 }
 
 .scene canvas {

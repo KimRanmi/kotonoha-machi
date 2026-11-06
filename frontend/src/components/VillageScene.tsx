@@ -3,18 +3,27 @@ import * as THREE from 'three';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
+import { collidesWithBuildings } from '../lib/villageBuildings';
+import { collidesWithTrees } from '../lib/villageScenery';
+import { createVillageWorld } from '../lib/villageScenery3d';
 import styles from './VillageScene.module.css';
 
 interface VillageSceneProps {
   avatar: Avatar;
   palette: AvatarPalette;
+  /** 열려 있는 건물의 라벨을 눌렀을 때 호출된다. 걸어가지 않고 바로 입장한다. */
+  onEnterBuilding: (buildingId: string) => void;
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
+const PLAYER_SCALE = 0.6; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
 const MAP_HALF_SIZE = 18; // 이동 가능한 정사각형 땅의 절반 크기
-const VIEW_HEIGHT = 9; // 화면에 세로로 보이는 월드 길이(직교 카메라)
-const CAMERA_OFFSET = new THREE.Vector3(10, 10, 10); // 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다
+const GROUND_HALF_SIZE = 60; // 눈에 보이는 풀밭의 절반 크기. 화면 어디를 봐도 땅이 보이게 이동 범위보다 훨씬 크다
+const VIEW_HEIGHT = 18; // 화면에 세로로 보이는 월드 길이(직교 카메라). 건물 3개가 한 화면에 들어오는 크기
+// 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다. 직교 카메라라 멀리 둬도 크기는 같고, 카메라 앞쪽의 나무가
+// 시야 앞면에 잘리지 않게 숲(최대 48) 바깥까지 물러나 있다.
+const CAMERA_OFFSET = new THREE.Vector3(50, 50, 50);
 
 /**
  * 화면 기준 방향키 → 월드 방향. 카메라가 (+x, +y, +z)에서 원점을 내려다보므로 화면 위쪽은 월드의
@@ -30,6 +39,11 @@ const KEY_DIRECTIONS: Record<string, [number, number]> = {
   ArrowRight: [1, -1],
   KeyD: [1, -1],
 };
+
+/** 캐릭터가 (x, z)에 설 수 없는 자리(건물이나 나무 줄기)인지. */
+function isBlocked(x: number, z: number): boolean {
+  return collidesWithBuildings(x, z) || collidesWithTrees(x, z);
+}
 
 function createGroundTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -48,13 +62,18 @@ function createGroundTexture(): THREE.CanvasTexture {
   texture.magFilter = THREE.NearestFilter;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(MAP_HALF_SIZE, MAP_HALF_SIZE);
+  texture.repeat.set(GROUND_HALF_SIZE, GROUND_HALF_SIZE);
   return texture;
 }
 
 /** 위에서 내려다보는 고정 쿼터뷰 마을. 방향키/WASD로 내 캐릭터를 자유롭게 걷게 한다. */
-function VillageScene({ avatar, palette }: VillageSceneProps) {
+function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // 장면은 avatar/palette가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
+  const onEnterRef = useRef(onEnterBuilding);
+  useEffect(() => {
+    onEnterRef.current = onEnterBuilding;
+  }, [onEnterBuilding]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -63,7 +82,7 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
     }
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#cfeaf5');
+    scene.background = new THREE.Color('#9fd28a'); // 풀밭 색. 혹시 땅 끝이 보여도 하늘색 틈이 생기지 않게
     scene.add(new THREE.AmbientLight(0xffffff, 1.5));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(6, 12, 4);
@@ -71,17 +90,21 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
 
     const groundTexture = createGroundTexture();
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(MAP_HALF_SIZE * 2, MAP_HALF_SIZE * 2),
+      new THREE.PlaneGeometry(GROUND_HALF_SIZE * 2, GROUND_HALF_SIZE * 2),
       new THREE.MeshLambertMaterial({ map: groundTexture }),
     );
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
+    // 건물, 길, 나무, 꽃 같은 풍경은 lib/villageScenery3d.ts가 만든다.
+    const world = createVillageWorld();
+    scene.add(world.group);
+
     const player = createAvatarModel(avatar, palette);
-    player.scale.setScalar(1.2);
+    player.scale.setScalar(PLAYER_SCALE);
     scene.add(player);
 
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
@@ -97,6 +120,40 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
       camera.updateProjectionMatrix();
     };
     resize();
+
+    // 간판은 3D 물체라서, 마우스 위치에서 화면 안쪽으로 광선을 쏘아 맞은 간판을 찾는다(raycaster).
+    // 열려 있는 건물 간판만 반응하고, 잠긴 건물 간판은 눌러도 아무 일도 없다.
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const findSign = (event: MouseEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(
+        world.signs.map((sign) => sign.object),
+        true,
+      )[0];
+      return world.signs.find((sign) => hit && sign.object.getObjectById(hit.object.id));
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      const hovered = findSign(event);
+      for (const sign of world.signs) {
+        sign.setHighlight(sign === hovered && !sign.building.locked);
+      }
+      renderer.domElement.style.cursor = hovered && !hovered.building.locked ? 'pointer' : '';
+    };
+    const handleClick = (event: MouseEvent) => {
+      const clicked = findSign(event);
+      if (clicked && !clicked.building.locked) {
+        onEnterRef.current(clicked.building.id);
+      }
+    };
+    renderer.domElement.addEventListener('pointermove', handlePointerMove);
+    renderer.domElement.addEventListener('click', handleClick);
+
     const observer = new ResizeObserver(resize);
     observer.observe(container);
 
@@ -140,16 +197,23 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
         dx /= length;
         dz /= length;
         const limit = MAP_HALF_SIZE - 1;
-        player.position.x = THREE.MathUtils.clamp(
+        // X, Z를 따로 검사해야 건물에 비스듬히 부딪혀도 벽을 따라 미끄러진다.
+        const nextX = THREE.MathUtils.clamp(
           player.position.x + dx * WALK_SPEED * delta,
           -limit,
           limit,
         );
-        player.position.z = THREE.MathUtils.clamp(
+        if (!isBlocked(nextX, player.position.z)) {
+          player.position.x = nextX;
+        }
+        const nextZ = THREE.MathUtils.clamp(
           player.position.z + dz * WALK_SPEED * delta,
           -limit,
           limit,
         );
+        if (!isBlocked(player.position.x, nextZ)) {
+          player.position.z = nextZ;
+        }
         targetAngle = Math.atan2(dx, dz);
       }
 
@@ -161,6 +225,7 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
       camera.position.copy(player.position).add(CAMERA_OFFSET);
       camera.lookAt(player.position);
       renderer.render(scene, camera);
+
       frameId = requestAnimationFrame(animate);
     };
     frameId = requestAnimationFrame(animate);
@@ -175,6 +240,9 @@ function VillageScene({ avatar, palette }: VillageSceneProps) {
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove);
+      renderer.domElement.removeEventListener('click', handleClick);
+      world.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();

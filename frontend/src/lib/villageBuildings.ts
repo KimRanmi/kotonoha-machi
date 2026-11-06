@@ -1,0 +1,71 @@
+/** 마을에 서 있는 건물 하나. 위치(x, z)는 건물 중심, width는 x 방향, depth는 z 방향 길이다. */
+export interface VillageBuilding {
+  id: string;
+  /** 간판에 일본어로 적히는 이름. */
+  label: string;
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+  height: number;
+  color: string;
+  /** 아직 열리지 않은 건물인지 여부. 지금은 코드에 고정한 값이고, 테마 완료 개수에 따른 서버 해금은 다음 단계에서 붙인다. */
+  locked: boolean;
+}
+
+export const PLAYER_RADIUS = 0.26;
+
+/** 벽 위에 얹는 뾰족 지붕의 높이. */
+export const ROOF_HEIGHT = 1.6;
+
+export const VILLAGE_BUILDINGS: VillageBuilding[] = [
+  {
+    id: 'cafe',
+    label: 'カフェ',
+    x: -8,
+    z: -4,
+    width: 5,
+    depth: 4,
+    height: 2.5,
+    color: '#C97B4A',
+    locked: false,
+  },
+  {
+    id: 'shop',
+    label: 'お店',
+    x: 2,
+    z: -10,
+    width: 5,
+    depth: 4,
+    height: 2.5,
+    color: '#8FA7C4',
+    locked: true,
+  },
+  {
+    id: 'home',
+    label: 'わが家',
+    x: 10,
+    z: -4,
+    width: 4,
+    depth: 4,
+    height: 2.2,
+    color: '#E8C07D',
+    locked: true, // 처음부터 열려 있어야 하지만 집 내부 화면이 아직 없어서 잠가 둔다
+  },
+];
+
+/** 캐릭터(원)가 (x, z)에 서 있을 때 어느 건물(사각형)과든 겹치는지 검사한다. */
+export function collidesWithBuildings(x: number, z: number): boolean {
+  return VILLAGE_BUILDINGS.some((building) => {
+    // 건물 사각형에서 캐릭터 중심에 가장 가까운 점을 구해, 그 거리가 반지름보다 짧으면 겹친 것이다.
+    const nearestX = Math.max(
+      building.x - building.width / 2,
+      Math.min(x, building.x + building.width / 2),
+    );
+    const nearestZ = Math.max(
+      building.z - building.depth / 2,
+      Math.min(z, building.z + building.depth / 2),
+    );
+    return Math.hypot(x - nearestX, z - nearestZ) < PLAYER_RADIUS;
+  });
+}
