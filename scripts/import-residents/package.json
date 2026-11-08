@@ -1,0 +1,9 @@
+{
+  "name": "import-residents",
+  "private": true,
+  "type": "module",
+  "description": "구글 시트(웹 게시 CSV)의 주민 페르소나를 읽어 검토용 Flyway SQL을 생성하는 개발 도구. 앱(backend/frontend)에는 포함되지 않는다.",
+  "scripts": {
+    "import": "node --env-file-if-exists=.env import.mjs"
+  }
+}

@@ -156,4 +156,88 @@ class ChatServiceTest {
     assertThat(prompt.getValue()).doesNotContain("INJECTED_MARKER");
     assertThat(user.getValue()).isEqualTo(injection);
   }
+
+  private ArgumentCaptor<String> chatAndCapturePrompt(Resident resident) {
+    when(residentRepository.findById(1L)).thenReturn(Optional.of(resident));
+    when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
+    when(geminiClient.generate(any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+
+    chatService.chat(1L, 1L, "こんにちは");
+
+    ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
+    verify(geminiClient).generate(prompt.capture(), eq("こんにちは"));
+    return prompt;
+  }
+
+  @Test
+  void chat_말투_배경_예시대사가_있으면_라벨과_함께_프롬프트에_들어간다() {
+    Resident resident = resident();
+    when(resident.getSpeechStyle()).thenReturn("부드러운 존댓말");
+    when(resident.getBackground()).thenReturn("마을 카페 주인");
+    when(resident.getSampleLines()).thenReturn("いらっしゃいませ。");
+
+    String prompt = chatAndCapturePrompt(resident).getValue();
+
+    assertThat(prompt)
+        .contains("\n말투 설명: 부드러운 존댓말")
+        .contains("\n배경 설정: 마을 카페 주인")
+        .contains("\n예시 대사: いらっしゃいませ。")
+        .doesNotContain("{extraStatus}");
+    assertThat(prompt.indexOf("말투 설명")).isLessThan(prompt.indexOf("배경 설정"));
+    assertThat(prompt.indexOf("배경 설정")).isLessThan(prompt.indexOf("예시 대사"));
+  }
+
+  @Test
+  void chat_선택_설정이_null_빈값_공백이면_라벨째_빠진다() {
+    Resident resident = resident();
+    when(resident.getSpeechStyle()).thenReturn("");
+    when(resident.getBackground()).thenReturn("   ");
+    when(resident.getSampleLines()).thenReturn(null);
+
+    String prompt = chatAndCapturePrompt(resident).getValue();
+
+    assertThat(prompt)
+        .doesNotContain("말투 설명")
+        .doesNotContain("배경 설정")
+        .doesNotContain("예시 대사")
+        .doesNotContain("{extraStatus}")
+        .contains("현재 장소/상황: 広場で散歩中\n");
+  }
+
+  @Test
+  void chat_일부만_있으면_있는_항목만_들어간다() {
+    Resident resident = resident();
+    when(resident.getBackground()).thenReturn("  마을 카페 주인  ");
+
+    String prompt = chatAndCapturePrompt(resident).getValue();
+
+    assertThat(prompt)
+        .contains("\n배경 설정: 마을 카페 주인\n")
+        .doesNotContain("말투 설명")
+        .doesNotContain("예시 대사");
+  }
+
+  @Test
+  void chat_주민_값_안의_플레이스홀더는_다시_치환되지_않는다() {
+    Resident resident = resident();
+    when(resident.getSpeechStyle()).thenReturn("{villagerName}라고 말한다 {personality} {unknown}");
+    when(resident.getBackground()).thenReturn("$1 \\ {currentContext}");
+
+    String prompt = chatAndCapturePrompt(resident).getValue();
+
+    assertThat(prompt)
+        .contains("말투 설명: {villagerName}라고 말한다 {personality} {unknown}")
+        .contains("배경 설정: $1 \\ {currentContext}");
+  }
+
+  @Test
+  void chat_템플릿의_모르는_플레이스홀더는_그대로_둔다_그리고_사용자_메시지는_분리된다() {
+    Resident resident = resident();
+    when(resident.getSampleLines()).thenReturn("{friendshipLevel}");
+
+    ArgumentCaptor<String> prompt = chatAndCapturePrompt(resident);
+
+    assertThat(prompt.getValue()).contains("예시 대사: {friendshipLevel}");
+    assertThat(prompt.getValue()).doesNotContain("こんにちは");
+  }
 }

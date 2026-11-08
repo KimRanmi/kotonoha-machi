@@ -611,3 +611,13 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 검증: `spotlessApply`·`test` 141개 통과(`ChatServiceTest`·`GeminiClientTest` 추가). 실제 서버를 띄워 Gemini를 호출해 보지는
     않았다. Gemini 응답 파싱, 엔티티-테이블 일치, 컨트롤러는 테스트가 없다.
   - 다음 할 일: 친밀도 올리는 규칙, 대화 기록 저장, 프런트 대화창, 음성 입력·발음 체크, 일본어 입력 도우미.
+- 주민 페르소나를 구글 시트에서 관리하도록 했다(`0017`). `V17`이 `resident`에 `slug`(고유 키)·`speech_style`·`background`·
+  `sample_lines`를 추가하고, `ChatService`가 비어 있지 않은 항목을 프롬프트의 캐릭터 설정에 넣는다(`{…}` 치환은 한 번에 처리).
+  `scripts/import-residents`가 웹 게시 CSV를 읽어 검증한 뒤 다음 번호의 upsert SQL을 만든다. 시트 열은 `id, name,
+  personality, appearance_job, core_features, hobby`이고, 이번에 시트의 주민 20명으로 `V18`을 만들었다. 기존 나나는
+  `V18` 첫 줄의 `UPDATE`로 시트의 나나(`r09`)가 이어받아 친밀도 기록이 보존된다(미유는 그대로).
+  - 검증: `spotlessApply`·`test` 146개 통과(통합 테스트 포함이라 V1~V18이 Flyway로 실제 적용되고 엔티티 검증을 거침). 스크립트는
+    샘플 CSV(정상/오류 7종)와 실제 시트로 실행했고, 생성 SQL을 임시 Postgres에 적용해 재적용 시 같은 결과인 것을 확인했다.
+    실제 서버를 띄워 Gemini 대화를 호출해 보지는 않았다. Gemini 응답 파싱과 `ChatController` 테스트는 없다.
+  - 다음 할 일: 대화 시작 시 주민의 실제 위치를 `current_context`로 넣기, 친밀도 올리는 규칙, 대화 기록 저장, 프런트 대화창,
+    요구사항 문서의 미유·나나 설명 정리.

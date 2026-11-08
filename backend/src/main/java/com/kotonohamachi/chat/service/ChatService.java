@@ -7,6 +7,9 @@ import com.kotonohamachi.resident.Resident;
 import com.kotonohamachi.resident.ResidentFriendship;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 /** 주민의 설정(성격·친밀도·상황)으로 시스템 프롬프트를 만들어 Gemini에게 대사를 받는다. */
@@ -21,7 +24,7 @@ public class ChatService {
       너는 "동물의 숲" 스타일의 힐링 게임에 등장하는 마을 주민(NPC) 캐릭터야. 지금부터 너는 완벽하게 캐릭터 본인이 되어 플레이어와 대화해야 해. AI 챗봇처럼 행동하거나 "제가 도울 일이 있나요?" 같은 말은 절대로 금지야. 게임 속 세상의 인물로만 존재해줘.
 
       [Character Status]
-      이름: {villagerName} / 성격 유형: {personality} / 플레이어와의 친밀도: {friendshipLevel} / 100 / 현재 장소/상황: {currentContext}
+      이름: {villagerName} / 성격 유형: {personality} / 플레이어와의 친밀도: {friendshipLevel} / 100 / 현재 장소/상황: {currentContext}{extraStatus}
 
       [Output Rules]
       1. 말투와 톤앤매너는 반드시 설정된 성격 유형을 100% 반영.
@@ -32,6 +35,8 @@ public class ChatService {
       6. translation에는 reply의 한국어 번역을 항상 넣는다.
       7. 플레이어의 일본어가 어색해도 알아듣고, 올바른 표현을 자연스럽게 되풀이해준다.
       """;
+
+  private static final Pattern PLACEHOLDER = Pattern.compile("\\{(\\w+)\\}");
 
   private final ResidentRepository residentRepository;
   private final ResidentFriendshipRepository friendshipRepository;
@@ -75,11 +80,39 @@ public class ChatService {
         .map(ResidentFriendship::getLevel)
         .orElse(0);
 
-    String systemPrompt = SYSTEM_PROMPT_TEMPLATE
-        .replace("{villagerName}", resident.getName())
-        .replace("{personality}", resident.getPersonality())
-        .replace("{friendshipLevel}", String.valueOf(friendshipLevel))
-        .replace("{currentContext}", resident.getCurrentContext());
+    String systemPrompt = fillTemplate(Map.of(
+        "villagerName", resident.getName(),
+        "personality", resident.getPersonality(),
+        "friendshipLevel", String.valueOf(friendshipLevel),
+        "currentContext", resident.getCurrentContext(),
+        "extraStatus", extraStatus(resident)));
     return geminiClient.generate(systemPrompt, normalizedMessage);
+  }
+
+  /** 템플릿의 {…}를 한 번에 치환한다. 치환된 값 안의 {…}는 다시 치환되지 않는다. */
+  private static String fillTemplate(Map<String, String> values) {
+    Matcher matcher = PLACEHOLDER.matcher(SYSTEM_PROMPT_TEMPLATE);
+    StringBuilder result = new StringBuilder();
+    while (matcher.find()) {
+      String value = values.getOrDefault(matcher.group(1), matcher.group());
+      matcher.appendReplacement(result, Matcher.quoteReplacement(value));
+    }
+    matcher.appendTail(result);
+    return result.toString();
+  }
+
+  /** 비어 있지 않은 선택 설정만 한국어 라벨을 붙여 줄바꿈으로 이어 붙인다. */
+  private static String extraStatus(Resident resident) {
+    StringBuilder extra = new StringBuilder();
+    appendIfPresent(extra, "말투 설명", resident.getSpeechStyle());
+    appendIfPresent(extra, "배경 설정", resident.getBackground());
+    appendIfPresent(extra, "예시 대사", resident.getSampleLines());
+    return extra.toString();
+  }
+
+  private static void appendIfPresent(StringBuilder extra, String label, String value) {
+    if (value != null && !value.isBlank()) {
+      extra.append('\n').append(label).append(": ").append(value.strip());
+    }
   }
 }
