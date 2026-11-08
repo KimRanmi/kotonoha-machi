@@ -603,3 +603,11 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 집은 요구사항상 처음부터 열려 있어야 하지만 집 내부 화면이 아직 없어 `locked: true`로 잠가 뒀다. 카페는 해금 로직이 없어
     지금처럼 열어 두었고 상점은 잠금이다. 열림 여부는 아직 프런트 코드의 고정 값이다(서버 해금은 다음 단계).
   - 검증: prettier·lint·build 통과. 임시 페이지에서 세 건물을 눈으로 확인했다(임시 페이지는 지웠다).
+- 주민과의 대화 백엔드 최소 구현(`chat`·`resident` 패키지). 주민(`resident`)·사용자별 친밀도(`resident_friendship`) 테이블을 `V16`으로
+  만들고 카페 주민 미유·나나를 시드로 넣었다. `POST /api/residents/{residentId}/chat`이 메시지를 받아 `{reply, translation}`
+  (일본어 대사 + 한국어 번역)을 돌려준다. Gemini는 백엔드 `GeminiClient`(RestClient)에서만 호출하고, 시스템 프롬프트는
+  `ChatService`가 이름·성격·친밀도·장소로 채우며 사용자 메시지는 따로 보낸다. 새 환경변수 `GEMINI_API_KEY`(필수)·`GEMINI_MODEL`
+  (선택, 기본 `gemini-2.0-flash`)를 `.env.example`에 추가했다.
+  - 검증: `spotlessApply`·`test` 141개 통과(`ChatServiceTest`·`GeminiClientTest` 추가). 실제 서버를 띄워 Gemini를 호출해 보지는
+    않았다. Gemini 응답 파싱, 엔티티-테이블 일치, 컨트롤러는 테스트가 없다.
+  - 다음 할 일: 친밀도 올리는 규칙, 대화 기록 저장, 프런트 대화창, 음성 입력·발음 체크, 일본어 입력 도우미.
