@@ -25,6 +25,10 @@ public class GeminiClient {
 
   private static final Logger log = LoggerFactory.getLogger(GeminiClient.class);
   private static final int TIMEOUT_MILLIS = 20_000;
+
+  /** 응답 길이 상한. 대사는 1~2줄이라 짧지만, 추론 토큰도 포함되므로 여유를 둔다. */
+  private static final int MAX_OUTPUT_TOKENS = 2048;
+
   private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
 
   private final String apiKey;
@@ -67,6 +71,7 @@ public class GeminiClient {
     GenerateContentConfig config = GenerateContentConfig.builder()
         .systemInstruction(Content.fromParts(Part.fromText(systemPrompt)))
         .responseMimeType("application/json")
+        .maxOutputTokens(MAX_OUTPUT_TOKENS)
         .responseSchema(schema)
         .httpOptions(HttpOptions.builder().timeout(TIMEOUT_MILLIS).build())
         .build();

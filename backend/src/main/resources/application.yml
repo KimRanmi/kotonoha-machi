@@ -52,4 +52,4 @@ app:
     # Gemini API 키. 비어 있으면 주민과의 대화를 쓸 수 없다(503).
     api-key: ${GEMINI_API_KEY:}
     # 주민 대화에 쓸 Gemini 모델.
-    model: ${GEMINI_MODEL:gemini-2.0-flash}
+    model: ${GEMINI_MODEL:gemini-3.6-flash}

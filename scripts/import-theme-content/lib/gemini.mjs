@@ -2,7 +2,7 @@
 // 만들지 않고, kanjiApi.mjs가 실제 사전 데이터로 조회·검증한다 — docs/requirements.md의
 // "AI가 뜻을 짓지 않는다" 제약을 지키는 지점이다.
 
-const MODEL = 'gemini-2.0-flash';
+const MODEL = 'gemini-3.6-flash';
 
 async function callGemini(apiKey, prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;

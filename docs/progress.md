@@ -632,3 +632,9 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   요구사항 문서의 "카페 주인 미유 + 알바생 나나" 문구와 가져오기 README·결정 문서 `0017`의 미유 언급을 맞췄다.
   - 검증: `spotlessApply`·`test` 통과(실패 0, V1~V19가 Flyway로 실제 적용됨). 삭제 결과를 실제 DB 행으로 확인하는 테스트는 없다.
   - 다음 할 일: Notion에 미러링된 요구사항 문서의 같은 문구 정리, 모델명 확인과 응답 길이 제한, 실제 서버로 Gemini 대화 확인.
+- Gemini 기본 모델을 `gemini-2.0-flash`에서 `gemini-3.6-flash`로 바꾸고 응답 길이 상한(`maxOutputTokens` 2048)을 넣었다. 공식
+  deprecations 페이지에 2.0-flash 종료 예정일이 2026-06-01로 적혀 있고 대체 모델로 `gemini-3.6-flash`가 안내돼 있어서다.
+  `application.yml`·`.env.example`과, 같은 죽은 모델을 쓰던 `scripts/import-theme-content/lib/gemini.mjs`도 함께 바꿨다.
+  - 검증: `spotlessApply`·`test` 통과. 새 모델로 실제 호출은 하지 않았다. 추론 토큰이 상한에 포함되는지, 2048이 충분한지는
+    실제 호출로 확인해야 한다(잘리면 502가 난다).
+  - 다음 할 일: 실제 서버로 Gemini 대화 확인.
