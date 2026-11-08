@@ -621,3 +621,9 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
     실제 서버를 띄워 Gemini 대화를 호출해 보지는 않았다. Gemini 응답 파싱과 `ChatController` 테스트는 없다.
   - 다음 할 일: 대화 시작 시 주민의 실제 위치를 `current_context`로 넣기, 친밀도 올리는 규칙, 대화 기록 저장, 프런트 대화창,
     요구사항 문서의 미유·나나 설명 정리.
+- Gemini 호출을 직접 REST 대신 Google GenAI Java SDK(`com.google.genai:google-genai:2.0.0`)로 바꿨다(`0018`). 새 라이브러리는
+  이유와 대안(Spring AI RC, 직접 호출 유지)을 설명하고 승인받았다. `GeminiClient` 내부만 SDK 호출로 교체했고 `ChatService`와
+  설정·오류 동작은 그대로다. 응답 파싱을 `parseReply`로 분리해 단위 테스트를 추가했다(정상 1건, 오류 입력 11건).
+  - 검증: `spotlessApply`·`test` 통과(실패 0, 통합 테스트 포함). 개발 에이전트가 만든 중복 파일 `GeminiClient 2.java`가
+    컴파일을 깨서 지웠다(원본과 내용 동일). 실제 Gemini를 호출해 SDK 경로를 확인하지는 않았다.
+  - 다음 할 일: 실제 서버로 Gemini 대화 확인, `current_context` 덮어쓰기 방식 결정, 친밀도 규칙, 대화 기록 저장, 프런트 대화창.

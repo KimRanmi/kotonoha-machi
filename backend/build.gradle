@@ -30,6 +30,7 @@ dependencies {
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	implementation 'com.resend:resend-java:4.28.0'
+	implementation 'com.google.genai:google-genai:2.0.0'
 	runtimeOnly 'org.postgresql:postgresql'
 
 	// spring-boot-dependencies가 참조하는 testcontainers-bom은 Gradle의 platform import로
