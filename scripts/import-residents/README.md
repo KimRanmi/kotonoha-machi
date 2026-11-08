@@ -84,4 +84,4 @@ UPDATE resident SET slug = 'r09' WHERE slug = 'nana';
 ```
 
 `resident_friendship`은 `resident.id`를 참조하므로 slug만 바꾸면 친밀도 기록이 보존된다.
-시트에 없는 ミユ(`miyu`)는 그대로 남는다.
+시트에 없는 주민은 DB에 그대로 남는다(지우려면 별도 마이그레이션을 만든다. 시드 ミユ는 `V19`에서 지웠다).
