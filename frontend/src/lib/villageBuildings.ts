@@ -9,8 +9,6 @@ export interface VillageBuilding {
   depth: number;
   height: number;
   color: string;
-  /** 아직 열리지 않은 건물인지 여부. 지금은 코드에 고정한 값이고, 테마 완료 개수에 따른 서버 해금은 다음 단계에서 붙인다. */
-  locked: boolean;
 }
 
 export const PLAYER_RADIUS = 0.26;
@@ -28,7 +26,6 @@ export const VILLAGE_BUILDINGS: VillageBuilding[] = [
     depth: 4,
     height: 2.5,
     color: '#C97B4A',
-    locked: false,
   },
   {
     id: 'shop',
@@ -39,7 +36,6 @@ export const VILLAGE_BUILDINGS: VillageBuilding[] = [
     depth: 4,
     height: 2.5,
     color: '#8FA7C4',
-    locked: true,
   },
   {
     id: 'home',
@@ -50,7 +46,6 @@ export const VILLAGE_BUILDINGS: VillageBuilding[] = [
     depth: 4,
     height: 2.2,
     color: '#E8C07D',
-    locked: true, // 처음부터 열려 있어야 하지만 집 내부 화면이 아직 없어서 잠가 둔다
   },
 ];
 

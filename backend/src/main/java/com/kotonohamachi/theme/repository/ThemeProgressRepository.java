@@ -24,4 +24,12 @@ public interface ThemeProgressRepository extends JpaRepository<ThemeProgress, Lo
    * @return 진행 상태 목록
    */
   List<ThemeProgress> findAllByUserId(Long userId);
+
+  /**
+   * 사용자가 끝까지 완료한 테마 수를 센다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @return 완료한 테마 수
+   */
+  long countByUserIdAndCompletedTrue(Long userId);
 }

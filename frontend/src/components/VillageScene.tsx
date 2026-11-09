@@ -14,6 +14,8 @@ interface VillageSceneProps {
   palette: AvatarPalette;
   /** 열려 있는 건물의 라벨을 눌렀을 때 호출된다. 걸어가지 않고 바로 입장한다. */
   onEnterBuilding: (buildingId: string) => void;
+  /** 서버가 열려 있다고 알려 준 건물 id들. 여기에 없는 건물은 잠긴 것으로 본다. */
+  unlockedBuildingIds: ReadonlySet<string>;
   /** 대화 가능한 거리 안에 들어온 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
   onNearResidentChange: (residentSlug: string | null) => void;
 }
@@ -101,6 +103,7 @@ function VillageScene({
   avatar,
   palette,
   onEnterBuilding,
+  unlockedBuildingIds,
   onNearResidentChange,
 }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -109,6 +112,13 @@ function VillageScene({
   useEffect(() => {
     onEnterRef.current = onEnterBuilding;
   }, [onEnterBuilding]);
+  // 열림 값도 같은 방식으로 ref에 담아 두고, 값이 바뀌면 장면을 다시 만들지 않고 간판 모양만 갱신한다.
+  const unlockedRef = useRef(unlockedBuildingIds);
+  const applyUnlockedRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    unlockedRef.current = unlockedBuildingIds;
+    applyUnlockedRef.current?.();
+  }, [unlockedBuildingIds]);
   const onNearRef = useRef(onNearResidentChange);
   useEffect(() => {
     onNearRef.current = onNearResidentChange;
@@ -138,6 +148,13 @@ function VillageScene({
     // 건물, 길, 나무, 꽃 같은 풍경은 lib/villageScenery3d.ts가 만든다.
     const world = createVillageWorld();
     scene.add(world.group);
+    const applyUnlocked = () => {
+      for (const sign of world.signs) {
+        sign.setLocked(!unlockedRef.current.has(sign.building.id));
+      }
+    };
+    applyUnlockedRef.current = applyUnlocked;
+    applyUnlocked();
 
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
@@ -189,16 +206,18 @@ function VillageScene({
       )[0];
       return world.signs.find((sign) => hit && sign.object.getObjectById(hit.object.id));
     };
+    const isUnlocked = (buildingId: string) => unlockedRef.current.has(buildingId);
     const handlePointerMove = (event: PointerEvent) => {
       const hovered = findSign(event);
       for (const sign of world.signs) {
-        sign.setHighlight(sign === hovered && !sign.building.locked);
+        sign.setHighlight(sign === hovered && isUnlocked(sign.building.id));
       }
-      renderer.domElement.style.cursor = hovered && !hovered.building.locked ? 'pointer' : '';
+      renderer.domElement.style.cursor =
+        hovered && isUnlocked(hovered.building.id) ? 'pointer' : '';
     };
     const handleClick = (event: MouseEvent) => {
       const clicked = findSign(event);
-      if (clicked && !clicked.building.locked) {
+      if (clicked && isUnlocked(clicked.building.id)) {
         onEnterRef.current(clicked.building.id);
       }
     };
@@ -315,6 +334,7 @@ function VillageScene({
       groundTexture.dispose();
       renderer.domElement.removeEventListener('pointermove', handlePointerMove);
       renderer.domElement.removeEventListener('click', handleClick);
+      applyUnlockedRef.current = null;
       world.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
