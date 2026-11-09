@@ -20,6 +20,7 @@ import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
+import com.kotonohamachi.village.service.VillageService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -53,6 +54,7 @@ public class ThemeService {
   private final ThemeExampleRepository themeExampleRepository;
   private final ThemeReadingPassageRepository themeReadingPassageRepository;
   private final UserRepository userRepository;
+  private final VillageService villageService;
 
   /**
    * 생성자.
@@ -64,6 +66,7 @@ public class ThemeService {
    * @param themeExampleRepository 테마 예문 콘텐츠 저장소
    * @param themeReadingPassageRepository 테마 독해 지문 콘텐츠 저장소
    * @param userRepository 사용자 저장소
+   * @param villageService 마을 건물 열림 서비스(테마 완료 시 건물 해금)
    */
   public ThemeService(
       ThemeRepository themeRepository,
@@ -72,7 +75,8 @@ public class ThemeService {
       ThemeVocabularyRepository themeVocabularyRepository,
       ThemeExampleRepository themeExampleRepository,
       ThemeReadingPassageRepository themeReadingPassageRepository,
-      UserRepository userRepository) {
+      UserRepository userRepository,
+      VillageService villageService) {
     this.themeRepository = themeRepository;
     this.themeProgressRepository = themeProgressRepository;
     this.themeKanjiRepository = themeKanjiRepository;
@@ -80,6 +84,7 @@ public class ThemeService {
     this.themeExampleRepository = themeExampleRepository;
     this.themeReadingPassageRepository = themeReadingPassageRepository;
     this.userRepository = userRepository;
+    this.villageService = villageService;
   }
 
   /**
@@ -166,6 +171,9 @@ public class ThemeService {
       throw new ApiException(ThemeErrorCode.STAGE_OUT_OF_ORDER);
     }
     progress.completeCurrentStage();
+    if (progress.isCompleted()) {
+      villageService.unlockBuildings(userId);
+    }
 
     return new ThemeProgressResponse(themeId, progress.getCurrentStage(), progress.isCompleted());
   }
