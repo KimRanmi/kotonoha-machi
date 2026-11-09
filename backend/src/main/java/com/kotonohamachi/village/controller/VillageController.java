@@ -38,8 +38,8 @@ public class VillageController {
    */
   @GetMapping("/api/village/buildings")
   public List<VillageBuildingResponse> getBuildings(Authentication authentication) {
-    User user = AuthPrincipal.resolve(authentication);
-    return villageService.getBuildings(user.getId());
+    AuthPrincipal.resolve(authentication);
+    return villageService.getBuildings();
   }
 
   /**
