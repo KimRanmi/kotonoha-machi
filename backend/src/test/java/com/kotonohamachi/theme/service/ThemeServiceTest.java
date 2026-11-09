@@ -68,6 +68,7 @@ class ThemeServiceTest {
   @Mock
   private VillageService villageService;
 
+  @Mock
   private VocabularyService vocabularyService;
 
   private ThemeService themeService;
