@@ -26,6 +26,7 @@ import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
+import com.kotonohamachi.vocabulary.service.VocabularyService;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -62,6 +63,9 @@ class ThemeServiceTest {
   @Mock
   private UserRepository userRepository;
 
+  @Mock
+  private VocabularyService vocabularyService;
+
   private ThemeService themeService;
 
   @BeforeEach
@@ -73,7 +77,8 @@ class ThemeServiceTest {
         themeVocabularyRepository,
         themeExampleRepository,
         themeReadingPassageRepository,
-        userRepository);
+        userRepository,
+        vocabularyService);
   }
 
   private static User user() {
