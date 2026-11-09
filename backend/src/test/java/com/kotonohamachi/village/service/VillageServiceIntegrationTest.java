@@ -134,7 +134,7 @@ class VillageServiceIntegrationTest {
   @Test
   void 한_번_열린_건물은_완료_수가_줄어도_유지된다() {
     Long userId = newUserId();
-    Long p1 = completeNewTheme(userId);
+    completeNewTheme(userId);
     completeNewTheme(userId);
     completeNewTheme(userId);
     assertThat(unlockedIds(villageService.getBuildings(userId)))
@@ -145,7 +145,6 @@ class VillageServiceIntegrationTest {
 
     assertThat(unlockedIds(villageService.getBuildings(userId)))
         .containsExactly("home", "cafe", "shop");
-    assertThat(p1).isNotNull();
   }
 
   @Test

@@ -29,6 +29,9 @@
 
 ## 한계 (알고 둔 것)
 
+- `theme`와 `village` 패키지가 서로를 안다: `ThemeService`가 `VillageService`를 부르고, `VillageService`는 완료 테마 수를 세려고
+  `theme.repository.ThemeProgressRepository`를 읽는다. 스프링 빈 순환은 아니라서(`VillageService`가 `ThemeService`를 쓰지
+  않는다) 동작에는 문제가 없다. 해금 조건에 테마 완료 외의 것이 생기면 이 방향 의존을 다시 본다.
 - 집 내부 화면이 아직 없어서, 열린 집을 누르면 지금은 `/chat/home`(대화창 뼈대)으로 이동한다. 집 내부 화면은 따로 만든다.
 - 테마 완료 API만으로는 하루 1테마 제한 때문에 상점(3개)까지의 흐름을 한 번에 통합 테스트할 수 없다. 서비스 규칙과 호출 연결을
   따로 검증했다.
