@@ -64,3 +64,21 @@ export function collidesWithBuildings(x: number, z: number): boolean {
     return Math.hypot(x - nearestX, z - nearestZ) < PLAYER_RADIUS;
   });
 }
+
+const DOOR_HALF_WIDTH = 0.55; // 문 너비(1.1)의 절반
+const DOOR_REACH = 0.3; // 벽에 닿은 캐릭터 중심에서 이만큼 안쪽이면 문 앞으로 본다
+
+/**
+ * 캐릭터가 (x, z)에서 건물 문 앞(문은 +z 벽 가운데)에 닿아 있으면 그 건물을 돌려준다.
+ * 문 폭 안쪽에서 벽에 붙어 있을 때만 참이라, 건물 옆을 스쳐 지나가는 것으로는 들어가지지 않는다.
+ */
+export function findDoorAt(x: number, z: number): VillageBuilding | undefined {
+  return VILLAGE_BUILDINGS.find((building) => {
+    const wallZ = building.z + building.depth / 2;
+    return (
+      Math.abs(x - building.x) <= DOOR_HALF_WIDTH &&
+      z >= wallZ &&
+      z <= wallZ + PLAYER_RADIUS + DOOR_REACH
+    );
+  });
+}

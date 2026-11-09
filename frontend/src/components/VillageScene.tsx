@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
-import { collidesWithBuildings } from '../lib/villageBuildings';
+import { collidesWithBuildings, findDoorAt } from '../lib/villageBuildings';
 import { VILLAGE_RESIDENTS, collidesWithResidents } from '../lib/villageResidents';
 import { collidesWithTrees } from '../lib/villageScenery';
 import { createVillageWorld } from '../lib/villageScenery3d';
@@ -12,7 +12,7 @@ import styles from './VillageScene.module.css';
 interface VillageSceneProps {
   avatar: Avatar;
   palette: AvatarPalette;
-  /** 열려 있는 건물의 라벨을 눌렀을 때 호출된다. 걸어가지 않고 바로 입장한다. */
+  /** 열려 있는 건물의 간판을 누르거나 문 앞에서 벽 쪽으로 걸어가면 호출된다. */
   onEnterBuilding: (buildingId: string) => void;
   /** 서버가 열려 있다고 알려 준 건물 id들. 여기에 없는 건물은 잠긴 것으로 본다. */
   unlockedBuildingIds: ReadonlySet<string>;
@@ -250,6 +250,7 @@ function VillageScene({
     window.addEventListener('blur', handleBlur);
 
     let nearSlug: string | null = null;
+    let entered = false; // 문 앞에서 프레임마다 입장이 중복 호출되지 않게
     let targetAngle = 0;
     let previousTime = performance.now();
     let frameId = 0;
@@ -286,6 +287,13 @@ function VillageScene({
           player.position.z = nextZ;
         }
         targetAngle = Math.atan2(dx, dz);
+
+        // 문 앞에서 벽 쪽(-z)으로 걸어 들어가면 열린 건물에 자동 입장한다.
+        const door = findDoorAt(player.position.x, player.position.z);
+        if (!entered && dz < 0 && door && isUnlocked(door.id)) {
+          entered = true;
+          onEnterRef.current(door.id);
+        }
       }
 
       // 가장 가까운 주민이 말 걸 수 있는 거리 안이면 마을 화면이 대화 버튼을 띄운다.
