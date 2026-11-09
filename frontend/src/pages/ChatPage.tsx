@@ -1,16 +1,86 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import type { FormEvent } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ApiError } from '../api/client';
+import { sendChatMessage } from '../api/chat';
 import JapaneseInput from '../components/JapaneseInput';
+import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
+
+/** 서버가 받는 메시지 최대 길이. */
+const MAX_MESSAGE_LENGTH = 200;
+
+interface ChatLine {
+  speaker: 'me' | 'resident';
+  text: string;
+  translation?: string;
+}
 
 function ChatPage() {
-  const { residentId } = useParams<{ residentId: string }>();
-  // TODO: 대화 기능이 생기면 입력 도우미 확인용 임시 입력란을 실제 대화 입력으로 교체한다.
+  const { residentSlug } = useParams<{ residentSlug: string }>();
+  const resident = VILLAGE_RESIDENTS.find((candidate) => candidate.slug === residentSlug);
   const [text, setText] = useState('');
+  const [lines, setLines] = useState<ChatLine[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  if (!resident) {
+    return (
+      <main>
+        <p role="alert">주민을 찾을 수 없습니다.</p>
+        <Link to="/town">마을로 돌아가기</Link>
+      </main>
+    );
+  }
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    const message = text.trim();
+    if (!message || isSending) {
+      return;
+    }
+    setIsSending(true);
+    setErrorMessage(null);
+    setLines((previous) => [...previous, { speaker: 'me', text: message }]);
+    setText('');
+    try {
+      const answer = await sendChatMessage(resident.slug, message);
+      setLines((previous) => [
+        ...previous,
+        { speaker: 'resident', text: answer.reply, translation: answer.translation },
+      ]);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof ApiError
+          ? error.message
+          : '대화에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+      );
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   return (
     <main>
-      <h1>주민과의 대화: {residentId}</h1>
-      <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
+      <Link to="/town">← 마을로</Link>
+      <h1>{resident.name}</h1>
+      <ul aria-live="polite">
+        {lines.map((line, index) => (
+          <li key={index}>
+            <strong>{line.speaker === 'me' ? '나' : resident.name}</strong>: {line.text}
+            {line.translation && <div>{line.translation}</div>}
+          </li>
+        ))}
+      </ul>
+      {errorMessage && <p role="alert">{errorMessage}</p>}
+      <form onSubmit={handleSubmit}>
+        <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
+        <button
+          type="submit"
+          disabled={isSending || !text.trim() || text.length > MAX_MESSAGE_LENGTH}
+        >
+          {isSending ? '답장을 기다리는 중…' : '보내기'}
+        </button>
+      </form>
     </main>
   );
 }

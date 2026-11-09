@@ -62,21 +62,21 @@ public class ChatService {
    * 주민에게 말을 걸고 대답을 받는다.
    *
    * @param userId 대화하는 사용자 ID
-   * @param residentId 대화할 주민 ID
+   * @param residentSlug 대화할 주민의 고유 키(예: r01)
    * @param message 플레이어의 메시지
    * @return 주민의 일본어 대사와 한국어 번역
    * @throws ApiException 메시지가 비었거나 너무 길면(400), 주민이 없으면(404), 대화할 수 없으면(502/503)
    */
-  public ChatResponse chat(Long userId, Long residentId, String message) {
+  public ChatResponse chat(Long userId, String residentSlug, String message) {
     String normalizedMessage = message == null ? "" : message.strip();
     if (normalizedMessage.isEmpty() || normalizedMessage.length() > MAX_MESSAGE_LENGTH) {
       throw new ApiException(ChatErrorCode.MESSAGE_INVALID);
     }
     Resident resident = residentRepository
-        .findById(residentId)
+        .findBySlug(residentSlug)
         .orElseThrow(() -> new ApiException(ChatErrorCode.RESIDENT_NOT_FOUND));
     int friendshipLevel = friendshipRepository
-        .findByUserIdAndResidentId(userId, residentId)
+        .findByUserIdAndResidentId(userId, resident.getId())
         .map(ResidentFriendship::getLevel)
         .orElse(0);
 
