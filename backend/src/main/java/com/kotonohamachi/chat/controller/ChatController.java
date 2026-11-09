@@ -30,16 +30,16 @@ public class ChatController {
    * 주민에게 말을 걸고 대답을 돌려준다.
    *
    * @param authentication 현재 요청의 인증 정보
-   * @param residentId 대화할 주민 ID
+   * @param residentSlug 대화할 주민의 고유 키(예: r01)
    * @param request 플레이어의 메시지
    * @return 주민의 일본어 대사와 한국어 번역
    */
-  @PostMapping("/api/residents/{residentId}/chat")
+  @PostMapping("/api/residents/{residentSlug}/chat")
   public ChatResponse chat(
       Authentication authentication,
-      @PathVariable Long residentId,
+      @PathVariable String residentSlug,
       @RequestBody ChatRequest request) {
     User user = AuthPrincipal.resolve(authentication);
-    return chatService.chat(user.getId(), residentId, request.message());
+    return chatService.chat(user.getId(), residentSlug, request.message());
   }
 }

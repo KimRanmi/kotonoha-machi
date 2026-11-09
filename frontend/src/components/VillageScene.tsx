@@ -14,10 +14,13 @@ interface VillageSceneProps {
   palette: AvatarPalette;
   /** 열려 있는 건물의 라벨을 눌렀을 때 호출된다. 걸어가지 않고 바로 입장한다. */
   onEnterBuilding: (buildingId: string) => void;
+  /** 대화 가능한 거리 안에 들어온 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
+  onNearResidentChange: (residentSlug: string | null) => void;
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
 const PLAYER_SCALE = 0.6; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
+const TALK_DISTANCE = 2; // 이 거리 안에 들어오면 주민에게 말을 걸 수 있다
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
 const MAP_HALF_SIZE = 18; // 이동 가능한 정사각형 땅의 절반 크기
 const GROUND_HALF_SIZE = 60; // 눈에 보이는 풀밭의 절반 크기. 화면 어디를 봐도 땅이 보이게 이동 범위보다 훨씬 크다
@@ -94,13 +97,22 @@ function createGroundTexture(): THREE.CanvasTexture {
 }
 
 /** 위에서 내려다보는 고정 쿼터뷰 마을. 방향키/WASD로 내 캐릭터를 자유롭게 걷게 한다. */
-function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
+function VillageScene({
+  avatar,
+  palette,
+  onEnterBuilding,
+  onNearResidentChange,
+}: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // 장면은 avatar/palette가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
   const onEnterRef = useRef(onEnterBuilding);
   useEffect(() => {
     onEnterRef.current = onEnterBuilding;
   }, [onEnterBuilding]);
+  const onNearRef = useRef(onNearResidentChange);
+  useEffect(() => {
+    onNearRef.current = onNearResidentChange;
+  }, [onNearResidentChange]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -218,6 +230,7 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
 
+    let nearSlug: string | null = null;
     let targetAngle = 0;
     let previousTime = performance.now();
     let frameId = 0;
@@ -256,6 +269,21 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
         targetAngle = Math.atan2(dx, dz);
       }
 
+      // 가장 가까운 주민이 말 걸 수 있는 거리 안이면 마을 화면이 대화 버튼을 띄운다.
+      let closest: string | null = null;
+      let closestDistance = TALK_DISTANCE;
+      for (const resident of VILLAGE_RESIDENTS) {
+        const distance = Math.hypot(player.position.x - resident.x, player.position.z - resident.z);
+        if (distance < closestDistance) {
+          closest = resident.slug;
+          closestDistance = distance;
+        }
+      }
+      if (closest !== nearSlug) {
+        nearSlug = closest;
+        onNearRef.current(nearSlug);
+      }
+
       // 현재 각도에서 목표 각도로 가장 짧은 방향으로 부드럽게 돈다.
       let diff = targetAngle - player.rotation.y;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
@@ -270,6 +298,7 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
     frameId = requestAnimationFrame(animate);
 
     return () => {
+      onNearRef.current(null);
       cancelAnimationFrame(frameId);
       observer.disconnect();
       window.removeEventListener('keydown', handleKeyDown);
