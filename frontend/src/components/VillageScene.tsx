@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import type { VillagePosition } from '../api/village';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
-import { collidesWithBuildings } from '../lib/villageBuildings';
+import { collidesWithBuildings, findDoorAt } from '../lib/villageBuildings';
 import { VILLAGE_RESIDENTS, collidesWithResidents } from '../lib/villageResidents';
 import { collidesWithTrees } from '../lib/villageScenery';
 import { createVillageWorld } from '../lib/villageScenery3d';
@@ -12,12 +13,18 @@ import styles from './VillageScene.module.css';
 interface VillageSceneProps {
   avatar: Avatar;
   palette: AvatarPalette;
-  /** 열려 있는 건물의 라벨을 눌렀을 때 호출된다. 걸어가지 않고 바로 입장한다. */
+  /** 열려 있는 건물의 간판을 눌렀을 때 호출된다. */
   onEnterBuilding: (buildingId: string) => void;
   /** 서버가 열려 있다고 알려 준 건물 id들. 여기에 없는 건물은 잠긴 것으로 본다. */
   unlockedBuildingIds: ReadonlySet<string>;
   /** 대화 가능한 거리 안에 들어온 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
   onNearResidentChange: (residentSlug: string | null) => void;
+  /** 열려 있는 건물의 문 앞에 선 동안 그 건물 id. 아니면 null. 바뀔 때만 호출된다. */
+  onNearBuildingChange: (buildingId: string | null) => void;
+  /** 서버에 저장된 마지막 위치. 없거나 지금은 설 수 없는 자리면 기본 시작 위치에서 시작한다. 장면을 만들 때 한 번만 읽는다. */
+  initialPosition: VillagePosition | null;
+  /** 캐릭터가 서 있는 자리가 바뀔 때마다(시작할 때 포함) 호출된다. 저장은 호출하는 쪽이 맡는다. */
+  onPositionChange: (position: VillagePosition) => void;
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
@@ -105,6 +112,9 @@ function VillageScene({
   onEnterBuilding,
   unlockedBuildingIds,
   onNearResidentChange,
+  onNearBuildingChange,
+  initialPosition,
+  onPositionChange,
 }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // 장면은 avatar/palette가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
@@ -123,6 +133,17 @@ function VillageScene({
   useEffect(() => {
     onNearRef.current = onNearResidentChange;
   }, [onNearResidentChange]);
+
+  const onNearBuildingRef = useRef(onNearBuildingChange);
+  useEffect(() => {
+    onNearBuildingRef.current = onNearBuildingChange;
+  }, [onNearBuildingChange]);
+  const onPositionRef = useRef(onPositionChange);
+  useEffect(() => {
+    onPositionRef.current = onPositionChange;
+  }, [onPositionChange]);
+  // 시작 위치는 장면을 만들 때 한 번만 쓰므로 ref에 담아 두고, 값이 바뀌어도 장면을 다시 만들지 않는다.
+  const initialPositionRef = useRef(initialPosition);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -158,6 +179,10 @@ function VillageScene({
 
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
+    const start = initialPositionRef.current;
+    if (start && !isBlocked(start.x, start.z)) {
+      player.position.set(start.x, 0, start.z);
+    }
     scene.add(player);
 
     // 주민은 고정 위치에 서서 광장 쪽을 바라본다. 장면이 사라질 때 정리할 수 있게 목록으로 들고 있는다.
@@ -249,7 +274,9 @@ function VillageScene({
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
 
+    onPositionRef.current({ x: player.position.x, z: player.position.z });
     let nearSlug: string | null = null;
+    let nearBuildingId: string | null = null;
     let targetAngle = 0;
     let previousTime = performance.now();
     let frameId = 0;
@@ -286,6 +313,15 @@ function VillageScene({
           player.position.z = nextZ;
         }
         targetAngle = Math.atan2(dx, dz);
+        onPositionRef.current({ x: player.position.x, z: player.position.z });
+      }
+
+      // 열린 건물의 문 앞에 서 있으면 마을 화면이 입장 버튼을 띄운다.
+      const door = findDoorAt(player.position.x, player.position.z);
+      const doorId = door && isUnlocked(door.id) ? door.id : null;
+      if (doorId !== nearBuildingId) {
+        nearBuildingId = doorId;
+        onNearBuildingRef.current(nearBuildingId);
       }
 
       // 가장 가까운 주민이 말 걸 수 있는 거리 안이면 마을 화면이 대화 버튼을 띄운다.
@@ -318,6 +354,7 @@ function VillageScene({
 
     return () => {
       onNearRef.current(null);
+      onNearBuildingRef.current(null);
       cancelAnimationFrame(frameId);
       observer.disconnect();
       window.removeEventListener('keydown', handleKeyDown);

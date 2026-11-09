@@ -1,20 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
 import { getTodayRecommendation, type Theme } from '../api/theme';
-import { getVillageBuildings } from '../api/village';
+import {
+  getVillageBuildings,
+  getVillagePosition,
+  saveVillagePosition,
+  type VillagePosition,
+} from '../api/village';
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import VillageScene from '../components/VillageScene';
+import { VILLAGE_BUILDINGS } from '../lib/villageBuildings';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
+
+const POSITION_SAVE_INTERVAL_MS = 30_000;
 
 function TownPage() {
   const navigate = useNavigate();
   const [nearResidentSlug, setNearResidentSlug] = useState<string | null>(null);
   const nearResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === nearResidentSlug);
+  const [nearBuildingId, setNearBuildingId] = useState<string | null>(null);
+  const nearBuilding = VILLAGE_BUILDINGS.find((building) => building.id === nearBuildingId);
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [palette, setPalette] = useState<AvatarPalette | null>(null);
@@ -22,6 +32,9 @@ function TownPage() {
   const [logoutErrorMessage, setLogoutErrorMessage] = useState<string | null>(null);
   const [todayTheme, setTodayTheme] = useState<Theme | null>(null);
   const [unlockedBuildingIds, setUnlockedBuildingIds] = useState<ReadonlySet<string>>(new Set());
+  // 마지막 위치를 받아 오기 전에는 마을을 그리지 않는다. 그려 버리면 기본 위치에서 시작했다가 순간이동하게 된다.
+  const [positionLoaded, setPositionLoaded] = useState(false);
+  const [initialPosition, setInitialPosition] = useState<VillagePosition | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,11 +97,94 @@ function TownPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    getVillagePosition()
+      .then((position) => {
+        if (!cancelled) {
+          setInitialPosition(position);
+        }
+      })
+      .catch(() => {
+        // 마지막 위치는 보조 정보라 실패해도 기본 시작 위치에서 시작한다.
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPositionLoaded(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // TODO: 건물 안 주민 배치가 생기면 입장 화면으로 바꾼다. 지금은 건물 id가 주민 slug가 아니라서 대화가 열리지 않는다.
+  useEffect(() => {
+    if (!nearBuildingId) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isFormControl =
+        target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(target.tagName);
+      if (event.key === 'Enter' && !isFormControl) {
+        navigate(`/chat/${nearBuildingId}`);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nearBuildingId, navigate]);
+
+  // 위치는 걸을 때마다 ref에만 담고, 서버 저장은 아래 시점에만 한다. 서버에 마지막으로 보낸 값과 같으면 보내지 않는다.
+  const currentPositionRef = useRef<VillagePosition | null>(null);
+  const savedPositionRef = useRef<VillagePosition | null>(null);
+
+  async function savePositionIfMoved() {
+    const current = currentPositionRef.current;
+    const saved = savedPositionRef.current;
+    if (!current || (saved && saved.x === current.x && saved.z === current.z)) {
+      return;
+    }
+    savedPositionRef.current = current;
+    try {
+      await saveVillagePosition(current);
+    } catch {
+      // 위치 저장은 실패해도 마을 이용을 막지 않는다. 다음 저장 시점에 다시 시도한다.
+      savedPositionRef.current = null;
+    }
+  }
+
+  // 30초마다, 탭이 숨겨지거나 닫힐 때, 마을 화면을 떠날 때 저장한다. 앞의 둘은 비정상 종료로 잃는 이동을 줄여 준다.
+  useEffect(() => {
+    if (!positionLoaded) {
+      return;
+    }
+    savedPositionRef.current = initialPosition;
+    const save = () => void savePositionIfMoved();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        save();
+      }
+    };
+    const intervalId = window.setInterval(save, POSITION_SAVE_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', save);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', save);
+      save();
+    };
+  }, [positionLoaded, initialPosition]);
+
   async function handleLogout() {
     setLogoutErrorMessage(null);
     setIsLoggingOut(true);
 
     try {
+      await savePositionIfMoved(); // 로그아웃하면 세션이 끊겨 저장할 수 없으므로 먼저 저장한다.
       await logout();
       navigate('/login', { replace: true });
     } catch (error) {
@@ -177,14 +273,18 @@ function TownPage() {
           <span className={styles.todayLearningCta}>시작하기 →</span>
         </Link>
       )}
-      {avatar && palette && (
+      {avatar && palette && positionLoaded && (
         <VillageScene
           avatar={avatar}
           palette={palette}
-          // TODO: 건물 안 주민 배치가 생기면 입장 화면으로 바꾼다. 지금은 건물 id가 주민 slug가 아니라서 대화가 열리지 않는다.
           onEnterBuilding={(buildingId) => navigate(`/chat/${buildingId}`)}
           unlockedBuildingIds={unlockedBuildingIds}
           onNearResidentChange={setNearResidentSlug}
+          onNearBuildingChange={setNearBuildingId}
+          initialPosition={initialPosition}
+          onPositionChange={(position) => {
+            currentPositionRef.current = position;
+          }}
         />
       )}
       {nearResident && (
@@ -194,6 +294,15 @@ function TownPage() {
           onClick={() => navigate(`/chat/${nearResident.slug}`)}
         >
           {nearResident.name}と話す
+        </button>
+      )}
+      {nearBuilding && !nearResident && (
+        <button
+          type="button"
+          className={styles.talkButton}
+          onClick={() => navigate(`/chat/${nearBuilding.id}`)}
+        >
+          {nearBuilding.label}に入る (Enter)
         </button>
       )}
       {logoutErrorMessage && (
