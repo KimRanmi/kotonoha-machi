@@ -12,6 +12,7 @@ import {
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import VillageScene from '../components/VillageScene';
+import { VILLAGE_BUILDINGS } from '../lib/villageBuildings';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
@@ -20,6 +21,8 @@ function TownPage() {
   const navigate = useNavigate();
   const [nearResidentSlug, setNearResidentSlug] = useState<string | null>(null);
   const nearResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === nearResidentSlug);
+  const [nearBuildingId, setNearBuildingId] = useState<string | null>(null);
+  const nearBuilding = VILLAGE_BUILDINGS.find((building) => building.id === nearBuildingId);
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [palette, setPalette] = useState<AvatarPalette | null>(null);
@@ -114,6 +117,23 @@ function TownPage() {
       cancelled = true;
     };
   }, []);
+
+  // TODO: 건물 안 주민 배치가 생기면 입장 화면으로 바꾼다. 지금은 건물 id가 주민 slug가 아니라서 대화가 열리지 않는다.
+  useEffect(() => {
+    if (!nearBuildingId) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isFormControl =
+        target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(target.tagName);
+      if (event.key === 'Enter' && !isFormControl) {
+        navigate(`/chat/${nearBuildingId}`);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nearBuildingId, navigate]);
 
   function handleSavePosition(position: VillagePosition) {
     saveVillagePosition(position).catch(() => {
@@ -218,10 +238,10 @@ function TownPage() {
         <VillageScene
           avatar={avatar}
           palette={palette}
-          // TODO: 건물 안 주민 배치가 생기면 입장 화면으로 바꾼다. 지금은 건물 id가 주민 slug가 아니라서 대화가 열리지 않는다.
           onEnterBuilding={(buildingId) => navigate(`/chat/${buildingId}`)}
           unlockedBuildingIds={unlockedBuildingIds}
           onNearResidentChange={setNearResidentSlug}
+          onNearBuildingChange={setNearBuildingId}
           initialPosition={initialPosition}
           onSavePosition={handleSavePosition}
         />
@@ -233,6 +253,15 @@ function TownPage() {
           onClick={() => navigate(`/chat/${nearResident.slug}`)}
         >
           {nearResident.name}と話す
+        </button>
+      )}
+      {nearBuilding && !nearResident && (
+        <button
+          type="button"
+          className={styles.talkButton}
+          onClick={() => navigate(`/chat/${nearBuilding.id}`)}
+        >
+          {nearBuilding.label}に入る (Enter)
         </button>
       )}
       {logoutErrorMessage && (

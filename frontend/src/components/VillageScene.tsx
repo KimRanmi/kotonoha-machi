@@ -13,12 +13,14 @@ import styles from './VillageScene.module.css';
 interface VillageSceneProps {
   avatar: Avatar;
   palette: AvatarPalette;
-  /** 열려 있는 건물의 간판을 누르거나 문 앞에서 벽 쪽으로 걸어가면 호출된다. */
+  /** 열려 있는 건물의 간판을 눌렀을 때 호출된다. */
   onEnterBuilding: (buildingId: string) => void;
   /** 서버가 열려 있다고 알려 준 건물 id들. 여기에 없는 건물은 잠긴 것으로 본다. */
   unlockedBuildingIds: ReadonlySet<string>;
   /** 대화 가능한 거리 안에 들어온 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
   onNearResidentChange: (residentSlug: string | null) => void;
+  /** 열려 있는 건물의 문 앞에 선 동안 그 건물 id. 아니면 null. 바뀔 때만 호출된다. */
+  onNearBuildingChange: (buildingId: string | null) => void;
   /** 서버에 저장된 마지막 위치. 없거나 지금은 설 수 없는 자리면 기본 시작 위치에서 시작한다. 장면을 만들 때 한 번만 읽는다. */
   initialPosition: VillagePosition | null;
   /** 마을을 떠나거나 탭을 닫기·숨길 때 지금 서 있는 자리를 저장하라고 알린다. */
@@ -110,6 +112,7 @@ function VillageScene({
   onEnterBuilding,
   unlockedBuildingIds,
   onNearResidentChange,
+  onNearBuildingChange,
   initialPosition,
   onSavePosition,
 }: VillageSceneProps) {
@@ -131,6 +134,10 @@ function VillageScene({
     onNearRef.current = onNearResidentChange;
   }, [onNearResidentChange]);
 
+  const onNearBuildingRef = useRef(onNearBuildingChange);
+  useEffect(() => {
+    onNearBuildingRef.current = onNearBuildingChange;
+  }, [onNearBuildingChange]);
   const onSaveRef = useRef(onSavePosition);
   useEffect(() => {
     onSaveRef.current = onSavePosition;
@@ -278,7 +285,7 @@ function VillageScene({
     window.addEventListener('pagehide', savePosition);
 
     let nearSlug: string | null = null;
-    let entered = false; // 문 앞에서 프레임마다 입장이 중복 호출되지 않게
+    let nearBuildingId: string | null = null;
     let targetAngle = 0;
     let previousTime = performance.now();
     let frameId = 0;
@@ -315,13 +322,14 @@ function VillageScene({
           player.position.z = nextZ;
         }
         targetAngle = Math.atan2(dx, dz);
+      }
 
-        // 문 앞에서 벽 쪽(-z)으로 걸어 들어가면 열린 건물에 자동 입장한다.
-        const door = findDoorAt(player.position.x, player.position.z);
-        if (!entered && dz < 0 && door && isUnlocked(door.id)) {
-          entered = true;
-          onEnterRef.current(door.id);
-        }
+      // 열린 건물의 문 앞에 서 있으면 마을 화면이 입장 버튼을 띄운다.
+      const door = findDoorAt(player.position.x, player.position.z);
+      const doorId = door && isUnlocked(door.id) ? door.id : null;
+      if (doorId !== nearBuildingId) {
+        nearBuildingId = doorId;
+        onNearBuildingRef.current(nearBuildingId);
       }
 
       // 가장 가까운 주민이 말 걸 수 있는 거리 안이면 마을 화면이 대화 버튼을 띄운다.
@@ -357,6 +365,7 @@ function VillageScene({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pagehide', savePosition);
       onNearRef.current(null);
+      onNearBuildingRef.current(null);
       cancelAnimationFrame(frameId);
       observer.disconnect();
       window.removeEventListener('keydown', handleKeyDown);
