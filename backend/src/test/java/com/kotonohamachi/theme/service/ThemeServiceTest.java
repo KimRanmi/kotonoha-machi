@@ -28,6 +28,7 @@ import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.village.service.VillageService;
+import com.kotonohamachi.vocabulary.service.VocabularyService;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -67,6 +68,9 @@ class ThemeServiceTest {
   @Mock
   private VillageService villageService;
 
+  @Mock
+  private VocabularyService vocabularyService;
+
   private ThemeService themeService;
 
   @BeforeEach
@@ -79,7 +83,8 @@ class ThemeServiceTest {
         themeExampleRepository,
         themeReadingPassageRepository,
         userRepository,
-        villageService);
+        villageService,
+        vocabularyService);
   }
 
   private static User user() {
@@ -161,6 +166,32 @@ class ThemeServiceTest {
     themeService.completeStage(1L, 1L, ThemeStage.READING); // READING -> REVIEW (미완료)
 
     verify(villageService, never()).unlockBuildings(any());
+  }
+
+  @Test
+  void completeStage_WORD_단계를_완료하면_단어장_저장을_요청한다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    progress.completeCurrentStage(); // KANJI -> WORD
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
+
+    themeService.completeStage(1L, 1L, ThemeStage.WORD);
+
+    verify(vocabularyService).saveThemeWords(1L, 1L, ThemeStage.WORD);
+  }
+
+  @Test
+  void completeStage_단계_순서를_어기면_단어장_저장을_요청하지_않는다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
+
+    catchThrowableOfType(
+        ApiException.class, () -> themeService.completeStage(1L, 1L, ThemeStage.WORD));
+
+    verify(vocabularyService, never()).saveThemeWords(any(), any(), any());
   }
 
   @Test
