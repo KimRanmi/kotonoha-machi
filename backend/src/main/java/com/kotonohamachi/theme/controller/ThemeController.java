@@ -7,6 +7,7 @@ import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
 import com.kotonohamachi.theme.service.ThemeService;
 import com.kotonohamachi.user.User;
+import com.kotonohamachi.vocabulary.service.VocabularyService;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -20,14 +21,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class ThemeController {
 
   private final ThemeService themeService;
+  private final VocabularyService vocabularyService;
 
   /**
    * 생성자.
    *
    * @param themeService 테마 진행 서비스
+   * @param vocabularyService 단어장 서비스
    */
-  public ThemeController(ThemeService themeService) {
+  public ThemeController(ThemeService themeService, VocabularyService vocabularyService) {
     this.themeService = themeService;
+    this.vocabularyService = vocabularyService;
   }
 
   /**
@@ -59,7 +63,8 @@ public class ThemeController {
   }
 
   /**
-   * 로그인한 사용자 자신이 테마의 한 단계를 완료 처리한다. 지금 진행해야 할 단계가 아니면 거부한다.
+   * 로그인한 사용자 자신이 테마의 한 단계를 완료 처리한다. 지금 진행해야 할 단계가 아니면 거부한다. 단어·표현
+   * 단계를 완료하면 그 단계에서 배운 단어가 단어장에 자동으로 저장된다.
    *
    * @param authentication 현재 요청의 인증 정보
    * @param themeId 진행할 테마 ID
@@ -70,7 +75,9 @@ public class ThemeController {
   public ThemeProgressResponse completeStage(
       Authentication authentication, @PathVariable Long themeId, @PathVariable ThemeStage stage) {
     User user = AuthPrincipal.resolve(authentication);
-    return themeService.completeStage(user.getId(), themeId, stage);
+    ThemeProgressResponse progress = themeService.completeStage(user.getId(), themeId, stage);
+    vocabularyService.saveThemeWords(user.getId(), themeId, stage);
+    return progress;
   }
 
   /**
