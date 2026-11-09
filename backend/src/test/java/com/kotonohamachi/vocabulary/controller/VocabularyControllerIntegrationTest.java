@@ -1,5 +1,6 @@
 package com.kotonohamachi.vocabulary.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.kotonohamachi.auth.service.EmailSender;
 import jakarta.servlet.Filter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,7 +51,12 @@ class VocabularyControllerIntegrationTest {
   @MockitoBean
   private EmailSender emailSender;
 
+  @Autowired
+  private JdbcTemplate jdbcTemplate;
+
   private MockMvc mockMvc;
+
+  private String lastEmail;
 
   @BeforeEach
   void setUp() {
@@ -58,6 +67,7 @@ class VocabularyControllerIntegrationTest {
 
   private MockHttpSession newLoggedInSession() throws Exception {
     String email = "user-" + UUID.randomUUID() + "@test.com";
+    lastEmail = email;
     String password = "password123";
     String nickname = "nick-" + UUID.randomUUID().toString().substring(0, 8);
 
@@ -101,6 +111,45 @@ class VocabularyControllerIntegrationTest {
     return themeId.longValue();
   }
 
+  private Long lastUserId() {
+    return jdbcTemplate.queryForObject(
+        "SELECT id FROM users WHERE email = ?", Long.class, lastEmail);
+  }
+
+  private int vocabularyCount(MockHttpSession session) throws Exception {
+    String body = mockMvc
+        .perform(get("/api/vocabulary").session(session))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+    return JsonPath.<List<Object>>read(body, "$").size();
+  }
+
+  private int countRows(Long userId, String surfaceForm, String reading) {
+    return jdbcTemplate.queryForObject(
+        "SELECT count(*) FROM user_vocabulary"
+            + " WHERE user_id = ? AND surface_form = ? AND reading = ?",
+        Integer.class,
+        userId,
+        surfaceForm,
+        reading);
+  }
+
+  private Long insertThemeVocabulary(
+      Long themeId, String stage, String surfaceForm, String reading, int displayOrder) {
+    return jdbcTemplate.queryForObject(
+        "INSERT INTO theme_vocabulary"
+            + " (theme_id, stage, surface_form, reading, meaning, jlpt_level, display_order)"
+            + " VALUES (?, ?, ?, ?, '테스트용 뜻', 3, ?) RETURNING id",
+        Long.class,
+        themeId,
+        stage,
+        surfaceForm,
+        reading,
+        displayOrder);
+  }
+
   private void complete(MockHttpSession session, Long themeId, String stage) throws Exception {
     mockMvc
         .perform(
@@ -124,34 +173,17 @@ class VocabularyControllerIntegrationTest {
   }
 
   @Test
-  void KANJI만_완료하면_단어장은_비어_있다() throws Exception {
-    MockHttpSession session = newLoggedInSession();
-    Long themeId = firstThemeId(session);
-
-    complete(session, themeId, "KANJI");
-
-    mockMvc
-        .perform(get("/api/vocabulary").session(session))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$").isEmpty());
-  }
-
-  @Test
   void WORD_EXPRESSION_단계를_완료하면_단어가_THEME_출처로_단어장에_저장된다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     Long themeId = firstThemeId(session);
 
     complete(session, themeId, "KANJI");
     complete(session, themeId, "WORD");
-    int afterWord = JsonPath.<java.util.List<Object>>read(
-            mockMvc
-                .perform(get("/api/vocabulary").session(session))
-                .andReturn()
-                .getResponse()
-                .getContentAsString(),
-            "$")
-        .size();
+    // 시드 기준 첫 테마는 단어 3개, 표현 2개다.
+    assertThat(vocabularyCount(session)).isEqualTo(3);
+
     complete(session, themeId, "EXPRESSION");
+    assertThat(vocabularyCount(session)).isEqualTo(5);
 
     mockMvc
         .perform(get("/api/vocabulary").session(session))
@@ -161,7 +193,58 @@ class VocabularyControllerIntegrationTest {
         .andExpect(jsonPath("$[0].reading").isNotEmpty())
         .andExpect(jsonPath("$[0].meaning").isNotEmpty())
         .andExpect(jsonPath("$[0].savedAt").isNotEmpty());
-    org.junit.jupiter.api.Assertions.assertTrue(afterWord > 0, "WORD 완료 후 단어가 저장되어야 한다");
+  }
+
+  @Test
+  void 이미_단어장에_있는_단어는_예외_없이_건너뛰고_중복_행이_생기지_않는다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    Long themeId = firstThemeId(session);
+    Long userId = lastUserId();
+    jdbcTemplate.update(
+        "INSERT INTO user_vocabulary (user_id, surface_form, reading, meaning, source)"
+            + " VALUES (?, '混雑', 'こんざつ', '미리 저장된 뜻', 'CHAT')",
+        userId);
+
+    complete(session, themeId, "KANJI");
+    complete(session, themeId, "WORD");
+
+    assertThat(vocabularyCount(session)).isEqualTo(3);
+    assertThat(countRows(userId, "混雑", "こんざつ")).isEqualTo(1);
+    // 기존 행은 덮어쓰지 않는다.
+    assertThat(jdbcTemplate.queryForObject(
+            "SELECT source FROM user_vocabulary WHERE user_id = ? AND surface_form = '混雑'",
+            String.class,
+            userId))
+        .isEqualTo("CHAT");
+  }
+
+  @Test
+  void 같은_테마의_WORD와_EXPRESSION이_겹쳐도_예외_없이_한_번만_저장된다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    Long themeId = firstThemeId(session);
+    Long userId = lastUserId();
+    // WORD의 '満席'을 EXPRESSION에도 넣고, 같은 EXPRESSION 안에 '種類'를 두 번 넣어 겹침을 만든다.
+    List<Long> addedIds = new ArrayList<>();
+    try {
+      addedIds.add(insertThemeVocabulary(themeId, "EXPRESSION", "満席", "まんせき", 10));
+      addedIds.add(insertThemeVocabulary(themeId, "EXPRESSION", "種類", "しゅるい", 11));
+      addedIds.add(insertThemeVocabulary(themeId, "EXPRESSION", "種類", "しゅるい", 12));
+
+      complete(session, themeId, "KANJI");
+      complete(session, themeId, "WORD");
+      assertThat(vocabularyCount(session)).isEqualTo(3);
+
+      complete(session, themeId, "EXPRESSION");
+
+      // 표현 2개만 새로 늘고, 겹친 3건은 건너뛴다.
+      assertThat(vocabularyCount(session)).isEqualTo(5);
+      assertThat(countRows(userId, "満席", "まんせき")).isEqualTo(1);
+      assertThat(countRows(userId, "種類", "しゅるい")).isEqualTo(1);
+    } finally {
+      for (Long id : addedIds) {
+        jdbcTemplate.update("DELETE FROM theme_vocabulary WHERE id = ?", id);
+      }
+    }
   }
 
   @Test
