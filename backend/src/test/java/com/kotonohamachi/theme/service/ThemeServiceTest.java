@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +27,7 @@ import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
+import com.kotonohamachi.village.service.VillageService;
 import com.kotonohamachi.vocabulary.service.VocabularyService;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -64,6 +66,8 @@ class ThemeServiceTest {
   private UserRepository userRepository;
 
   @Mock
+  private VillageService villageService;
+
   private VocabularyService vocabularyService;
 
   private ThemeService themeService;
@@ -78,6 +82,7 @@ class ThemeServiceTest {
         themeExampleRepository,
         themeReadingPassageRepository,
         userRepository,
+        villageService,
         vocabularyService);
   }
 
@@ -143,6 +148,23 @@ class ThemeServiceTest {
     ThemeProgressResponse response = themeService.completeStage(1L, 1L, ThemeStage.REVIEW);
 
     assertThat(response.completed()).isTrue();
+    verify(villageService, times(1)).unlockBuildings(1L);
+  }
+
+  @Test
+  void completeStage_테마가_아직_끝나지_않은_단계에서는_건물_해금을_호출하지_않는다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    progress.completeCurrentStage(); // KANJI -> WORD
+    progress.completeCurrentStage(); // WORD -> EXPRESSION
+    progress.completeCurrentStage(); // EXPRESSION -> EXAMPLE
+    progress.completeCurrentStage(); // EXAMPLE -> READING
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
+
+    themeService.completeStage(1L, 1L, ThemeStage.READING); // READING -> REVIEW (미완료)
+
+    verify(villageService, never()).unlockBuildings(any());
   }
 
   @Test

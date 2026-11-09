@@ -3,20 +3,25 @@ import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
 import { getTodayRecommendation, type Theme } from '../api/theme';
+import { getVillageBuildings } from '../api/village';
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import VillageScene from '../components/VillageScene';
+import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
 
 function TownPage() {
   const navigate = useNavigate();
+  const [nearResidentSlug, setNearResidentSlug] = useState<string | null>(null);
+  const nearResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === nearResidentSlug);
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [palette, setPalette] = useState<AvatarPalette | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutErrorMessage, setLogoutErrorMessage] = useState<string | null>(null);
   const [todayTheme, setTodayTheme] = useState<Theme | null>(null);
+  const [unlockedBuildingIds, setUnlockedBuildingIds] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +55,28 @@ function TownPage() {
       })
       .catch(() => {
         // 오늘의 학습 배너는 보조 정보라 실패해도 화면을 막지 않는다.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getVillageBuildings()
+      .then((buildings) => {
+        if (!cancelled) {
+          setUnlockedBuildingIds(
+            new Set(
+              buildings.filter((building) => building.unlocked).map((building) => building.id),
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        // 건물 열림 정보는 보조 정보라 실패해도 마을을 막지 않는다. 이 경우 모든 건물을 잠금으로 본다.
       });
 
     return () => {
@@ -154,9 +181,20 @@ function TownPage() {
         <VillageScene
           avatar={avatar}
           palette={palette}
-          // 건물 id가 곧 담당 주민 id다(카페 → /chat/cafe). 주민 데이터가 생기면 이 연결을 바꾼다.
+          // TODO: 건물 안 주민 배치가 생기면 입장 화면으로 바꾼다. 지금은 건물 id가 주민 slug가 아니라서 대화가 열리지 않는다.
           onEnterBuilding={(buildingId) => navigate(`/chat/${buildingId}`)}
+          unlockedBuildingIds={unlockedBuildingIds}
+          onNearResidentChange={setNearResidentSlug}
         />
+      )}
+      {nearResident && (
+        <button
+          type="button"
+          className={styles.talkButton}
+          onClick={() => navigate(`/chat/${nearResident.slug}`)}
+        >
+          {nearResident.name}と話す
+        </button>
       )}
       {logoutErrorMessage && (
         <p className={styles.content} role="alert">

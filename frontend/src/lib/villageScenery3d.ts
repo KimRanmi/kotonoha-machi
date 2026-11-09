@@ -27,6 +27,8 @@ export interface VillageSign {
   building: VillageBuilding;
   object: THREE.Object3D;
   setHighlight: (on: boolean) => void;
+  /** 간판 글자를 잠김("準備中" 표시) 또는 열림 모양으로 다시 그린다. */
+  setLocked: (locked: boolean) => void;
 }
 
 export interface VillageWorld {
@@ -263,13 +265,21 @@ export function createVillageWorld(): VillageWorld {
     place(box(0.35, 0.25, 0.5, '#d9534f'), 1.2, 1, front + 1.6, house);
   };
 
+  /** 간판 판 그림을 만든다. 돌려주는 draw(locked)로 잠김/열림 모양을 언제든 다시 그릴 수 있다. */
   const createSignTexture = (building: VillageBuilding) => {
     const style = SIGN_STYLES[building.id];
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 144;
-    const context = canvas.getContext('2d');
-    if (context) {
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    textures.push(texture);
+    const draw = (locked: boolean) => {
+      const context = canvas.getContext('2d');
+      if (!context) {
+        return;
+      }
+      context.clearRect(0, 0, 512, 144);
       context.fillStyle = style.background;
       context.fillRect(0, 0, 512, 144);
       context.strokeStyle = style.accent;
@@ -278,18 +288,17 @@ export function createVillageWorld(): VillageWorld {
       context.textAlign = 'center';
       context.textBaseline = 'middle';
       context.fillStyle = style.text;
-      context.font = `bold ${building.locked ? 68 : 78}px ${SIGN_FONT}`;
-      context.fillText(building.label, 256, building.locked ? 58 : 74);
-      if (building.locked) {
+      context.font = `bold ${locked ? 68 : 78}px ${SIGN_FONT}`;
+      context.fillText(building.label, 256, locked ? 58 : 74);
+      if (locked) {
         context.fillStyle = style.accent;
         context.font = `bold 28px ${SIGN_FONT}`;
         context.fillText('準備中', 256, 112);
       }
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    textures.push(texture);
-    return texture;
+      texture.needsUpdate = true;
+    };
+    draw(true); // 서버에서 열림 값을 받기 전에는 잠김으로 시작한다.
+    return { texture, draw };
   };
 
   const createSign = (building: VillageBuilding): VillageSign => {
@@ -303,7 +312,8 @@ export function createVillageWorld(): VillageWorld {
       z,
       object,
     );
-    const faceMaterial = new THREE.MeshBasicMaterial({ map: createSignTexture(building) });
+    const signTexture = createSignTexture(building);
+    const faceMaterial = new THREE.MeshBasicMaterial({ map: signTexture.texture });
     materials.push(faceMaterial);
     const face = new THREE.Mesh(
       geometry(new THREE.PlaneGeometry(SIGN_WIDTH, SIGN_HEIGHT)),
@@ -314,6 +324,7 @@ export function createVillageWorld(): VillageWorld {
       building,
       object,
       setHighlight: (on) => faceMaterial.color.setScalar(on ? 1.3 : 1),
+      setLocked: signTexture.draw,
     };
   };
 

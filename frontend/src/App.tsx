@@ -22,7 +22,7 @@ function App() {
         <Route path="/town" element={<TownPage />} />
         <Route path="/town/themes" element={<CompletedThemesPage />} />
         <Route path="/town/themes/:themeId" element={<ThemeLearningPage />} />
-        <Route path="/chat/:residentId" element={<ChatPage />} />
+        <Route path="/chat/:residentSlug" element={<ChatPage />} />
         <Route path="/vocabulary" element={<VocabularyPage />} />
       </Route>
     </Routes>
