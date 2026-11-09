@@ -21,6 +21,7 @@ import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.village.service.VillageService;
+import com.kotonohamachi.vocabulary.service.VocabularyService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -55,6 +56,7 @@ public class ThemeService {
   private final ThemeReadingPassageRepository themeReadingPassageRepository;
   private final UserRepository userRepository;
   private final VillageService villageService;
+  private final VocabularyService vocabularyService;
 
   /**
    * 생성자.
@@ -67,6 +69,7 @@ public class ThemeService {
    * @param themeReadingPassageRepository 테마 독해 지문 콘텐츠 저장소
    * @param userRepository 사용자 저장소
    * @param villageService 마을 건물 열림 서비스(테마 완료 시 건물 해금)
+   * @param vocabularyService 단어장 서비스
    */
   public ThemeService(
       ThemeRepository themeRepository,
@@ -76,7 +79,8 @@ public class ThemeService {
       ThemeExampleRepository themeExampleRepository,
       ThemeReadingPassageRepository themeReadingPassageRepository,
       UserRepository userRepository,
-      VillageService villageService) {
+      VillageService villageService,
+      VocabularyService vocabularyService) {
     this.themeRepository = themeRepository;
     this.themeProgressRepository = themeProgressRepository;
     this.themeKanjiRepository = themeKanjiRepository;
@@ -85,6 +89,7 @@ public class ThemeService {
     this.themeReadingPassageRepository = themeReadingPassageRepository;
     this.userRepository = userRepository;
     this.villageService = villageService;
+    this.vocabularyService = vocabularyService;
   }
 
   /**
@@ -145,7 +150,7 @@ public class ThemeService {
   /**
    * 테마의 한 단계를 완료 처리하고 다음 단계로 진행한다. 지금 진행해야 할 단계가 아닌 단계를 요청하면(건너뛰기나 이미 끝난
    * 단계 재요청) 거부한다. 하루(한국 시간)에 "오늘의 테마"({@link #getTodayRecommendedTheme})만 진행할 수 있어서, 다른
-   * 테마의 단계는 거부한다(오늘 이미 다른 테마를 완료했다면 한도 초과, 아니면 오늘의 테마가 아님). 아직 시작하지 않은 테마라면 이 호출로 진행 상태를 새로 만든다.
+   * 테마의 단계는 거부한다(오늘 이미 다른 테마를 완료했다면 한도 초과, 아니면 오늘의 테마가 아님). 아직 시작하지 않은 테마라면 이 호출로 진행 상태를 새로 만든다. 단어·표현 단계를 완료하면 같은 트랜잭션 안에서 그 단계의 단어를 단어장에 저장하므로, 둘 중 하나가 실패하면 함께 취소된다.
    *
    * @param userId 진행할 사용자 ID(로그인한 본인)
    * @param themeId 진행할 테마 ID
@@ -174,6 +179,7 @@ public class ThemeService {
     if (progress.isCompleted()) {
       villageService.unlockBuildings(userId);
     }
+    vocabularyService.saveThemeWords(userId, themeId, stage);
 
     return new ThemeProgressResponse(themeId, progress.getCurrentStage(), progress.isCompleted());
   }
