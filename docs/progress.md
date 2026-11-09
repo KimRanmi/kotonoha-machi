@@ -661,3 +661,18 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
 - 주민 목록 API는 필요 없다고 정해서 요구사항 체크리스트에서 뺐다(바로 위 항목의 "주민 목록 API → …" 순서는 이 결정으로 대체). 노션 작업 일지
   페이지 2개(11/8 주민 대화 API, 11/9 캐릭터 생성 흐름)는 휴지통으로 옮겼다(복구 가능). 요구사항 노션 페이지의 카페 주민 문구는
   저장소 문서와 맞췄다. 주민을 화면에 어떻게 알려줄지(목록 API 없이)는 정해지지 않았다.
+
+## 2026-11-09
+
+- 학습 단어장 저장·조회를 만들었다(`0019`). 테마의 단어·표현 단계를 완료하면 그 단계의 단어가 `user_vocabulary`에 자동 저장되고,
+  `GET /api/vocabulary`로 최근 저장 순 조회, 프런트 `/vocabulary` 화면에 표기·읽는 법·뜻·JLPT 레벨이 보인다.
+  - 백엔드: `V20__create_vocabulary_table.sql`, `vocabulary/`(엔티티·저장소·`VocabularyService`·컨트롤러·DTO). 뜻·읽는 법은
+    `theme_vocabulary`의 사전 데이터를 복사한다. 사용자+표기+읽는 법이 같으면 중복 저장하지 않는다. 처음엔 `ThemeController`에서
+    호출했다가 단계 완료와 한 트랜잭션이 되도록 `ThemeService.completeStage` 안으로 옮겼다.
+  - 프런트: `api/vocabulary.ts`, `VocabularyPage`(로딩·에러·빈 목록 처리).
+  - 검증: `spotlessApply`·`test` 170개 통과(실패 0). 새 테스트는 `VocabularyServiceTest` 5개, `ThemeServiceTest` 2개 추가,
+    `VocabularyControllerIntegrationTest` 5개(실제 Postgres). 프런트 prettier·lint·build 통과. 실제 서버(8081)와 프런트(5174)를 임시 DB로
+    띄워 한자 단계는 저장 없음, 단어 단계 완료 후 3개 저장, 브라우저 `/vocabulary`에 표시되는 것을 확인했고 임시 DB·서버는 지웠다.
+    화면에서 퀴즈를 직접 풀어 완료하는 경로와 단어가 많을 때의 레이아웃은 확인하지 않았다.
+  - 아직 안 한 것: 대화 중 단어 저장(대화 기능이 없고, 뜻·읽는 법은 사전 API로 조회해야 함), 검색·레벨 필터·복습(UI 상세 미정),
+    같은 단계 동시 완료 시 유니크 제약 예외 처리.
