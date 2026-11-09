@@ -1,9 +1,7 @@
 package com.kotonohamachi.common;
 
-import java.sql.SQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -20,9 +18,6 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
 
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-  // PostgreSQL의 unique_violation SQLSTATE.
-  private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
   /**
    * 도메인 규칙 위반({@link ApiException})을 처리한다.
@@ -115,34 +110,6 @@ public class GlobalExceptionHandler {
       NoResourceFoundException exception) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(new ErrorResponse("요청한 경로를 찾을 수 없습니다."));
-  }
-
-  /**
-   * DB 유니크 제약 위반을 처리한다. 같은 요청이 동시에 두 번 들어와(더블클릭 등) 둘 다 중복 확인을 통과한 경우에 나며, 먼저 도착한 요청이
-   * 이미 처리한 상태라 409로 알려준다. 유니크 위반이 아닌 다른 무결성 오류(NOT NULL 위반 등)는 서버 버그이므로 500으로 처리한다.
-   *
-   * @param exception 발생한 예외
-   * @return 유니크 위반이면 409 응답, 아니면 500 응답
-   */
-  @ExceptionHandler(DataIntegrityViolationException.class)
-  public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(
-      DataIntegrityViolationException exception) {
-    if (isUniqueViolation(exception)) {
-      return ResponseEntity.status(HttpStatus.CONFLICT)
-          .body(new ErrorResponse("이미 처리된 요청입니다. 화면을 새로고침해 주세요."));
-    }
-    return handleUnexpectedException(exception);
-  }
-
-  /** 원인 예외를 따라가며 PostgreSQL 유니크 위반 코드(23505)가 있는지 확인한다. */
-  private static boolean isUniqueViolation(Throwable exception) {
-    for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-      if (cause instanceof SQLException sqlException
-          && UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**

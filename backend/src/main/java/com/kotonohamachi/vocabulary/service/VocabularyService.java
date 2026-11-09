@@ -1,15 +1,22 @@
 package com.kotonohamachi.vocabulary.service;
 
+import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.vocabulary.VocabularyEntry;
+import com.kotonohamachi.vocabulary.VocabularyErrorCode;
 import com.kotonohamachi.vocabulary.VocabularySource;
 import com.kotonohamachi.vocabulary.dto.VocabularyResponse;
 import com.kotonohamachi.vocabulary.repository.VocabularyRepository;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,12 +50,14 @@ public class VocabularyService {
   /**
    * 테마 학습의 한 단계에서 배운 단어를 단어장에 저장한다. 단어({@link ThemeStage#WORD})와 표현({@link
    * ThemeStage#EXPRESSION}) 단계만 대상이고, 다른 단계는 아무것도 저장하지 않는다. 이미 단어장에 있는 단어는
-   * 건너뛰므로 같은 단계를 다시 호출해도 안전하다.
+   * 건너뛰므로 같은 단계를 다시 호출해도 안전하다. 이미 있는 단어는 단어마다 묻지 않고 한 번에 조회해서 가려낸다.
    *
    * @param userId 단어장 주인 ID(로그인한 본인)
    * @param themeId 배운 테마 ID
    * @param stage 완료한 단계
    * @return 이번에 새로 저장한 단어 수
+   * @throws ApiException 같은 단계의 완료가 동시에 처리되어 저장이 겹치면(409). 이 예외로 호출한 쪽의 트랜잭션 전체(단계 완료
+   *     포함)가 취소된다.
    */
   @Transactional
   public int saveThemeWords(Long userId, Long themeId, ThemeStage stage) {
@@ -57,24 +66,44 @@ public class VocabularyService {
     }
     List<ThemeVocabulary> learnedWords =
         themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(themeId, stage);
-    User user = findUserOrThrow(userId);
-
-    int savedCount = 0;
-    for (ThemeVocabulary word : learnedWords) {
-      if (vocabularyRepository.existsByUserIdAndSurfaceFormAndReading(
-          userId, word.getSurfaceForm(), word.getReading())) {
-        continue;
-      }
-      vocabularyRepository.save(new VocabularyEntry(
-          user,
-          word.getSurfaceForm(),
-          word.getReading(),
-          word.getMeaning(),
-          word.getJlptLevel(),
-          VocabularySource.THEME));
-      savedCount++;
+    if (learnedWords.isEmpty()) {
+      return 0;
     }
-    return savedCount;
+
+    // 이미 저장된 단어와, 이번 배치에서 방금 고른 단어를 한 집합으로 관리해서 중복을 건너뛴다.
+    Set<WordKey> knownWords = vocabularyRepository
+        .findAllByUserIdAndSurfaceFormIn(
+            userId,
+            learnedWords.stream()
+                .map(ThemeVocabulary::getSurfaceForm)
+                .distinct()
+                .toList())
+        .stream()
+        .map(entry -> new WordKey(entry.getSurfaceForm(), entry.getReading()))
+        .collect(Collectors.toCollection(HashSet::new));
+
+    User user = findUserOrThrow(userId);
+    List<VocabularyEntry> newEntries = new ArrayList<>();
+    for (ThemeVocabulary word : learnedWords) {
+      if (knownWords.add(new WordKey(word.getSurfaceForm(), word.getReading()))) {
+        newEntries.add(new VocabularyEntry(
+            user,
+            word.getSurfaceForm(),
+            word.getReading(),
+            word.getMeaning(),
+            word.getJlptLevel(),
+            VocabularySource.THEME));
+      }
+    }
+
+    try {
+      vocabularyRepository.saveAll(newEntries);
+    } catch (DataIntegrityViolationException exception) {
+      // 같은 사용자의 같은 단계 완료가 동시에 들어와 둘 다 위의 조회를 통과한 경우, 뒤에 온 요청이 DB 유니크 제약에 걸린다.
+      // 이 시점의 DB 트랜잭션은 이미 실패 상태라 여기서 계속 진행할 수 없으므로, ApiException으로 바꿔 던져 전체를 취소한다.
+      throw new ApiException(VocabularyErrorCode.SAVE_CONFLICT);
+    }
+    return newEntries.size();
   }
 
   /**
@@ -89,6 +118,9 @@ public class VocabularyService {
         .map(VocabularyResponse::from)
         .toList();
   }
+
+  /** 단어장에서 같은 단어를 가리는 기준: 표기와 읽는 법이 모두 같아야 같은 단어다. */
+  private record WordKey(String surfaceForm, String reading) {}
 
   private User findUserOrThrow(Long userId) {
     return userRepository
