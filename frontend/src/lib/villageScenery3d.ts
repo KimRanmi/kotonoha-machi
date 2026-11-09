@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { ROOF_HEIGHT, VILLAGE_BUILDINGS, type VillageBuilding } from './villageBuildings';
+import {
+  DOOR_WIDTH,
+  ROOF_HEIGHT,
+  VILLAGE_BUILDINGS,
+  type VillageBuilding,
+} from './villageBuildings';
 import {
   TREE_RADIUS,
   VILLAGE_BUSHES,
@@ -79,7 +84,7 @@ export function createVillageWorld(): VillageWorld {
 
   // 건물: 벽 상자 + 뾰족 지붕 + 문. 창문과 장식은 건물별 함수가 카메라가 보는 +z, +x 벽에 단다.
   const doorMaterial = material('#6b4a32');
-  const doorGeometry = geometry(new THREE.BoxGeometry(1.1, 1.8, 0.1));
+  const doorGeometry = geometry(new THREE.BoxGeometry(DOOR_WIDTH, 1.8, 0.1));
   const roofGeometry = geometry(new THREE.ConeGeometry(1, ROOF_HEIGHT, 4));
 
   // 건물마다 컨셉에 맞는 장식을 단다. 좌표는 건물 중심 기준이고 문은 +z 벽 가운데에 있다.
