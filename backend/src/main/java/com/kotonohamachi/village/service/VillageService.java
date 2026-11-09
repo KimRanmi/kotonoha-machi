@@ -1,15 +1,11 @@
 package com.kotonohamachi.village.service;
 
-import com.kotonohamachi.village.VillageBuilding;
-import com.kotonohamachi.village.dto.VillageBuildingResponse;
 import com.kotonohamachi.village.dto.VillagePositionResponse;
 import com.kotonohamachi.village.repository.UserVillagePositionRepository;
-import java.util.Arrays;
-import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 마을 건물 목록과 사용자가 마지막으로 서 있던 자리를 다룬다. 모든 건물은 처음부터 열려 있다. */
+/** 사용자가 마을에서 마지막으로 서 있던 자리를 저장하고 조회한다. */
 @Service
 public class VillageService {
 
@@ -22,17 +18,6 @@ public class VillageService {
    */
   public VillageService(UserVillagePositionRepository positionRepository) {
     this.positionRepository = positionRepository;
-  }
-
-  /**
-   * 건물 목록(항상 집, 카페, 상점 순서)을 조회한다. 모든 건물이 열려 있다.
-   *
-   * @return 건물 3개의 열림 상태(모두 true)
-   */
-  public List<VillageBuildingResponse> getBuildings() {
-    return Arrays.stream(VillageBuilding.values())
-        .map(building -> new VillageBuildingResponse(building.getId(), true))
-        .toList();
   }
 
   /**

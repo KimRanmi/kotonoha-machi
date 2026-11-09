@@ -83,27 +83,6 @@ class VillageControllerIntegrationTest {
   }
 
   @Test
-  void 마을_건물_조회는_로그인하지_않으면_401을_반환한다() throws Exception {
-    mockMvc.perform(get("/api/village/buildings")).andExpect(status().isUnauthorized());
-  }
-
-  @Test
-  void 로그인한_신규_사용자는_모두_열린_건물_3개를_순서대로_받는다() throws Exception {
-    MockHttpSession session = newLoggedInSession();
-
-    mockMvc
-        .perform(get("/api/village/buildings").session(session))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(3))
-        .andExpect(jsonPath("$[0].id").value("home"))
-        .andExpect(jsonPath("$[0].unlocked").value(true))
-        .andExpect(jsonPath("$[1].id").value("cafe"))
-        .andExpect(jsonPath("$[1].unlocked").value(true))
-        .andExpect(jsonPath("$[2].id").value("shop"))
-        .andExpect(jsonPath("$[2].unlocked").value(true));
-  }
-
-  @Test
   void 마을_위치는_로그인하지_않으면_401을_반환한다() throws Exception {
     mockMvc.perform(get("/api/village/position")).andExpect(status().isUnauthorized());
     mockMvc

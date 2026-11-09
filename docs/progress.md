@@ -768,3 +768,6 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 테스트: 해금 관련 테스트(마일스톤·`ThemeService` 해금 호출 검증)를 지우고 `VillageServiceTest`로 교체했다. V20 백필 마이그레이션 테스트는 과거 마이그레이션 검증이라 유지했다.
   - 검증: `spotlessApply`·`test` 통과. 프런트는 변경이 없고, 실제 앱을 띄워 확인하지는 않았다.
   - 참고: 삭제된 `user_building` 데이터는 복구할 수 없지만 모두 열림이라 잃는 정보는 없다. `0019` 결정 문서는 과거 기록으로 두었고, 마일스톤 방식으로 되돌리려면 테이블부터 다시 만들어야 한다.
+  - 프런트: 간판 잠김 표시("準備中")·열림 판단·`getVillageBuildings` 호출을 제거해 모든 건물이 처음부터 눌러지고 문 앞 입장 버튼도 항상 동작한다.
+    더 쓰이지 않는 `GET /api/village/buildings`와 `VillageBuilding`·`VillageBuildingResponse`·`VillageService.getBuildings`도 백엔드에서 지웠다.
+    검증: 백엔드 `spotlessApply`·`test`, 프런트 `prettier`·`lint`·`build` 통과. 브라우저로 간판 클릭을 직접 확인하지는 않았다.

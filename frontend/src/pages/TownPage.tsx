@@ -3,12 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
 import { getTodayRecommendation, type Theme } from '../api/theme';
-import {
-  getVillageBuildings,
-  getVillagePosition,
-  saveVillagePosition,
-  type VillagePosition,
-} from '../api/village';
+import { getVillagePosition, saveVillagePosition, type VillagePosition } from '../api/village';
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import VillageScene from '../components/VillageScene';
@@ -31,7 +26,6 @@ function TownPage() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutErrorMessage, setLogoutErrorMessage] = useState<string | null>(null);
   const [todayTheme, setTodayTheme] = useState<Theme | null>(null);
-  const [unlockedBuildingIds, setUnlockedBuildingIds] = useState<ReadonlySet<string>>(new Set());
   // 마지막 위치를 받아 오기 전에는 마을을 그리지 않는다. 그려 버리면 기본 위치에서 시작했다가 순간이동하게 된다.
   const [positionLoaded, setPositionLoaded] = useState(false);
   const [initialPosition, setInitialPosition] = useState<VillagePosition | null>(null);
@@ -68,28 +62,6 @@ function TownPage() {
       })
       .catch(() => {
         // 오늘의 학습 배너는 보조 정보라 실패해도 화면을 막지 않는다.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    getVillageBuildings()
-      .then((buildings) => {
-        if (!cancelled) {
-          setUnlockedBuildingIds(
-            new Set(
-              buildings.filter((building) => building.unlocked).map((building) => building.id),
-            ),
-          );
-        }
-      })
-      .catch(() => {
-        // 건물 열림 정보는 보조 정보라 실패해도 마을을 막지 않는다. 이 경우 모든 건물을 잠금으로 본다.
       });
 
     return () => {
@@ -278,7 +250,6 @@ function TownPage() {
           avatar={avatar}
           palette={palette}
           onEnterBuilding={(buildingId) => navigate(`/chat/${buildingId}`)}
-          unlockedBuildingIds={unlockedBuildingIds}
           onNearResidentChange={setNearResidentSlug}
           onNearBuildingChange={setNearBuildingId}
           initialPosition={initialPosition}
