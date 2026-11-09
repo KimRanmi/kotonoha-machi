@@ -1,10 +1,10 @@
 package com.kotonohamachi.village;
 
-/** 마을 건물의 종류. 건물을 열기 위해 필요한 완료 테마 수를 함께 정의한다(집 0개, 카페 1개, 상점 3개). */
+/** 마을 건물의 종류. 건물을 열기 위해 필요한 완료 테마 수를 함께 정의한다(지금은 모든 건물이 0개라 처음부터 열린다). */
 public enum VillageBuilding {
   HOME("home", 0),
-  CAFE("cafe", 1),
-  SHOP("shop", 3);
+  CAFE("cafe", 0),
+  SHOP("shop", 0);
 
   private final String id;
   private final int requiredCompletedThemes;

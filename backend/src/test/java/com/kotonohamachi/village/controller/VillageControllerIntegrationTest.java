@@ -88,7 +88,7 @@ class VillageControllerIntegrationTest {
   }
 
   @Test
-  void 로그인한_신규_사용자는_집만_열린_건물_3개를_순서대로_받는다() throws Exception {
+  void 로그인한_신규_사용자는_모두_열린_건물_3개를_순서대로_받는다() throws Exception {
     MockHttpSession session = newLoggedInSession();
 
     mockMvc
@@ -98,9 +98,9 @@ class VillageControllerIntegrationTest {
         .andExpect(jsonPath("$[0].id").value("home"))
         .andExpect(jsonPath("$[0].unlocked").value(true))
         .andExpect(jsonPath("$[1].id").value("cafe"))
-        .andExpect(jsonPath("$[1].unlocked").value(false))
+        .andExpect(jsonPath("$[1].unlocked").value(true))
         .andExpect(jsonPath("$[2].id").value("shop"))
-        .andExpect(jsonPath("$[2].unlocked").value(false));
+        .andExpect(jsonPath("$[2].unlocked").value(true));
   }
 
   @Test

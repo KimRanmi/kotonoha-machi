@@ -24,7 +24,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * {@link VillageService}의 건물 열림 규칙(집 0개, 카페 1개, 상점 3개)을 실제 Postgres(Testcontainers)로
+ * {@link VillageService}의 건물 열림 규칙(모든 건물이 처음부터 열림)을 실제 Postgres(Testcontainers)로
  * 검증한다. 하루 한 테마 제한 때문에 API로는 여러 테마를 완료하기 어려워서, 테마 진행 행을 저장소로 직접 만든다.
  */
 @Testcontainers
@@ -83,12 +83,12 @@ class VillageServiceIntegrationTest {
   }
 
   @Test
-  void 가입_직후_완료_테마가_없으면_집만_열린다() {
+  void 가입_직후_완료_테마가_없어도_모든_건물이_열린다() {
     Long userId = newUserId();
 
     List<VillageBuildingResponse> buildings = villageService.getBuildings(userId);
 
-    assertThat(unlockedIds(buildings)).containsExactly("home");
+    assertThat(unlockedIds(buildings)).containsExactly("home", "cafe", "shop");
   }
 
   @Test
@@ -99,51 +99,6 @@ class VillageServiceIntegrationTest {
 
     assertThat(buildings)
         .extracting(VillageBuildingResponse::id)
-        .containsExactly("home", "cafe", "shop");
-  }
-
-  @Test
-  void 테마를_1개_완료하면_카페가_열리고_상점은_잠겨_있다() {
-    Long userId = newUserId();
-    completeNewTheme(userId);
-    villageService.unlockBuildings(userId);
-
-    assertThat(unlockedIds(villageService.getBuildings(userId))).containsExactly("home", "cafe");
-  }
-
-  @Test
-  void 테마를_2개_완료해도_상점은_잠겨_있다() {
-    Long userId = newUserId();
-    completeNewTheme(userId);
-    completeNewTheme(userId);
-
-    assertThat(unlockedIds(villageService.getBuildings(userId))).containsExactly("home", "cafe");
-  }
-
-  @Test
-  void 테마를_3개_완료하면_상점까지_열린다() {
-    Long userId = newUserId();
-    completeNewTheme(userId);
-    completeNewTheme(userId);
-    completeNewTheme(userId);
-
-    assertThat(unlockedIds(villageService.getBuildings(userId)))
-        .containsExactly("home", "cafe", "shop");
-  }
-
-  @Test
-  void 한_번_열린_건물은_완료_수가_줄어도_유지된다() {
-    Long userId = newUserId();
-    completeNewTheme(userId);
-    completeNewTheme(userId);
-    completeNewTheme(userId);
-    assertThat(unlockedIds(villageService.getBuildings(userId)))
-        .containsExactly("home", "cafe", "shop");
-
-    jdbcTemplate.update("UPDATE theme_progress SET completed = false WHERE user_id = ?", userId);
-    assertThat(themeProgressRepository.countByUserIdAndCompletedTrue(userId)).isZero();
-
-    assertThat(unlockedIds(villageService.getBuildings(userId)))
         .containsExactly("home", "cafe", "shop");
   }
 
@@ -159,6 +114,6 @@ class VillageServiceIntegrationTest {
     assertThat(second).isEqualTo(first);
     Integer rows = jdbcTemplate.queryForObject(
         "SELECT count(*) FROM user_building WHERE user_id = ?", Integer.class, userId);
-    assertThat(rows).isEqualTo(2);
+    assertThat(rows).isEqualTo(3);
   }
 }

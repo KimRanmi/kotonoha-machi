@@ -15,8 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 마을 건물의 열림 상태와 사용자가 마지막으로 서 있던 자리를 DB에 저장하고 조회한다. 열림 규칙(집 0개, 카페 1개, 상점 3개
- * 완료)은 AI가 아니라 이 일반 코드가 판단하며, 한 번 열린 건물은 규칙이 바뀌어도 다시 잠기지 않는다.
+ * 마을 건물의 열림 상태와 사용자가 마지막으로 서 있던 자리를 DB에 저장하고 조회한다. 열림 규칙(현재는 모든 건물이 처음부터 열림)은 AI가 아니라 이 일반 코드가 판단하며, 한 번 열린 건물은 규칙이 바뀌어도 다시 잠기지 않는다.
  */
 @Service
 public class VillageService {
