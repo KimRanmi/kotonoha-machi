@@ -4,6 +4,7 @@ import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
 import { collidesWithBuildings } from '../lib/villageBuildings';
+import { VILLAGE_RESIDENTS, collidesWithResidents } from '../lib/villageResidents';
 import { collidesWithTrees } from '../lib/villageScenery';
 import { createVillageWorld } from '../lib/villageScenery3d';
 import styles from './VillageScene.module.css';
@@ -42,7 +43,33 @@ const KEY_DIRECTIONS: Record<string, [number, number]> = {
 
 /** 캐릭터가 (x, z)에 설 수 없는 자리(건물이나 나무 줄기)인지. */
 function isBlocked(x: number, z: number): boolean {
-  return collidesWithBuildings(x, z) || collidesWithTrees(x, z);
+  return collidesWithBuildings(x, z) || collidesWithTrees(x, z) || collidesWithResidents(x, z);
+}
+
+/** 주민 머리 위에 띄울 이름표. 글자를 캔버스에 그려 항상 카메라를 향하는 판(Sprite)에 붙인다. */
+function createNameTag(name: string): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const context = canvas.getContext('2d');
+  if (context) {
+    context.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    context.beginPath();
+    context.roundRect(0, 8, 256, 48, 24);
+    context.fill();
+    context.fillStyle = '#3d3a36';
+    context.font = 'bold 30px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(name, 128, 33);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
+  sprite.renderOrder = 1; // 다른 물체에 가려지지 않게 맨 위에 그린다
+  sprite.scale.set(2.4, 0.6, 1);
+  sprite.position.y = 2.6; // 주민 모델(배율 적용 전) 머리 위
+  return sprite;
 }
 
 function createGroundTexture(): THREE.CanvasTexture {
@@ -103,6 +130,18 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
     scene.add(player);
+
+    // 주민은 고정 위치에 서서 광장 쪽을 바라본다. 장면이 사라질 때 정리할 수 있게 목록으로 들고 있는다.
+    const residentModels = VILLAGE_RESIDENTS.map((resident) => {
+      const model = createAvatarModel(resident.avatar, palette);
+      model.scale.setScalar(PLAYER_SCALE);
+      model.position.set(resident.x, 0, resident.z);
+      model.rotation.y = Math.atan2(-resident.x, -resident.z);
+      const nameTag = createNameTag(resident.name);
+      model.add(nameTag);
+      scene.add(model);
+      return { model, nameTag };
+    });
 
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -237,6 +276,11 @@ function VillageScene({ avatar, palette, onEnterBuilding }: VillageSceneProps) {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
       disposeAvatarModel(player);
+      for (const { model, nameTag } of residentModels) {
+        disposeAvatarModel(model);
+        nameTag.material.map?.dispose();
+        nameTag.material.dispose();
+      }
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();
