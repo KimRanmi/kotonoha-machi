@@ -7,6 +7,7 @@ import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.vocabulary.VocabularyEntry;
 import com.kotonohamachi.vocabulary.VocabularySource;
+import com.kotonohamachi.vocabulary.dto.VocabularyResponse;
 import com.kotonohamachi.vocabulary.repository.VocabularyRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -74,6 +75,19 @@ public class VocabularyService {
       savedCount++;
     }
     return savedCount;
+  }
+
+  /**
+   * 사용자의 단어장을 최근 저장한 순서로 조회한다.
+   *
+   * @param userId 단어장 주인 ID(로그인한 본인)
+   * @return 단어장 목록
+   */
+  @Transactional(readOnly = true)
+  public List<VocabularyResponse> getVocabulary(Long userId) {
+    return vocabularyRepository.findAllByUserIdOrderBySavedAtDescIdDesc(userId).stream()
+        .map(VocabularyResponse::from)
+        .toList();
   }
 
   private User findUserOrThrow(Long userId) {

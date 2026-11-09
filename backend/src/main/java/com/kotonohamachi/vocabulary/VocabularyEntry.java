@@ -84,6 +84,15 @@ public class VocabularyEntry {
   }
 
   /**
+   * 단어장 항목 ID를 반환한다.
+   *
+   * @return 항목 ID
+   */
+  public Long getId() {
+    return id;
+  }
+
+  /**
    * 단어 표기를 반환한다.
    *
    * @return 한자·가나로 쓰인 표기
