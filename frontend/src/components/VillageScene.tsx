@@ -4,6 +4,7 @@ import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
 import { collidesWithBuildings } from '../lib/villageBuildings';
+import { VILLAGE_RESIDENTS, collidesWithResidents } from '../lib/villageResidents';
 import { collidesWithTrees } from '../lib/villageScenery';
 import { createVillageWorld } from '../lib/villageScenery3d';
 import styles from './VillageScene.module.css';
@@ -15,10 +16,13 @@ interface VillageSceneProps {
   onEnterBuilding: (buildingId: string) => void;
   /** 서버가 열려 있다고 알려 준 건물 id들. 여기에 없는 건물은 잠긴 것으로 본다. */
   unlockedBuildingIds: ReadonlySet<string>;
+  /** 대화 가능한 거리 안에 들어온 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
+  onNearResidentChange: (residentSlug: string | null) => void;
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
 const PLAYER_SCALE = 0.6; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
+const TALK_DISTANCE = 2; // 이 거리 안에 들어오면 주민에게 말을 걸 수 있다
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
 const MAP_HALF_SIZE = 18; // 이동 가능한 정사각형 땅의 절반 크기
 const GROUND_HALF_SIZE = 60; // 눈에 보이는 풀밭의 절반 크기. 화면 어디를 봐도 땅이 보이게 이동 범위보다 훨씬 크다
@@ -44,7 +48,33 @@ const KEY_DIRECTIONS: Record<string, [number, number]> = {
 
 /** 캐릭터가 (x, z)에 설 수 없는 자리(건물이나 나무 줄기)인지. */
 function isBlocked(x: number, z: number): boolean {
-  return collidesWithBuildings(x, z) || collidesWithTrees(x, z);
+  return collidesWithBuildings(x, z) || collidesWithTrees(x, z) || collidesWithResidents(x, z);
+}
+
+/** 주민 머리 위에 띄울 이름표. 글자를 캔버스에 그려 항상 카메라를 향하는 판(Sprite)에 붙인다. */
+function createNameTag(name: string): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const context = canvas.getContext('2d');
+  if (context) {
+    context.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    context.beginPath();
+    context.roundRect(0, 8, 256, 48, 24);
+    context.fill();
+    context.fillStyle = '#3d3a36';
+    context.font = 'bold 30px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(name, 128, 33);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
+  sprite.renderOrder = 1; // 다른 물체에 가려지지 않게 맨 위에 그린다
+  sprite.scale.set(2.4, 0.6, 1);
+  sprite.position.y = 2.6; // 주민 모델(배율 적용 전) 머리 위
+  return sprite;
 }
 
 function createGroundTexture(): THREE.CanvasTexture {
@@ -74,6 +104,7 @@ function VillageScene({
   palette,
   onEnterBuilding,
   unlockedBuildingIds,
+  onNearResidentChange,
 }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // 장면은 avatar/palette가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
@@ -88,6 +119,10 @@ function VillageScene({
     unlockedRef.current = unlockedBuildingIds;
     applyUnlockedRef.current?.();
   }, [unlockedBuildingIds]);
+  const onNearRef = useRef(onNearResidentChange);
+  useEffect(() => {
+    onNearRef.current = onNearResidentChange;
+  }, [onNearResidentChange]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -124,6 +159,18 @@ function VillageScene({
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
     scene.add(player);
+
+    // 주민은 고정 위치에 서서 광장 쪽을 바라본다. 장면이 사라질 때 정리할 수 있게 목록으로 들고 있는다.
+    const residentModels = VILLAGE_RESIDENTS.map((resident) => {
+      const model = createAvatarModel(resident.avatar, palette);
+      model.scale.setScalar(PLAYER_SCALE);
+      model.position.set(resident.x, 0, resident.z);
+      model.rotation.y = Math.atan2(-resident.x, -resident.z);
+      const nameTag = createNameTag(resident.name);
+      model.add(nameTag);
+      scene.add(model);
+      return { model, nameTag };
+    });
 
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -202,6 +249,7 @@ function VillageScene({
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
 
+    let nearSlug: string | null = null;
     let targetAngle = 0;
     let previousTime = performance.now();
     let frameId = 0;
@@ -240,6 +288,21 @@ function VillageScene({
         targetAngle = Math.atan2(dx, dz);
       }
 
+      // 가장 가까운 주민이 말 걸 수 있는 거리 안이면 마을 화면이 대화 버튼을 띄운다.
+      let closest: string | null = null;
+      let closestDistance = TALK_DISTANCE;
+      for (const resident of VILLAGE_RESIDENTS) {
+        const distance = Math.hypot(player.position.x - resident.x, player.position.z - resident.z);
+        if (distance < closestDistance) {
+          closest = resident.slug;
+          closestDistance = distance;
+        }
+      }
+      if (closest !== nearSlug) {
+        nearSlug = closest;
+        onNearRef.current(nearSlug);
+      }
+
       // 현재 각도에서 목표 각도로 가장 짧은 방향으로 부드럽게 돈다.
       let diff = targetAngle - player.rotation.y;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
@@ -254,12 +317,18 @@ function VillageScene({
     frameId = requestAnimationFrame(animate);
 
     return () => {
+      onNearRef.current(null);
       cancelAnimationFrame(frameId);
       observer.disconnect();
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
       disposeAvatarModel(player);
+      for (const { model, nameTag } of residentModels) {
+        disposeAvatarModel(model);
+        nameTag.material.map?.dispose();
+        nameTag.material.dispose();
+      }
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();
