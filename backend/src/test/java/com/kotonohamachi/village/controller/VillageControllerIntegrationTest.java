@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -100,5 +101,62 @@ class VillageControllerIntegrationTest {
         .andExpect(jsonPath("$[1].unlocked").value(false))
         .andExpect(jsonPath("$[2].id").value("shop"))
         .andExpect(jsonPath("$[2].unlocked").value(false));
+  }
+
+  @Test
+  void 마을_위치는_로그인하지_않으면_401을_반환한다() throws Exception {
+    mockMvc.perform(get("/api/village/position")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(put("/api/village/position")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"x\":1,\"z\":2}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void 위치를_저장한_적이_없으면_좌표가_null이다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+
+    mockMvc
+        .perform(get("/api/village/position").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.x").isEmpty())
+        .andExpect(jsonPath("$.z").isEmpty());
+  }
+
+  @Test
+  void 저장한_위치를_다시_조회하면_같은_값을_받는다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+
+    mockMvc
+        .perform(put("/api/village/position")
+            .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"x\":3.5,\"z\":-7.25}"))
+        .andExpect(status().isNoContent());
+
+    mockMvc
+        .perform(get("/api/village/position").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.x").value(3.5))
+        .andExpect(jsonPath("$.z").value(-7.25));
+  }
+
+  @Test
+  void 마을_범위를_벗어나거나_빠진_좌표는_400을_반환한다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+
+    mockMvc
+        .perform(put("/api/village/position")
+            .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"x\":99,\"z\":0}"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(put("/api/village/position")
+            .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"x\":1}"))
+        .andExpect(status().isBadRequest());
   }
 }

@@ -90,6 +90,13 @@ public class User {
   @Column(name = "avatar_shoes_color", nullable = false)
   private AvatarShoesColor avatarShoesColor = AvatarShoesColor.WHITE;
 
+  // 마을에서 마지막으로 서 있던 자리. 둘 다 null이면 저장한 적이 없다.
+  @Column(name = "village_x")
+  private Double villageX;
+
+  @Column(name = "village_z")
+  private Double villageZ;
+
   /** JPA가 엔티티를 만들 때 사용하는 기본 생성자. */
   protected User() {}
 
@@ -366,6 +373,35 @@ public class User {
     this.avatarClothesStyle = clothesStyle;
     this.avatarClothesColor = clothesColor;
     this.avatarShoesColor = shoesColor;
+  }
+
+  /**
+   * 마을에서 마지막으로 서 있던 자리를 기록한다. 범위 검증은 호출하는 쪽의 책임이다.
+   *
+   * @param x 가로(x) 좌표
+   * @param z 세로(z) 좌표
+   */
+  public void moveInVillage(double x, double z) {
+    this.villageX = x;
+    this.villageZ = z;
+  }
+
+  /**
+   * 마을에서 마지막으로 서 있던 자리의 x 좌표를 반환한다.
+   *
+   * @return x 좌표. 저장한 적이 없으면 null
+   */
+  public Double getVillageX() {
+    return villageX;
+  }
+
+  /**
+   * 마을에서 마지막으로 서 있던 자리의 z 좌표를 반환한다.
+   *
+   * @return z 좌표. 저장한 적이 없으면 null
+   */
+  public Double getVillageZ() {
+    return villageZ;
   }
 
   /**

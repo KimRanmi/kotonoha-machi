@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import type { VillagePosition } from '../api/village';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
@@ -18,6 +19,10 @@ interface VillageSceneProps {
   unlockedBuildingIds: ReadonlySet<string>;
   /** 대화 가능한 거리 안에 들어온 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
   onNearResidentChange: (residentSlug: string | null) => void;
+  /** 서버에 저장된 마지막 위치. 없거나 지금은 설 수 없는 자리면 기본 시작 위치에서 시작한다. 장면을 만들 때 한 번만 읽는다. */
+  initialPosition: VillagePosition | null;
+  /** 마을을 떠나거나 탭을 닫기·숨길 때 지금 서 있는 자리를 저장하라고 알린다. */
+  onSavePosition: (position: VillagePosition) => void;
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
@@ -105,6 +110,8 @@ function VillageScene({
   onEnterBuilding,
   unlockedBuildingIds,
   onNearResidentChange,
+  initialPosition,
+  onSavePosition,
 }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // 장면은 avatar/palette가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
@@ -123,6 +130,13 @@ function VillageScene({
   useEffect(() => {
     onNearRef.current = onNearResidentChange;
   }, [onNearResidentChange]);
+
+  const onSaveRef = useRef(onSavePosition);
+  useEffect(() => {
+    onSaveRef.current = onSavePosition;
+  }, [onSavePosition]);
+  // 시작 위치는 장면을 만들 때 한 번만 쓰므로 ref에 담아 두고, 값이 바뀌어도 장면을 다시 만들지 않는다.
+  const initialPositionRef = useRef(initialPosition);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -158,6 +172,10 @@ function VillageScene({
 
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
+    const start = initialPositionRef.current;
+    if (start && !isBlocked(start.x, start.z)) {
+      player.position.set(start.x, 0, start.z);
+    }
     scene.add(player);
 
     // 주민은 고정 위치에 서서 광장 쪽을 바라본다. 장면이 사라질 때 정리할 수 있게 목록으로 들고 있는다.
@@ -249,6 +267,16 @@ function VillageScene({
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
 
+    // 서 있는 자리를 서버에 저장하도록 알린다. 숨김/종료는 탭 전환·닫기 때 불리고, 정리 함수는 다른 화면으로 갈 때 부른다.
+    const savePosition = () => onSaveRef.current({ x: player.position.x, z: player.position.z });
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        savePosition();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', savePosition);
+
     let nearSlug: string | null = null;
     let entered = false; // 문 앞에서 프레임마다 입장이 중복 호출되지 않게
     let targetAngle = 0;
@@ -325,6 +353,9 @@ function VillageScene({
     frameId = requestAnimationFrame(animate);
 
     return () => {
+      savePosition();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', savePosition);
       onNearRef.current(null);
       cancelAnimationFrame(frameId);
       observer.disconnect();

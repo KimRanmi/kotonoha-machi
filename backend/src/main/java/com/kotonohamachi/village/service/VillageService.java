@@ -1,9 +1,12 @@
 package com.kotonohamachi.village.service;
 
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
+import com.kotonohamachi.user.User;
+import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.village.UserBuilding;
 import com.kotonohamachi.village.VillageBuilding;
 import com.kotonohamachi.village.dto.VillageBuildingResponse;
+import com.kotonohamachi.village.dto.VillagePositionResponse;
 import com.kotonohamachi.village.repository.UserBuildingRepository;
 import java.util.Arrays;
 import java.util.List;
@@ -21,18 +24,22 @@ public class VillageService {
 
   private final UserBuildingRepository userBuildingRepository;
   private final ThemeProgressRepository themeProgressRepository;
+  private final UserRepository userRepository;
 
   /**
    * 생성자.
    *
    * @param userBuildingRepository 열린 건물 저장소
    * @param themeProgressRepository 사용자별 테마 진행 상태 저장소(완료 테마 수 계산용)
+   * @param userRepository 사용자 저장소(마지막 위치 저장용)
    */
   public VillageService(
       UserBuildingRepository userBuildingRepository,
-      ThemeProgressRepository themeProgressRepository) {
+      ThemeProgressRepository themeProgressRepository,
+      UserRepository userRepository) {
     this.userBuildingRepository = userBuildingRepository;
     this.themeProgressRepository = themeProgressRepository;
+    this.userRepository = userRepository;
   }
 
   /**
@@ -68,5 +75,35 @@ public class VillageService {
         userBuildingRepository.unlockIfAbsent(userId, building.getId());
       }
     }
+  }
+
+  /**
+   * 사용자가 마을에서 마지막으로 서 있던 자리를 조회한다.
+   *
+   * @param userId 조회할 사용자 ID(로그인한 본인)
+   * @return 마지막 자리. 저장한 적이 없으면 두 좌표 모두 null
+   */
+  @Transactional(readOnly = true)
+  public VillagePositionResponse getPosition(Long userId) {
+    User user = findUserOrThrow(userId);
+    return new VillagePositionResponse(user.getVillageX(), user.getVillageZ());
+  }
+
+  /**
+   * 사용자가 마을에서 서 있는 자리를 저장한다. 좌표 범위는 요청 검증이 이미 확인했다.
+   *
+   * @param userId 저장할 사용자 ID(로그인한 본인)
+   * @param x 가로(x) 좌표
+   * @param z 세로(z) 좌표
+   */
+  @Transactional
+  public void savePosition(Long userId, double x, double z) {
+    findUserOrThrow(userId).moveInVillage(x, z);
+  }
+
+  private User findUserOrThrow(Long userId) {
+    return userRepository
+        .findById(userId)
+        .orElseThrow(() -> new IllegalStateException("로그인한 사용자를 찾을 수 없습니다."));
   }
 }
