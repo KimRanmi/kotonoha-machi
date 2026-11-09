@@ -146,6 +146,32 @@ class ThemeServiceTest {
   }
 
   @Test
+  void completeStage_WORD_단계를_완료하면_단어장_저장을_요청한다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    progress.completeCurrentStage(); // KANJI -> WORD
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
+
+    themeService.completeStage(1L, 1L, ThemeStage.WORD);
+
+    verify(vocabularyService).saveThemeWords(1L, 1L, ThemeStage.WORD);
+  }
+
+  @Test
+  void completeStage_단계_순서를_어기면_단어장_저장을_요청하지_않는다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
+
+    catchThrowableOfType(
+        ApiException.class, () -> themeService.completeStage(1L, 1L, ThemeStage.WORD));
+
+    verify(vocabularyService, never()).saveThemeWords(any(), any(), any());
+  }
+
+  @Test
   void completeStage_진행중인_단계를_건너뛰면_409_예외를_던진다() {
     Theme theme = new Theme("카페에서 주문하기");
     ThemeProgress progress = new ThemeProgress(user(), theme);
