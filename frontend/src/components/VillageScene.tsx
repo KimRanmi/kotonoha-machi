@@ -23,8 +23,8 @@ interface VillageSceneProps {
   onNearBuildingChange: (buildingId: string | null) => void;
   /** 서버에 저장된 마지막 위치. 없거나 지금은 설 수 없는 자리면 기본 시작 위치에서 시작한다. 장면을 만들 때 한 번만 읽는다. */
   initialPosition: VillagePosition | null;
-  /** 마을을 떠나거나 탭을 닫기·숨길 때 지금 서 있는 자리를 저장하라고 알린다. */
-  onSavePosition: (position: VillagePosition) => void;
+  /** 캐릭터가 서 있는 자리가 바뀔 때마다(시작할 때 포함) 호출된다. 저장은 호출하는 쪽이 맡는다. */
+  onPositionChange: (position: VillagePosition) => void;
 }
 
 const WALK_SPEED = 4; // 초당 이동 거리
@@ -114,7 +114,7 @@ function VillageScene({
   onNearResidentChange,
   onNearBuildingChange,
   initialPosition,
-  onSavePosition,
+  onPositionChange,
 }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // 장면은 avatar/palette가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
@@ -138,10 +138,10 @@ function VillageScene({
   useEffect(() => {
     onNearBuildingRef.current = onNearBuildingChange;
   }, [onNearBuildingChange]);
-  const onSaveRef = useRef(onSavePosition);
+  const onPositionRef = useRef(onPositionChange);
   useEffect(() => {
-    onSaveRef.current = onSavePosition;
-  }, [onSavePosition]);
+    onPositionRef.current = onPositionChange;
+  }, [onPositionChange]);
   // 시작 위치는 장면을 만들 때 한 번만 쓰므로 ref에 담아 두고, 값이 바뀌어도 장면을 다시 만들지 않는다.
   const initialPositionRef = useRef(initialPosition);
 
@@ -274,16 +274,7 @@ function VillageScene({
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
 
-    // 서 있는 자리를 서버에 저장하도록 알린다. 숨김/종료는 탭 전환·닫기 때 불리고, 정리 함수는 다른 화면으로 갈 때 부른다.
-    const savePosition = () => onSaveRef.current({ x: player.position.x, z: player.position.z });
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        savePosition();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', savePosition);
-
+    onPositionRef.current({ x: player.position.x, z: player.position.z });
     let nearSlug: string | null = null;
     let nearBuildingId: string | null = null;
     let targetAngle = 0;
@@ -322,6 +313,7 @@ function VillageScene({
           player.position.z = nextZ;
         }
         targetAngle = Math.atan2(dx, dz);
+        onPositionRef.current({ x: player.position.x, z: player.position.z });
       }
 
       // 열린 건물의 문 앞에 서 있으면 마을 화면이 입장 버튼을 띄운다.
@@ -361,9 +353,6 @@ function VillageScene({
     frameId = requestAnimationFrame(animate);
 
     return () => {
-      savePosition();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', savePosition);
       onNearRef.current(null);
       onNearBuildingRef.current(null);
       cancelAnimationFrame(frameId);

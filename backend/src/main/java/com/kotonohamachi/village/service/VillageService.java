@@ -1,13 +1,12 @@
 package com.kotonohamachi.village.service;
 
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
-import com.kotonohamachi.user.User;
-import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.village.UserBuilding;
 import com.kotonohamachi.village.VillageBuilding;
 import com.kotonohamachi.village.dto.VillageBuildingResponse;
 import com.kotonohamachi.village.dto.VillagePositionResponse;
 import com.kotonohamachi.village.repository.UserBuildingRepository;
+import com.kotonohamachi.village.repository.UserVillagePositionRepository;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -16,30 +15,30 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 마을 건물의 열림 상태를 DB에 저장하고 조회한다. 열림 규칙(집 0개, 카페 1개, 상점 3개 완료)은 AI가 아니라 이 일반
- * 코드가 판단하며, 한 번 열린 건물은 규칙이 바뀌어도 다시 잠기지 않는다.
+ * 마을 건물의 열림 상태와 사용자가 마지막으로 서 있던 자리를 DB에 저장하고 조회한다. 열림 규칙(집 0개, 카페 1개, 상점 3개
+ * 완료)은 AI가 아니라 이 일반 코드가 판단하며, 한 번 열린 건물은 규칙이 바뀌어도 다시 잠기지 않는다.
  */
 @Service
 public class VillageService {
 
   private final UserBuildingRepository userBuildingRepository;
   private final ThemeProgressRepository themeProgressRepository;
-  private final UserRepository userRepository;
+  private final UserVillagePositionRepository positionRepository;
 
   /**
    * 생성자.
    *
    * @param userBuildingRepository 열린 건물 저장소
    * @param themeProgressRepository 사용자별 테마 진행 상태 저장소(완료 테마 수 계산용)
-   * @param userRepository 사용자 저장소(마지막 위치 저장용)
+   * @param positionRepository 마을에서 마지막으로 서 있던 자리 저장소
    */
   public VillageService(
       UserBuildingRepository userBuildingRepository,
       ThemeProgressRepository themeProgressRepository,
-      UserRepository userRepository) {
+      UserVillagePositionRepository positionRepository) {
     this.userBuildingRepository = userBuildingRepository;
     this.themeProgressRepository = themeProgressRepository;
-    this.userRepository = userRepository;
+    this.positionRepository = positionRepository;
   }
 
   /**
@@ -85,8 +84,10 @@ public class VillageService {
    */
   @Transactional(readOnly = true)
   public VillagePositionResponse getPosition(Long userId) {
-    User user = findUserOrThrow(userId);
-    return new VillagePositionResponse(user.getVillageX(), user.getVillageZ());
+    return positionRepository
+        .findById(userId)
+        .map(position -> new VillagePositionResponse(position.getX(), position.getZ()))
+        .orElse(new VillagePositionResponse(null, null));
   }
 
   /**
@@ -98,12 +99,6 @@ public class VillageService {
    */
   @Transactional
   public void savePosition(Long userId, double x, double z) {
-    findUserOrThrow(userId).moveInVillage(x, z);
-  }
-
-  private User findUserOrThrow(Long userId) {
-    return userRepository
-        .findById(userId)
-        .orElseThrow(() -> new IllegalStateException("로그인한 사용자를 찾을 수 없습니다."));
+    positionRepository.upsert(userId, x, z);
   }
 }

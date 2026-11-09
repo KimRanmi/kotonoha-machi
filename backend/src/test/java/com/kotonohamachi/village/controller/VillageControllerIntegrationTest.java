@@ -27,7 +27,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** {@code GET /api/village/buildings}의 인증과 응답 형태를 실제 Postgres와 Security 필터 체인으로 검증한다. */
+/** 마을 건물 조회와 마지막 위치 조회·저장 API의 인증과 응답 형태를 실제 Postgres와 Security 필터 체인으로 검증한다. */
 @Testcontainers
 @SpringBootTest
 class VillageControllerIntegrationTest {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
@@ -16,6 +16,8 @@ import { VILLAGE_BUILDINGS } from '../lib/villageBuildings';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
+
+const POSITION_SAVE_INTERVAL_MS = 30_000;
 
 function TownPage() {
   const navigate = useNavigate();
@@ -135,17 +137,54 @@ function TownPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [nearBuildingId, navigate]);
 
-  function handleSavePosition(position: VillagePosition) {
-    saveVillagePosition(position).catch(() => {
-      // 위치 저장은 실패해도 마을 이용을 막지 않는다. 다음에 저장할 때 다시 시도한다.
-    });
+  // 위치는 걸을 때마다 ref에만 담고, 서버 저장은 아래 시점에만 한다. 서버에 마지막으로 보낸 값과 같으면 보내지 않는다.
+  const currentPositionRef = useRef<VillagePosition | null>(null);
+  const savedPositionRef = useRef<VillagePosition | null>(null);
+
+  async function savePositionIfMoved() {
+    const current = currentPositionRef.current;
+    const saved = savedPositionRef.current;
+    if (!current || (saved && saved.x === current.x && saved.z === current.z)) {
+      return;
+    }
+    savedPositionRef.current = current;
+    try {
+      await saveVillagePosition(current);
+    } catch {
+      // 위치 저장은 실패해도 마을 이용을 막지 않는다. 다음 저장 시점에 다시 시도한다.
+      savedPositionRef.current = null;
+    }
   }
+
+  // 30초마다, 탭이 숨겨지거나 닫힐 때, 마을 화면을 떠날 때 저장한다. 앞의 둘은 비정상 종료로 잃는 이동을 줄여 준다.
+  useEffect(() => {
+    if (!positionLoaded) {
+      return;
+    }
+    savedPositionRef.current = initialPosition;
+    const save = () => void savePositionIfMoved();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        save();
+      }
+    };
+    const intervalId = window.setInterval(save, POSITION_SAVE_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', save);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', save);
+      save();
+    };
+  }, [positionLoaded, initialPosition]);
 
   async function handleLogout() {
     setLogoutErrorMessage(null);
     setIsLoggingOut(true);
 
     try {
+      await savePositionIfMoved(); // 로그아웃하면 세션이 끊겨 저장할 수 없으므로 먼저 저장한다.
       await logout();
       navigate('/login', { replace: true });
     } catch (error) {
@@ -243,7 +282,9 @@ function TownPage() {
           onNearResidentChange={setNearResidentSlug}
           onNearBuildingChange={setNearBuildingId}
           initialPosition={initialPosition}
-          onSavePosition={handleSavePosition}
+          onPositionChange={(position) => {
+            currentPositionRef.current = position;
+          }}
         />
       )}
       {nearResident && (
