@@ -12,6 +12,10 @@ const WALL_HEIGHT = 12;
 const WALL_THICKNESS = 0.2;
 // 바닥과 벽은 방 크기보다 훨씬 길게 만든다. 방의 앞쪽·오른쪽 끝 너머까지 이어져, 화면 어디에도 빈 배경이 보이지 않는다.
 const FILL_SIZE = 60;
+const MAT_WIDTH = 1.6; // 현관 매트의 가로 길이(배치 좌표)
+// 방 앞쪽 가장자리에 두르는 낮은 문턱. 캐릭터 발목 높이라 방 안을 가리지 않는다.
+const SILL_HEIGHT = 0.25;
+const SILL_DEPTH = 0.2;
 const WOOD = '#8a5a3c';
 const DARK_WOOD = '#5a3a24';
 const CREAM = '#f5f0e0';
@@ -86,7 +90,22 @@ export function createInteriorRoom(interior: BuildingInterior): InteriorRoom {
   );
   place(box(FILL_SIZE, 0.25, 0.06, WOOD), centerX, 0.125, ROOM_LAYOUT.minZ + 0.03, group);
   place(box(0.06, 0.25, FILL_SIZE, WOOD), ROOM_LAYOUT.minX + 0.03, 0.125, centerZ, group);
-  place(box(1.6, 0.04, 0.7, '#a8672e'), 0, 0.02, ROOM_LAYOUT.maxZ - 0.35, group);
+  place(box(MAT_WIDTH, 0.04, 0.7, '#a8672e'), 0, 0.02, ROOM_LAYOUT.maxZ - 0.35, group);
+  // 방 앞쪽 가장자리의 문턱. 매트 자리만 비워 두어, 매트가 빈 바닥이 아니라 현관에 깔린 것으로 보인다.
+  const sillRight = ROOM_LAYOUT.minX + FILL_SIZE;
+  const sillEdges = [
+    [ROOM_LAYOUT.minX, -MAT_WIDTH / 2],
+    [MAT_WIDTH / 2, sillRight],
+  ];
+  for (const [from, to] of sillEdges) {
+    place(
+      box(to - from, SILL_HEIGHT, SILL_DEPTH, WOOD),
+      (from + to) / 2,
+      SILL_HEIGHT / 2,
+      ROOM_LAYOUT.maxZ + SILL_DEPTH / 2,
+      group,
+    );
+  }
 
   // 가구 종류별 모양. 가구 중심이 원점, 앞면이 +z인 채로 만들고 놓을 때 위치와 방향을 준다.
   const builders: Record<FurnitureKind, (g: THREE.Group, color?: string) => void> = {
