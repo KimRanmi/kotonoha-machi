@@ -17,9 +17,9 @@ public interface ResidentRepository extends JpaRepository<Resident, Long> {
   Optional<Resident> findBySlug(String slug);
 
   /**
-   * 어느 건물에든 속한 주민을 id 순으로 조회한다.
+   * 지내는 장소가 정해진 주민을 id 순으로 조회한다.
    *
-   * @return 소속 건물이 있는 주민 목록
+   * @return 장소가 있는 주민 목록
    */
-  List<Resident> findAllByWorkBuildingIsNotNullOrderByIdAsc();
+  List<Resident> findAllByLocationIsNotNullOrderByIdAsc();
 }

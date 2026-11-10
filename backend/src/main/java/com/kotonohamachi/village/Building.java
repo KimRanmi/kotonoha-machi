@@ -43,6 +43,9 @@ public class Building {
   @Column(nullable = false)
   private String color;
 
+  @Column(nullable = false)
+  private String location;
+
   /** JPA가 엔티티를 만들 때 사용하는 기본 생성자. */
   protected Building() {}
 
@@ -76,5 +79,14 @@ public class Building {
 
   public String getColor() {
     return color;
+  }
+
+  /**
+   * 건물이 있는 장소 이름(주민 시트의 location 값과 같다)을 반환한다.
+   *
+   * @return 장소 이름
+   */
+  public String getLocation() {
+    return location;
   }
 }

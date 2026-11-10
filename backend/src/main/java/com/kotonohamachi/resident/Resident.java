@@ -37,8 +37,8 @@ public class Resident {
   @Column(name = "sample_lines", nullable = false)
   private String sampleLines;
 
-  @Column(name = "work_building")
-  private String workBuilding;
+  @Column
+  private String location;
 
   /** JPA가 엔티티를 만들 때 사용하는 기본 생성자. */
   protected Resident() {}
@@ -76,11 +76,11 @@ public class Resident {
   }
 
   /**
-   * 주민이 속한 건물의 slug를 반환한다.
+   * 주민이 지내는 장소 이름을 반환한다. 같은 이름의 건물이 있으면 그 건물에 속한 주민이다.
    *
-   * @return 건물 slug. 소속이 없으면 null
+   * @return 장소 이름. 정하지 않았으면 null
    */
-  public String getWorkBuilding() {
-    return workBuilding;
+  public String getLocation() {
+    return location;
   }
 }

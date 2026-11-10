@@ -19,7 +19,7 @@ export interface Plant {
 export const TREE_RADIUS = 0.6;
 
 /** 나무·꽃을 심을 수 있는 땅의 절반 크기(가장자리에서 조금 안쪽). */
-const PLANT_LIMIT = 16;
+const PLANT_LIMIT = 20;
 const PATH_WIDTH = 1.6;
 
 /** 중앙 광장과, 광장에서 각 건물 문 앞까지 이어지는 길. */
@@ -66,7 +66,7 @@ function createRandom(seed: number): () => number {
 function scatterTrees(isOccupied: IsOccupied): Plant[] {
   const random = createRandom(7);
   const trees: Plant[] = [];
-  for (let attempt = 0; attempt < 400 && trees.length < 12; attempt++) {
+  for (let attempt = 0; attempt < 600 && trees.length < 18; attempt++) {
     const x = (random() * 2 - 1) * PLANT_LIMIT;
     const z = (random() * 2 - 1) * PLANT_LIMIT;
     const tooClose = trees.some((tree) => Math.hypot(tree.x - x, tree.z - z) < 4);
@@ -82,7 +82,7 @@ function scatterFlowers(trees: Plant[], isOccupied: IsOccupied): Plant[] {
   const random = createRandom(21);
   const flowers: Plant[] = [];
   // 꽃은 한 송이씩 흩뿌리지 않고 무리 지어 핀다.
-  for (let cluster = 0; cluster < 14; cluster++) {
+  for (let cluster = 0; cluster < 21; cluster++) {
     const centerX = (random() * 2 - 1) * PLANT_LIMIT;
     const centerZ = (random() * 2 - 1) * PLANT_LIMIT;
     for (let i = 0; i < 10; i++) {
@@ -105,7 +105,7 @@ function scatterFlowers(trees: Plant[], isOccupied: IsOccupied): Plant[] {
 function scatterBushes(trees: Plant[], isOccupied: IsOccupied): Plant[] {
   const random = createRandom(99);
   const bushes: Plant[] = [];
-  for (let attempt = 0; attempt < 200 && bushes.length < 16; attempt++) {
+  for (let attempt = 0; attempt < 300 && bushes.length < 24; attempt++) {
     const x = (random() * 2 - 1) * PLANT_LIMIT;
     const z = (random() * 2 - 1) * PLANT_LIMIT;
     const nearTree = trees.some((tree) => Math.hypot(tree.x - x, tree.z - z) < 1.5);
@@ -116,9 +116,9 @@ function scatterBushes(trees: Plant[], isOccupied: IsOccupied): Plant[] {
   return bushes;
 }
 
-/** 숲이 시작되는 거리. 캐릭터가 걸어 다니는 땅(±17) 바로 바깥부터 나무를 심는다. */
-const FOREST_START = 18.5;
-const FOREST_END = 48;
+/** 숲이 시작되는 거리. 캐릭터가 걸어 다니는 땅(±21) 바로 바깥부터 나무를 심는다. */
+const FOREST_START = 22.5;
+const FOREST_END = 52;
 const FOREST_SPACING = 6.5;
 
 /** 걸어 다닐 수 있는 땅 바깥을 둘러싼 숲. 캐릭터가 들어갈 수 없는 곳이라 충돌 판정은 없다. */

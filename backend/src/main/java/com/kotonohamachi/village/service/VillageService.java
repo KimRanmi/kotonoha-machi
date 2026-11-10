@@ -37,16 +37,16 @@ public class VillageService {
   }
 
   /**
-   * 마을 건물 목록을 등록된 순서로 조회한다. 건물마다 속한 주민 중 가장 먼저 등록된 한 명의 slug를 함께 준다(입장하면 그 주민과
-   * 대화한다). 속한 주민이 없으면 null이다.
+   * 마을 건물 목록을 등록된 순서로 조회한다. 건물마다 같은 장소(location)에서 지내는 주민 중 가장 먼저 등록된 한 명의
+   * slug를 함께 준다(입장하면 그 주민과 대화한다). 그런 주민이 없으면 null이다.
    *
    * @return 건물 목록
    */
   @Transactional(readOnly = true)
   public List<VillageBuildingResponse> getBuildings() {
-    Map<String, String> residentByBuilding = new HashMap<>();
-    for (Resident resident : residentRepository.findAllByWorkBuildingIsNotNullOrderByIdAsc()) {
-      residentByBuilding.putIfAbsent(resident.getWorkBuilding(), resident.getSlug());
+    Map<String, String> residentByLocation = new HashMap<>();
+    for (Resident resident : residentRepository.findAllByLocationIsNotNullOrderByIdAsc()) {
+      residentByLocation.putIfAbsent(resident.getLocation(), resident.getSlug());
     }
     return buildingRepository.findAllByOrderByIdAsc().stream()
         .map(building -> new VillageBuildingResponse(
@@ -58,7 +58,7 @@ public class VillageService {
             building.getDepth(),
             building.getHeight(),
             building.getColor(),
-            residentByBuilding.get(building.getSlug())))
+            residentByLocation.get(building.getLocation())))
         .toList();
   }
 

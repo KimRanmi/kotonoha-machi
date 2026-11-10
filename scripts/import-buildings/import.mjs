@@ -18,12 +18,13 @@ const MIGRATION_DIR = path.join(
 );
 
 const FETCH_TIMEOUT_MS = 15000;
-const COLUMNS = ['id', 'label', 'x', 'z', 'width', 'depth', 'height', 'color'];
+const COLUMNS = ['id', 'label', 'x', 'z', 'width', 'depth', 'height', 'color', 'location'];
 const NUMBER_COLUMNS = ['x', 'z', 'width', 'depth', 'height'];
 const POSITIVE_COLUMNS = ['width', 'depth', 'height'];
 const SLUG_PATTERN = /^[a-z][a-z0-9_]{0,19}$/;
 const COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 const LABEL_MAX_LENGTH = 20;
+const LOCATION_MAX_LENGTH = 30;
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -101,7 +102,12 @@ function parseCsv(text) {
 
 // 시트 한 행을 DB 열 형태로 검증·변환한다. 문제는 rowErrors에 모은다.
 function toBuilding(values, rowErrors) {
-  const building = { slug: values.id, label: values.label, color: values.color.toUpperCase() };
+  const building = {
+    slug: values.id,
+    label: values.label,
+    color: values.color.toUpperCase(),
+    location: values.location,
+  };
   for (const key of COLUMNS) {
     if (values[key] === '') {
       rowErrors.push(`${key}가 비어 있다`);
@@ -112,6 +118,9 @@ function toBuilding(values, rowErrors) {
   }
   if ([...values.label].length > LABEL_MAX_LENGTH) {
     rowErrors.push(`label이 ${LABEL_MAX_LENGTH}자를 넘는다`);
+  }
+  if ([...values.location].length > LOCATION_MAX_LENGTH) {
+    rowErrors.push(`location이 ${LOCATION_MAX_LENGTH}자를 넘는다`);
   }
   if (values.color !== '' && !COLOR_PATTERN.test(values.color)) {
     rowErrors.push(`color '${values.color}'는 #RRGGBB 형식이어야 한다`);
@@ -158,6 +167,7 @@ function validate(rows) {
 
   const buildings = [];
   const seenSlugs = new Map();
+  const seenLocations = new Map();
   rows.slice(1).forEach((cells, index) => {
     const rowNumber = index + 2; // 시트 기준(헤더가 1행)
     if (cells.every((c) => c.trim() === '')) {
@@ -175,6 +185,15 @@ function validate(rows) {
         rowErrors.push(`id '${values.id}'가 ${seenSlugs.get(values.id)}행과 중복된다`);
       } else {
         seenSlugs.set(values.id, rowNumber);
+      }
+    }
+    if (values.location !== '') {
+      if (seenLocations.has(values.location)) {
+        rowErrors.push(
+          `location '${values.location}'가 ${seenLocations.get(values.location)}행과 중복된다`,
+        );
+      } else {
+        seenLocations.set(values.location, rowNumber);
       }
     }
     rowErrors.forEach((e) => errors.push(`${rowNumber}행: ${e}`));
@@ -199,7 +218,7 @@ function sqlEscape(value) {
 }
 
 function buildSql(buildings) {
-  const columns = ['slug', 'label', 'x', 'z', 'width', 'depth', 'height', 'color'];
+  const columns = ['slug', 'label', 'x', 'z', 'width', 'depth', 'height', 'color', 'location'];
   const updatable = columns.filter((c) => c !== 'slug');
   const header =
     '-- scripts/import-buildings 가 구글 시트에서 생성한 마을 건물 upsert. 검토 후 커밋한다.\n' +

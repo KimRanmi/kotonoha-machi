@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,6 +39,9 @@ class VillageControllerIntegrationTest {
 
   @Autowired
   private WebApplicationContext webApplicationContext;
+
+  @Autowired
+  private JdbcTemplate jdbcTemplate;
 
   @MockitoBean
   private EmailSender emailSender;
@@ -88,22 +92,23 @@ class VillageControllerIntegrationTest {
   }
 
   @Test
-  void 로그인한_사용자는_건물_3개와_속한_주민을_받는다() throws Exception {
+  void 로그인한_사용자는_건물_목록과_같은_장소의_주민을_받는다() throws Exception {
+    // 건물·주민 데이터는 시트에서 만든 마이그레이션이 채우므로, 이 테스트는 자기만의 장소를 직접 넣어 확인한다.
+    jdbcTemplate.update(
+        "INSERT INTO building (slug, label, x, z, width, depth, height, color, location) "
+            + "VALUES ('it_with', 'テスト', 1.5, -2, 4, 3.5, 2.5, '#112233', '통합테스트장소'), "
+            + "('it_without', 'ナシ', 3, -2, 4, 3.5, 2.5, '#445566', '통합테스트빈장소')");
+    jdbcTemplate.update("UPDATE resident SET location = '통합테스트장소' WHERE slug = 'r01'");
     MockHttpSession session = newLoggedInSession();
 
     mockMvc
         .perform(get("/api/village/buildings").session(session))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(3))
-        .andExpect(jsonPath("$[0].id").value("home"))
-        .andExpect(jsonPath("$[0].residentSlug").doesNotExist())
-        .andExpect(jsonPath("$[1].id").value("cafe"))
-        .andExpect(jsonPath("$[1].label").value("カフェ"))
-        .andExpect(jsonPath("$[1].x").value(-8.0))
-        .andExpect(jsonPath("$[1].color").value("#C97B4A"))
-        .andExpect(jsonPath("$[1].residentSlug").value("r05"))
-        .andExpect(jsonPath("$[2].id").value("shop"))
-        .andExpect(jsonPath("$[2].residentSlug").value("r03"));
+        .andExpect(jsonPath("$[?(@.id == 'it_with')].label").value("テスト"))
+        .andExpect(jsonPath("$[?(@.id == 'it_with')].x").value(1.5))
+        .andExpect(jsonPath("$[?(@.id == 'it_with')].color").value("#112233"))
+        .andExpect(jsonPath("$[?(@.id == 'it_with')].residentSlug").value("r01"))
+        .andExpect(jsonPath("$[?(@.id == 'it_without')].residentSlug[0]").doesNotExist());
   }
 
   @Test
