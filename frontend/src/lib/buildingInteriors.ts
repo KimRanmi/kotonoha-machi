@@ -2,18 +2,32 @@ import { PLAYER_RADIUS } from './villageBuildings';
 
 /**
  * 건물 내부(방) 데이터. 방은 모든 건물이 같은 크기다. 카메라가 (+x, +z) 쪽에서 내려다보므로 벽은
- * 뒤쪽(z = minZ)과 왼쪽(x = minX) 두 면만 세우고, 현관은 앞쪽(z = maxZ) 가장자리 가운데에 있다.
- * 가구는 벽이 있는 뒤·왼쪽에 모아 두고, 오른쪽과 앞쪽은 걸어다닐 빈 바닥으로 남긴다.
+ * 뒤쪽과 왼쪽 두 면만 세우고, 현관은 앞쪽(+z) 가장자리 가운데에 있다.
+ *
+ * 좌표계가 둘이다. 가구 배치는 "배치 좌표"(가로 10 × 세로 8, 중심 (0, 0))로 적고, 화면에 그릴 때와
+ * 캐릭터가 걸을 때는 여기에 ROOM_SCALE을 곱한 "월드 좌표"를 쓴다. 그래서 배율 하나만 바꾸면 방 크기,
+ * 가구 크기, 가구 사이 간격이 함께 커지거나 작아진다.
  */
-export const ROOM = { minX: -5, maxX: 8, minZ: -4, maxZ: 6.5 };
-/** 방 가운데. 현관과 카메라가 이 값을 기준으로 삼는다. */
+export const ROOM_SCALE = 1.3;
+
+/** 배치 좌표로 본 방의 범위. 가구 목록과 방 모양(lib/buildingInterior3d.ts)이 이 좌표를 쓴다. */
+export const ROOM_LAYOUT = { minX: -5, maxX: 5, minZ: -4, maxZ: 4 };
+
+/** 월드 좌표로 본 방의 범위. 캐릭터가 걸어다닐 수 있는 범위다. */
+export const ROOM = {
+  minX: ROOM_LAYOUT.minX * ROOM_SCALE,
+  maxX: ROOM_LAYOUT.maxX * ROOM_SCALE,
+  minZ: ROOM_LAYOUT.minZ * ROOM_SCALE,
+  maxZ: ROOM_LAYOUT.maxZ * ROOM_SCALE,
+};
+/** 방 가운데(월드 좌표). 현관과 카메라가 이 값을 기준으로 삼는다. */
 export const ROOM_CENTER = { x: (ROOM.minX + ROOM.maxX) / 2, z: (ROOM.minZ + ROOM.maxZ) / 2 };
 
-const BACK = ROOM.minZ; // 뒷벽의 z
-const LEFT = ROOM.minX; // 왼쪽 벽의 x
+const BACK = ROOM_LAYOUT.minZ; // 뒷벽의 z(배치 좌표)
+const LEFT = ROOM_LAYOUT.minX; // 왼쪽 벽의 x(배치 좌표)
 
-/** 방에 들어왔을 때 캐릭터가 서는 자리(현관 매트 바로 안쪽). */
-export const ROOM_ENTRANCE = { x: ROOM_CENTER.x, z: ROOM.maxZ - 1.4 };
+/** 방에 들어왔을 때 캐릭터가 서는 자리(월드 좌표, 현관 매트 바로 안쪽). */
+export const ROOM_ENTRANCE = { x: ROOM_CENTER.x, z: ROOM.maxZ - 1.8 };
 
 /** 가구 종류. 모양은 lib/buildingInterior3d.ts가 종류별로 만든다. */
 export type FurnitureKind =
@@ -51,7 +65,7 @@ export type FurnitureKind =
 /** 방에 놓인 가구 하나. */
 export interface InteriorItem {
   kind: FurnitureKind;
-  /** 가구 중심의 위치. 벽걸이(칠판·창문 등)는 벽면 좌표(BACK 또는 LEFT)를 준다. */
+  /** 가구 중심의 위치(배치 좌표). 벽걸이(칠판·창문 등)는 벽면 좌표(BACK 또는 LEFT)를 준다. */
   x: number;
   z: number;
   /** 90도 단위 회전 횟수. 0이면 앞면이 +z(현관 쪽), 1이면 +x(왼쪽 벽에 붙일 때)를 본다. */
@@ -63,7 +77,7 @@ export interface InteriorItem {
 export interface BuildingInterior {
   floorColor: string;
   wallColor: string;
-  /** 이 건물에 속한 주민이 서 있는 자리. 주민이 없는 건물에서는 쓰이지 않는다. */
+  /** 이 건물에 속한 주민이 서 있는 자리(배치 좌표). 주민이 없는 건물에서는 쓰이지 않는다. */
   residentSpot: { x: number; z: number };
   items: InteriorItem[];
 }
@@ -387,8 +401,16 @@ export function getBuildingInterior(buildingId: string): BuildingInterior {
   return BUILDING_INTERIORS[buildingId] ?? DEFAULT_INTERIOR;
 }
 
-/** 캐릭터(원)가 (x, z)에 서 있을 때 어느 가구(사각형)와든 겹치는지 검사한다. */
-export function collidesWithFurniture(items: InteriorItem[], x: number, z: number): boolean {
+/** 캐릭터(원)가 월드 좌표 (worldX, worldZ)에 서 있을 때 어느 가구(사각형)와든 겹치는지 검사한다. */
+export function collidesWithFurniture(
+  items: InteriorItem[],
+  worldX: number,
+  worldZ: number,
+): boolean {
+  // 가구가 배치 좌표로 적혀 있으므로 캐릭터 위치와 반지름을 배치 좌표로 바꿔서 비교한다.
+  const x = worldX / ROOM_SCALE;
+  const z = worldZ / ROOM_SCALE;
+  const radius = PLAYER_RADIUS / ROOM_SCALE;
   return items.some((item) => {
     const footprint = FOOTPRINTS[item.kind];
     if (!footprint) {
@@ -400,12 +422,12 @@ export function collidesWithFurniture(items: InteriorItem[], x: number, z: numbe
     const halfDepth = (turned ? footprint[0] : footprint[1]) / 2;
     const nearestX = Math.max(item.x - halfWidth, Math.min(x, item.x + halfWidth));
     const nearestZ = Math.max(item.z - halfDepth, Math.min(z, item.z + halfDepth));
-    return Math.hypot(x - nearestX, z - nearestZ) < PLAYER_RADIUS;
+    return Math.hypot(x - nearestX, z - nearestZ) < radius;
   });
 }
 
-const EXIT_HALF_WIDTH = 0.8;
-const EXIT_REACH = 0.75;
+const EXIT_HALF_WIDTH = 1; // 월드 좌표. 3D 매트(배치 좌표 너비 1.6)의 절반과 거의 같다
+const EXIT_REACH = 1;
 
 /** 캐릭터가 현관 매트(앞쪽 가장자리 가운데) 위에 서 있는지. 여기서 밖으로 나갈 수 있다. */
 export function isAtRoomExit(x: number, z: number): boolean {

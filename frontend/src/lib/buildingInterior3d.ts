@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
-  ROOM,
-  ROOM_CENTER,
+  ROOM_LAYOUT,
+  ROOM_SCALE,
   type BuildingInterior,
   type FurnitureKind,
   type InteriorItem,
@@ -67,26 +67,26 @@ export function createInteriorRoom(interior: BuildingInterior): InteriorRoom {
 
   // 방: 바닥과 카메라 반대편 두 벽(뒤, 왼쪽), 벽 아래 걸레받이, 현관 매트.
   // 뒤·왼쪽 구석에서 시작해 오른쪽(+x)과 앞쪽(+z)으로 FILL_SIZE만큼 뻗는다.
-  const centerX = ROOM.minX + FILL_SIZE / 2;
-  const centerZ = ROOM.minZ + FILL_SIZE / 2;
+  const centerX = ROOM_LAYOUT.minX + FILL_SIZE / 2;
+  const centerZ = ROOM_LAYOUT.minZ + FILL_SIZE / 2;
   place(box(FILL_SIZE, 0.2, FILL_SIZE, interior.floorColor), centerX, -0.1, centerZ, group);
   place(
     box(FILL_SIZE + WALL_THICKNESS, WALL_HEIGHT, WALL_THICKNESS, interior.wallColor),
     centerX - WALL_THICKNESS / 2,
     WALL_HEIGHT / 2,
-    ROOM.minZ - WALL_THICKNESS / 2,
+    ROOM_LAYOUT.minZ - WALL_THICKNESS / 2,
     group,
   );
   place(
     box(WALL_THICKNESS, WALL_HEIGHT, FILL_SIZE, interior.wallColor),
-    ROOM.minX - WALL_THICKNESS / 2,
+    ROOM_LAYOUT.minX - WALL_THICKNESS / 2,
     WALL_HEIGHT / 2,
     centerZ,
     group,
   );
-  place(box(FILL_SIZE, 0.25, 0.06, WOOD), centerX, 0.125, ROOM.minZ + 0.03, group);
-  place(box(0.06, 0.25, FILL_SIZE, WOOD), ROOM.minX + 0.03, 0.125, centerZ, group);
-  place(box(1.6, 0.04, 0.7, '#a8672e'), ROOM_CENTER.x, 0.02, ROOM.maxZ - 0.35, group);
+  place(box(FILL_SIZE, 0.25, 0.06, WOOD), centerX, 0.125, ROOM_LAYOUT.minZ + 0.03, group);
+  place(box(0.06, 0.25, FILL_SIZE, WOOD), ROOM_LAYOUT.minX + 0.03, 0.125, centerZ, group);
+  place(box(1.6, 0.04, 0.7, '#a8672e'), 0, 0.02, ROOM_LAYOUT.maxZ - 0.35, group);
 
   // 가구 종류별 모양. 가구 중심이 원점, 앞면이 +z인 채로 만들고 놓을 때 위치와 방향을 준다.
   const builders: Record<FurnitureKind, (g: THREE.Group, color?: string) => void> = {
@@ -329,6 +329,8 @@ export function createInteriorRoom(interior: BuildingInterior): InteriorRoom {
     place(furniture, item.x, 0, item.z, group);
   };
   interior.items.forEach(addItem);
+  // 여기까지는 배치 좌표로 만들었다. 묶음 전체를 키워 월드 좌표에 맞춘다.
+  group.scale.setScalar(ROOM_SCALE);
 
   return {
     group,

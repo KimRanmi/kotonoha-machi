@@ -8,6 +8,7 @@ import {
   ROOM,
   ROOM_CENTER,
   ROOM_ENTRANCE,
+  ROOM_SCALE,
   collidesWithFurniture,
   isAtRoomExit,
   type BuildingInterior,
@@ -81,7 +82,11 @@ function InteriorScene({
     const room = createInteriorRoom(interior);
     scene.add(room.group);
 
-    const spot = interior.residentSpot;
+    // 주민 자리는 배치 좌표로 적혀 있어 월드 좌표로 바꾼다.
+    const spot = {
+      x: interior.residentSpot.x * ROOM_SCALE,
+      z: interior.residentSpot.z * ROOM_SCALE,
+    };
     const isBlocked = (x: number, z: number) =>
       collidesWithFurniture(interior.items, x, z) ||
       (resident !== null && Math.hypot(x - spot.x, z - spot.z) < PLAYER_RADIUS + RESIDENT_RADIUS);
@@ -145,6 +150,8 @@ function InteriorScene({
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
 
+    // 계산대 같은 가구가 커진 만큼, 그 너머의 주민에게 말을 걸 수 있는 거리도 같이 늘린다.
+    const talkDistance = TALK_DISTANCE * ROOM_SCALE;
     const cameraTarget = new THREE.Vector3();
     let nearResident = false;
     let nearExit = false;
@@ -193,7 +200,7 @@ function InteriorScene({
 
       const canTalk =
         resident !== null &&
-        Math.hypot(player.position.x - spot.x, player.position.z - spot.z) < TALK_DISTANCE;
+        Math.hypot(player.position.x - spot.x, player.position.z - spot.z) < talkDistance;
       if (canTalk !== nearResident) {
         nearResident = canTalk;
         onNearResidentRef.current(nearResident);
