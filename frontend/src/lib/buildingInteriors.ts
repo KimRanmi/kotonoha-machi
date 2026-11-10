@@ -2,16 +2,16 @@ import { PLAYER_RADIUS } from './villageBuildings';
 
 /**
  * 건물 내부(방) 데이터. 방은 모든 건물이 같은 크기다. 카메라가 (+x, +z) 쪽에서 내려다보므로 벽은
- * 뒤쪽과 왼쪽 두 면만 세우고, 현관은 앞쪽(+z) 가장자리 가운데에 있다.
+ * 뒤쪽과 왼쪽 두 면만 세우고, 현관 매트는 화면 맨 아래 모서리(앞·오른쪽 꼭짓점) 안쪽에 있다.
  *
- * 좌표계가 둘이다. 가구 배치는 "배치 좌표"(가로 10 × 세로 8, 중심 (0, 0))로 적고, 화면에 그릴 때와
+ * 좌표계가 둘이다. 가구 배치는 "배치 좌표"(가로 10 × 세로 10.5, 가구는 뒤쪽 8칸에 두고 앞쪽은 현관 앞 빈 바닥)로 적고, 화면에 그릴 때와
  * 캐릭터가 걸을 때는 여기에 ROOM_SCALE을 곱한 "월드 좌표"를 쓴다. 그래서 배율 하나만 바꾸면 방 크기,
  * 가구 크기, 가구 사이 간격이 함께 커지거나 작아진다.
  */
 export const ROOM_SCALE = 1.3;
 
 /** 배치 좌표로 본 방의 범위. 가구 목록과 방 모양(lib/buildingInterior3d.ts)이 이 좌표를 쓴다. */
-export const ROOM_LAYOUT = { minX: -5, maxX: 5, minZ: -4, maxZ: 4 };
+export const ROOM_LAYOUT = { minX: -5, maxX: 5, minZ: -4, maxZ: 6.5 };
 
 /** 월드 좌표로 본 방의 범위. 캐릭터가 걸어다닐 수 있는 범위다. */
 export const ROOM = {
@@ -26,8 +26,25 @@ export const ROOM_CENTER = { x: (ROOM.minX + ROOM.maxX) / 2, z: (ROOM.minZ + ROO
 const BACK = ROOM_LAYOUT.minZ; // 뒷벽의 z(배치 좌표)
 const LEFT = ROOM_LAYOUT.minX; // 왼쪽 벽의 x(배치 좌표)
 
-/** 방에 들어왔을 때 캐릭터가 서는 자리(월드 좌표, 현관 매트 바로 안쪽). */
-export const ROOM_ENTRANCE = { x: ROOM_CENTER.x, z: ROOM.maxZ - 1.8 };
+/**
+ * 현관 매트(배치 좌표). 방의 앞·오른쪽 꼭짓점(화면에서 가장 아래쪽 모서리) 안쪽 바닥에, 모서리를
+ * 가로지르는 방향(화면 가로)으로 깔린다. length는 매트의 긴 쪽, depth는 짧은 쪽이다.
+ * 방 안쪽을 향한 방향은 (-x, -z)다.
+ */
+export const ROOM_MAT = {
+  x: ROOM_LAYOUT.maxX - 0.8,
+  z: ROOM_LAYOUT.maxZ - 0.8,
+  length: 2.4,
+  depth: 0.7,
+  angle: (3 * Math.PI) / 4, // 매트 긴 쪽이 (+x, -z) 방향(화면 가로)이 되도록 돌린 각도
+};
+const INWARD = Math.SQRT1_2; // 방 안쪽 방향 (-x, -z)의 한 성분(단위 벡터)
+
+/** 방에 들어왔을 때 캐릭터가 서는 자리(월드 좌표, 현관 매트 바로 안쪽). 방 안쪽을 본다. */
+export const ROOM_ENTRANCE = {
+  x: (ROOM_MAT.x - INWARD * (ROOM_MAT.depth / 2 + 0.9)) * ROOM_SCALE,
+  z: (ROOM_MAT.z - INWARD * (ROOM_MAT.depth / 2 + 0.9)) * ROOM_SCALE,
+};
 
 /** 가구 종류. 모양은 lib/buildingInterior3d.ts가 종류별로 만든다. */
 export type FurnitureKind =
@@ -426,10 +443,14 @@ export function collidesWithFurniture(
   });
 }
 
-const EXIT_HALF_WIDTH = 1.5; // 월드 좌표. 3D 매트(배치 좌표 너비 2.4)의 절반과 거의 같다
-const EXIT_REACH = 1;
+const EXIT_DEPTH = ROOM_MAT.depth / 2 + 0.6; // 매트 중심에서 방 안쪽으로 이 거리까지가 매트 위(배치 좌표)
 
-/** 캐릭터가 현관 매트(앞쪽 가장자리 가운데) 위에 서 있는지. 여기서 밖으로 나갈 수 있다. */
+/** 캐릭터가 현관 매트(방의 맨 아래 모서리 안쪽) 위에 서 있는지. 여기서 밖으로 나갈 수 있다. */
 export function isAtRoomExit(x: number, z: number): boolean {
-  return Math.abs(x - ROOM_CENTER.x) <= EXIT_HALF_WIDTH && z >= ROOM.maxZ - EXIT_REACH;
+  // 월드 좌표를 배치 좌표로 바꾼 뒤, 매트 중심 기준으로 안쪽 방향·가로 방향 거리를 잰다.
+  const dx = x / ROOM_SCALE - ROOM_MAT.x;
+  const dz = z / ROOM_SCALE - ROOM_MAT.z;
+  const inward = -(dx + dz) * INWARD;
+  const across = (dx - dz) * INWARD;
+  return Math.abs(across) <= ROOM_MAT.length / 2 && Math.abs(inward) <= EXIT_DEPTH;
 }

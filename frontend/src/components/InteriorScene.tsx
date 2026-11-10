@@ -6,7 +6,6 @@ import type { AvatarPalette } from '../lib/avatarPreview';
 import { createInteriorRoom } from '../lib/buildingInterior3d';
 import {
   ROOM,
-  ROOM_CENTER,
   ROOM_ENTRANCE,
   ROOM_SCALE,
   collidesWithFurniture,
@@ -42,9 +41,9 @@ interface InteriorSceneProps {
 const VIEW_HEIGHT = 9; // 화면에 세로로 보이는 월드 길이(직교 카메라). 마을(18)보다 가까이서 봐 방이 화면을 채운다
 /** 카메라가 바라보는 높이. 캐릭터 발이 아니라 몸 가운데를 화면 중심에 둔다. */
 const CAMERA_TARGET_HEIGHT = 0.6;
-// 카메라가 따라가는 범위(방 중심 기준). 캐릭터가 방 가장자리에 가도 카메라는 이 안에서 멈춰, 방 바깥이 화면을 많이 차지하지 않는다.
-const CAMERA_RANGE_X = 3.2;
-const CAMERA_RANGE_Z = 2.2;
+// 방의 맨 아래 꼭짓점 (ROOM.maxX, ROOM.maxZ)이 화면 아래 끝에 닿는 카메라 위치(x + z)의 한계. 카메라는 (50, 50, 50)에서
+// 내려다보므로(고도각의 sin이 1/√3), 화면 가운데에서 아래 끝까지 VIEW_HEIGHT / 2만큼이 땅에서는 각 축 (VIEW_HEIGHT / 2) × √1.5다.
+const CAMERA_BOTTOM_LIMIT = ROOM.maxX + ROOM.maxZ - 2 * (VIEW_HEIGHT / 2) * Math.sqrt(1.5);
 
 /** 건물 안 방. 마을과 같은 고정 쿼터뷰로 가까이서 보고, 카메라가 내 캐릭터를 따라 움직인다. */
 function InteriorScene({
@@ -94,7 +93,7 @@ function InteriorScene({
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
     player.position.set(ROOM_ENTRANCE.x, 0, ROOM_ENTRANCE.z);
-    player.rotation.y = Math.PI; // 방 안쪽(-z)을 보고 들어온다
+    player.rotation.y = (-3 * Math.PI) / 4; // 맨 아래 모서리의 매트에서 방 안쪽(-x, -z)을 보고 들어온다
     scene.add(player);
 
     // 주민은 정해진 자리에 서서 현관 쪽을 바라본다.
@@ -211,13 +210,15 @@ function InteriorScene({
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
       player.rotation.y += diff * Math.min(1, TURN_SPEED * delta);
 
-      cameraTarget.set(
-        ROOM_CENTER.x +
-          THREE.MathUtils.clamp(player.position.x - ROOM_CENTER.x, -CAMERA_RANGE_X, CAMERA_RANGE_X),
-        CAMERA_TARGET_HEIGHT,
-        ROOM_CENTER.z +
-          THREE.MathUtils.clamp(player.position.z - ROOM_CENTER.z, -CAMERA_RANGE_Z, CAMERA_RANGE_Z),
-      );
+      // 캐릭터를 따라가되, 방 맨 아래 꼭짓점 너머의 빈 바닥이 화면에 보이지 않게 아래쪽 한계에서 멈춘다.
+      let targetX = THREE.MathUtils.clamp(player.position.x, ROOM.minX, ROOM.maxX);
+      let targetZ = THREE.MathUtils.clamp(player.position.z, ROOM.minZ, ROOM.maxZ);
+      const overBottom = targetX + targetZ - CAMERA_BOTTOM_LIMIT;
+      if (overBottom > 0) {
+        targetX -= overBottom / 2;
+        targetZ -= overBottom / 2;
+      }
+      cameraTarget.set(targetX, CAMERA_TARGET_HEIGHT, targetZ);
       camera.position.copy(cameraTarget).add(CAMERA_OFFSET);
       camera.lookAt(cameraTarget);
       renderer.render(scene, camera);
