@@ -11,7 +11,7 @@ export interface VillageBuilding {
   depth: number;
   height: number;
   color: string;
-  /** 입장하면 대화할 주민의 slug. 이 건물에 속한 주민이 없으면 null. */
+  /** 건물 안에 서 있는 주민의 slug. 이 건물에 속한 주민이 없으면 null. */
   residentSlug: string | null;
 }
 

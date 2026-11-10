@@ -28,7 +28,6 @@ function TownPage() {
   const [buildingsErrorMessage, setBuildingsErrorMessage] = useState<string | null>(null);
   const [buildingsAttempt, setBuildingsAttempt] = useState(0);
   const nearBuilding = buildings?.find((building) => building.id === nearBuildingId);
-  const nearBuildingResidentSlug = nearBuilding?.residentSlug ?? null;
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [palette, setPalette] = useState<AvatarPalette | null>(null);
@@ -125,7 +124,7 @@ function TownPage() {
   }, []);
 
   useEffect(() => {
-    if (!nearBuildingResidentSlug) {
+    if (!nearBuildingId) {
       return;
     }
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -133,12 +132,12 @@ function TownPage() {
       const isFormControl =
         target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(target.tagName);
       if (event.key === 'Enter' && !isFormControl) {
-        navigate(`/chat/${nearBuildingResidentSlug}`);
+        navigate(`/town/buildings/${nearBuildingId}`);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nearBuildingResidentSlug, navigate]);
+  }, [nearBuildingId, navigate]);
 
   // 위치는 걸을 때마다 ref에만 담고, 서버 저장은 아래 시점에만 한다. 서버에 마지막으로 보낸 값과 같으면 보내지 않는다.
   const currentPositionRef = useRef<VillagePosition | null>(null);
@@ -281,12 +280,7 @@ function TownPage() {
           avatar={avatar}
           palette={palette}
           buildings={buildings}
-          onEnterBuilding={(buildingId) => {
-            const residentSlug = buildings.find((b) => b.id === buildingId)?.residentSlug;
-            if (residentSlug) {
-              navigate(`/chat/${residentSlug}`);
-            }
-          }}
+          onEnterBuilding={(buildingId) => navigate(`/town/buildings/${buildingId}`)}
           onNearResidentChange={setNearResidentSlug}
           onNearBuildingChange={setNearBuildingId}
           initialPosition={initialPosition}
@@ -304,11 +298,11 @@ function TownPage() {
           {nearResident.name}と話す
         </button>
       )}
-      {nearBuilding && nearBuildingResidentSlug && !nearResident && (
+      {nearBuilding && !nearResident && (
         <button
           type="button"
           className={styles.talkButton}
-          onClick={() => navigate(`/chat/${nearBuildingResidentSlug}`)}
+          onClick={() => navigate(`/town/buildings/${nearBuilding.id}`)}
         >
           {nearBuilding.label}に入る (Enter)
         </button>
