@@ -19,7 +19,8 @@ const MIGRATION_DIR = path.join(
 
 const FETCH_TIMEOUT_MS = 15000;
 const REQUIRED = ['id', 'name', 'personality', 'appearance_job', 'core_features'];
-const OPTIONAL = ['hobby'];
+const OPTIONAL = ['hobby', 'building'];
+const BUILDING_PATTERN = /^[a-z][a-z0-9_]{0,19}$/;
 const MAX_LENGTH = { name: 50, personality: 30, background: 500 };
 // 시트에 없는 값의 공통 기본 문장. 나중에 대화 시작 시 실제 위치로 덮어쓸 예정이다.
 const DEFAULT_CONTEXT = '마을에서 평소처럼 하루를 보내고 있다.';
@@ -109,6 +110,7 @@ function toResident(values, rowErrors) {
     speech_style: '',
     background: '',
     sample_lines: '',
+    work_building: values.building === '' ? null : values.building,
   };
   for (const key of REQUIRED) {
     if (values[key] === '') {
@@ -130,6 +132,9 @@ function toResident(values, rowErrors) {
       resident.name = japanese;
     }
   }
+  if (values.building !== '' && !BUILDING_PATTERN.test(values.building)) {
+    rowErrors.push(`building '${values.building}'는 건물 id(영문 소문자·숫자·_ 20자 이내)여야 한다`);
+  }
   resident.background =
     `외모·직업: ${values.appearance_job}\n` +
     `핵심 특징: ${values.core_features}\n` +
@@ -141,7 +146,7 @@ function toResident(values, rowErrors) {
 function validate(rows) {
   const errors = [];
   if (rows.length === 0) {
-    return { errors: ['CSV가 비어 있다.'], residents: [] };
+    return { errors: ['CSV가 비어 있다.'], residents: [], includeBuilding: false };
   }
   const header = rows[0].map((h) => h.trim());
   const allowed = [...REQUIRED, ...OPTIONAL];
@@ -159,7 +164,7 @@ function validate(rows) {
     errors.push('헤더: 중복된 열 이름이 있다');
   }
   if (errors.length > 0) {
-    return { errors, residents: [] };
+    return { errors, residents: [], includeBuilding: false };
   }
 
   const residents = [];
@@ -200,7 +205,7 @@ function validate(rows) {
   if (residents.length === 0) {
     errors.push('데이터 행이 0개다.');
   }
-  return { errors, residents };
+  return { errors, residents, includeBuilding: header.includes('building') };
 }
 
 function nextMigrationVersion() {
@@ -215,7 +220,7 @@ function sqlEscape(value) {
   return value.replaceAll("'", "''");
 }
 
-function buildSql(residents) {
+function buildSql(residents, includeBuilding) {
   const columns = [
     'slug',
     'name',
@@ -225,12 +230,18 @@ function buildSql(residents) {
     'background',
     'sample_lines',
   ];
+  // 시트에 building 열이 없으면 work_building을 건드리지 않는다(있던 소속이 지워지지 않게).
+  if (includeBuilding) {
+    columns.push('work_building');
+  }
   const updatable = columns.filter((c) => c !== 'slug');
   const header =
     '-- scripts/import-residents 가 구글 시트에서 생성한 주민 페르소나 upsert. 검토 후 커밋한다.\n' +
     '-- 시트에서 지운 주민은 삭제하지 않는다.\n';
   const statements = residents.map((r) => {
-    const values = columns.map((c) => `'${sqlEscape(r[c])}'`).join(', ');
+    const values = columns
+      .map((c) => (r[c] === null ? 'NULL' : `'${sqlEscape(r[c])}'`))
+      .join(', ');
     const sets = updatable.map((c) => `${c} = EXCLUDED.${c}`).join(', ');
     return (
       `INSERT INTO resident (${columns.join(', ')})\n` +
@@ -244,7 +255,7 @@ function buildSql(residents) {
 async function main() {
   const options = parseArgs();
   const rows = parseCsv(await loadCsvText(options));
-  const { errors, residents } = validate(rows);
+  const { errors, residents, includeBuilding } = validate(rows);
   if (errors.length > 0) {
     console.error('검증 실패 (파일을 만들지 않았다):');
     errors.forEach((e) => console.error(`  - ${e}`));
@@ -252,7 +263,7 @@ async function main() {
   }
   const filename = `V${nextMigrationVersion()}__upsert_residents.sql`;
   const outputPath = path.join(MIGRATION_DIR, filename);
-  writeFileSync(outputPath, buildSql(residents), 'utf8');
+  writeFileSync(outputPath, buildSql(residents, includeBuilding), 'utf8');
   console.log(`생성: ${outputPath}`);
   console.log(`대상 slug ${residents.length}개 (이미 있으면 갱신, 없으면 추가):`);
   residents.forEach((r) => console.log(`  - ${r.slug} (${r.name})`));

@@ -1,4 +1,5 @@
-import { PLAYER_RADIUS, VILLAGE_BUILDINGS } from './villageBuildings';
+import type { VillageBuilding } from '../api/village';
+import { PLAYER_RADIUS } from './villageBuildings';
 
 /** 가운데가 (x, z)인 직사각형. 길이나 건물 자리를 나타낼 때 쓴다. */
 export interface Rect {
@@ -22,16 +23,18 @@ const PLANT_LIMIT = 16;
 const PATH_WIDTH = 1.6;
 
 /** 중앙 광장과, 광장에서 각 건물 문 앞까지 이어지는 길. */
-export const VILLAGE_PATHS: Rect[] = [
-  { x: 0, z: 0, width: 5, depth: 5 },
-  ...VILLAGE_BUILDINGS.flatMap((building) => {
-    const doorZ = building.z + building.depth / 2; // 문은 +z 쪽 벽에 있다.
-    return [
-      { x: building.x, z: doorZ / 2, width: PATH_WIDTH, depth: Math.abs(doorZ) },
-      { x: building.x / 2, z: 0, width: Math.abs(building.x), depth: PATH_WIDTH },
-    ];
-  }),
-];
+function createPaths(buildings: VillageBuilding[]): Rect[] {
+  return [
+    { x: 0, z: 0, width: 5, depth: 5 },
+    ...buildings.flatMap((building) => {
+      const doorZ = building.z + building.depth / 2; // 문은 +z 쪽 벽에 있다.
+      return [
+        { x: building.x, z: doorZ / 2, width: PATH_WIDTH, depth: Math.abs(doorZ) },
+        { x: building.x / 2, z: 0, width: Math.abs(building.x), depth: PATH_WIDTH },
+      ];
+    }),
+  ];
+}
 
 function isInsideRect(x: number, z: number, rect: Rect, margin: number): boolean {
   return (
@@ -39,12 +42,14 @@ function isInsideRect(x: number, z: number, rect: Rect, margin: number): boolean
   );
 }
 
-/** 건물이나 길 위라서 식물을 심으면 안 되는 곳인지. */
-function isOccupied(x: number, z: number, margin: number): boolean {
-  return (
-    VILLAGE_BUILDINGS.some((building) => isInsideRect(x, z, building, margin + 1)) ||
-    VILLAGE_PATHS.some((path) => isInsideRect(x, z, path, margin))
-  );
+/** 식물을 심을 자리가 막혀 있는지 묻는 함수. margin은 건물·길에서 띄울 거리다. */
+type IsOccupied = (x: number, z: number, margin: number) => boolean;
+
+/** 건물이나 길 위라서 식물을 심으면 안 되는 곳인지 판단하는 함수를 만든다. */
+function createIsOccupied(buildings: VillageBuilding[], paths: Rect[]): IsOccupied {
+  return (x, z, margin) =>
+    buildings.some((building) => isInsideRect(x, z, building, margin + 1)) ||
+    paths.some((path) => isInsideRect(x, z, path, margin));
 }
 
 /** 같은 시드면 항상 같은 숫자열을 주는 난수. 새로 고쳐도 마을이 똑같이 나오게 한다. */
@@ -58,7 +63,7 @@ function createRandom(seed: number): () => number {
   };
 }
 
-function scatterTrees(): Plant[] {
+function scatterTrees(isOccupied: IsOccupied): Plant[] {
   const random = createRandom(7);
   const trees: Plant[] = [];
   for (let attempt = 0; attempt < 400 && trees.length < 12; attempt++) {
@@ -73,7 +78,7 @@ function scatterTrees(): Plant[] {
   return trees;
 }
 
-function scatterFlowers(trees: Plant[]): Plant[] {
+function scatterFlowers(trees: Plant[], isOccupied: IsOccupied): Plant[] {
   const random = createRandom(21);
   const flowers: Plant[] = [];
   // 꽃은 한 송이씩 흩뿌리지 않고 무리 지어 핀다.
@@ -97,7 +102,7 @@ function scatterFlowers(trees: Plant[]): Plant[] {
   return flowers;
 }
 
-function scatterBushes(trees: Plant[]): Plant[] {
+function scatterBushes(trees: Plant[], isOccupied: IsOccupied): Plant[] {
   const random = createRandom(99);
   const bushes: Plant[] = [];
   for (let attempt = 0; attempt < 200 && bushes.length < 16; attempt++) {
@@ -133,14 +138,31 @@ function scatterForest(): Plant[] {
   return forest;
 }
 
-export const VILLAGE_TREES = scatterTrees();
+/** 걸어 다닐 수 있는 땅 바깥의 숲. 건물과 상관없이 늘 같은 자리다. */
 export const VILLAGE_FOREST = scatterForest();
-export const VILLAGE_FLOWERS = scatterFlowers(VILLAGE_TREES);
-export const VILLAGE_BUSHES = scatterBushes(VILLAGE_TREES);
+
+/** 건물 목록에서 계산하는 마을 배치. 건물이 바뀌면 길·나무·꽃·덤불도 새로 계산해야 한다. */
+export interface VillageLayout {
+  paths: Rect[];
+  trees: Plant[];
+  flowers: Plant[];
+  bushes: Plant[];
+}
+
+/** 서버에서 받은 건물 목록으로 길과 식물 배치를 계산한다. 같은 건물이면 항상 같은 배치가 나온다. */
+export function createVillageLayout(buildings: VillageBuilding[]): VillageLayout {
+  const paths = createPaths(buildings);
+  const isOccupied = createIsOccupied(buildings, paths);
+  const trees = scatterTrees(isOccupied);
+  return {
+    paths,
+    trees,
+    flowers: scatterFlowers(trees, isOccupied),
+    bushes: scatterBushes(trees, isOccupied),
+  };
+}
 
 /** 캐릭터(원)가 (x, z)에 서 있을 때 어느 나무 줄기와든 겹치는지 검사한다. 꽃과 덤불은 지나다닐 수 있다. */
-export function collidesWithTrees(x: number, z: number): boolean {
-  return VILLAGE_TREES.some(
-    (tree) => Math.hypot(x - tree.x, z - tree.z) < PLAYER_RADIUS + TREE_RADIUS,
-  );
+export function collidesWithTrees(trees: Plant[], x: number, z: number): boolean {
+  return trees.some((tree) => Math.hypot(x - tree.x, z - tree.z) < PLAYER_RADIUS + TREE_RADIUS);
 }

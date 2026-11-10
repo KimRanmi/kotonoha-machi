@@ -1,23 +1,65 @@
 package com.kotonohamachi.village.service;
 
+import com.kotonohamachi.resident.Resident;
+import com.kotonohamachi.resident.repository.ResidentRepository;
+import com.kotonohamachi.village.dto.VillageBuildingResponse;
 import com.kotonohamachi.village.dto.VillagePositionResponse;
+import com.kotonohamachi.village.repository.BuildingRepository;
 import com.kotonohamachi.village.repository.UserVillagePositionRepository;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 사용자가 마을에서 마지막으로 서 있던 자리를 저장하고 조회한다. */
+/** 마을 건물 목록과 사용자가 마을에서 마지막으로 서 있던 자리를 다룬다. 건물은 모두 처음부터 열려 있다. */
 @Service
 public class VillageService {
 
+  private final BuildingRepository buildingRepository;
+  private final ResidentRepository residentRepository;
   private final UserVillagePositionRepository positionRepository;
 
   /**
    * 생성자.
    *
+   * @param buildingRepository 건물 저장소
+   * @param residentRepository 주민 저장소(건물에 속한 주민 조회용)
    * @param positionRepository 마을에서 마지막으로 서 있던 자리 저장소
    */
-  public VillageService(UserVillagePositionRepository positionRepository) {
+  public VillageService(
+      BuildingRepository buildingRepository,
+      ResidentRepository residentRepository,
+      UserVillagePositionRepository positionRepository) {
+    this.buildingRepository = buildingRepository;
+    this.residentRepository = residentRepository;
     this.positionRepository = positionRepository;
+  }
+
+  /**
+   * 마을 건물 목록을 등록된 순서로 조회한다. 건물마다 속한 주민 중 가장 먼저 등록된 한 명의 slug를 함께 준다(입장하면 그 주민과
+   * 대화한다). 속한 주민이 없으면 null이다.
+   *
+   * @return 건물 목록
+   */
+  @Transactional(readOnly = true)
+  public List<VillageBuildingResponse> getBuildings() {
+    Map<String, String> residentByBuilding = new HashMap<>();
+    for (Resident resident : residentRepository.findAllByWorkBuildingIsNotNullOrderByIdAsc()) {
+      residentByBuilding.putIfAbsent(resident.getWorkBuilding(), resident.getSlug());
+    }
+    return buildingRepository.findAllByOrderByIdAsc().stream()
+        .map(building -> new VillageBuildingResponse(
+            building.getSlug(),
+            building.getLabel(),
+            building.getX(),
+            building.getZ(),
+            building.getWidth(),
+            building.getDepth(),
+            building.getHeight(),
+            building.getColor(),
+            residentByBuilding.get(building.getSlug())))
+        .toList();
   }
 
   /**

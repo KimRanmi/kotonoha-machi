@@ -27,7 +27,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** 마을 건물 조회와 마지막 위치 조회·저장 API의 인증과 응답 형태를 실제 Postgres와 Security 필터 체인으로 검증한다. */
+/** 마을 건물 목록 조회와 마지막 위치 조회·저장 API의 인증과 응답 형태를 실제 Postgres와 Security 필터 체인으로 검증한다. */
 @Testcontainers
 @SpringBootTest
 class VillageControllerIntegrationTest {
@@ -80,6 +80,30 @@ class VillageControllerIntegrationTest {
         .andReturn()
         .getRequest()
         .getSession();
+  }
+
+  @Test
+  void 마을_건물_조회는_로그인하지_않으면_401을_반환한다() throws Exception {
+    mockMvc.perform(get("/api/village/buildings")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void 로그인한_사용자는_건물_3개와_속한_주민을_받는다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+
+    mockMvc
+        .perform(get("/api/village/buildings").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(3))
+        .andExpect(jsonPath("$[0].id").value("home"))
+        .andExpect(jsonPath("$[0].residentSlug").doesNotExist())
+        .andExpect(jsonPath("$[1].id").value("cafe"))
+        .andExpect(jsonPath("$[1].label").value("カフェ"))
+        .andExpect(jsonPath("$[1].x").value(-8.0))
+        .andExpect(jsonPath("$[1].color").value("#C97B4A"))
+        .andExpect(jsonPath("$[1].residentSlug").value("r05"))
+        .andExpect(jsonPath("$[2].id").value("shop"))
+        .andExpect(jsonPath("$[2].residentSlug").value("r03"));
   }
 
   @Test

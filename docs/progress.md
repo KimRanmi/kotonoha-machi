@@ -778,3 +778,13 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   `UserBuildingMigrationTest`(V20 SQL은 Flyway 이력 때문에 유지), 파일이 `package-info.java` 하나뿐이던 빈 `town` 패키지.
   `requirements.md`의 해금 문구(섹션 제목·자동 생성·"다 열린 뒤"·해금 피드백)를 정리하고 `0019`는 폐기 표시했다.
   - 검증: `spotlessApply`·`test` 결과는 아래 커밋 시점 기준. 안 정한 것: 건물↔담당 주민 연결(입장 시 `/chat/{건물id}` 문제), 건물 데이터화 여부.
+
+## 2026-11-10 (건물 데이터화)
+
+- 건물 정보를 구글 시트→DB→API로 옮겼다(`0023`). `V25`로 `building` 테이블(시드 3개)과 `resident.work_building`(카페=r05, 상점=r03)을 만들고,
+  `GET /api/village/buildings`가 위치·크기·색·간판 이름과 입장 시 만날 주민 slug를 준다. 프런트는 건물을 서버에서 받은 뒤 길·나무·꽃 배치와
+  충돌·문 앞 판정을 계산하며, 건물 입장은 `/chat/{주민 slug}`로 가고 소속 주민이 없는 건물(집)은 입장 버튼이 뜨지 않는다.
+  `scripts/import-buildings`를 새로 만들고 `import-residents`에 `building` 열을 추가했다(열이 없으면 `work_building`을 건드리지 않음).
+  - 검증: 백엔드 `spotlessApply`·`test`, 프런트 `prettier`·`lint`·`build` 통과. 격리한 DB·서버로 실제 기동해 API 응답, 마을 화면(간판·길·나무),
+    상점 간판 클릭 → `/chat/r03`, 집 간판 클릭 → 이동 없음을 확인했다. 두 스크립트는 샘플 CSV로 생성·검증 실패 동작을 확인했다.
+  - 아직 안 한 것: 실제 구글 시트·게시 CSV 주소(사용자가 준비), 시트로 실제 SQL을 만들어 시드와 같은지 확인, 건물 내부 화면, 주민 이동·일과.

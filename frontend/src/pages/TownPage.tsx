@@ -3,11 +3,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
 import { getTodayRecommendation, type Theme } from '../api/theme';
-import { getVillagePosition, saveVillagePosition, type VillagePosition } from '../api/village';
+import {
+  getVillageBuildings,
+  getVillagePosition,
+  saveVillagePosition,
+  type VillageBuilding,
+  type VillagePosition,
+} from '../api/village';
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import VillageScene from '../components/VillageScene';
-import { VILLAGE_BUILDINGS } from '../lib/villageBuildings';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
@@ -19,7 +24,12 @@ function TownPage() {
   const [nearResidentSlug, setNearResidentSlug] = useState<string | null>(null);
   const nearResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === nearResidentSlug);
   const [nearBuildingId, setNearBuildingId] = useState<string | null>(null);
-  const nearBuilding = VILLAGE_BUILDINGS.find((building) => building.id === nearBuildingId);
+  // 마을 건물은 서버(구글 시트가 원본)에서 받아 온다. 받기 전에는 마을을 그리지 않는다.
+  const [buildings, setBuildings] = useState<VillageBuilding[] | null>(null);
+  const [buildingsErrorMessage, setBuildingsErrorMessage] = useState<string | null>(null);
+  const nearBuilding = buildings?.find((building) => building.id === nearBuildingId);
+  // 건물에 들어가면 그 건물에 속한 주민과 대화한다. 속한 주민이 없는 건물은 들어갈 수 없다.
+  const nearBuildingResidentSlug = nearBuilding?.residentSlug ?? null;
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [palette, setPalette] = useState<AvatarPalette | null>(null);
@@ -72,6 +82,28 @@ function TownPage() {
   useEffect(() => {
     let cancelled = false;
 
+    getVillageBuildings()
+      .then((loaded) => {
+        if (!cancelled) {
+          setBuildings(loaded);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setBuildingsErrorMessage(
+            error instanceof ApiError ? error.message : '마을 건물을 불러오지 못했습니다.',
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
     getVillagePosition()
       .then((position) => {
         if (!cancelled) {
@@ -92,9 +124,8 @@ function TownPage() {
     };
   }, []);
 
-  // TODO: 건물 안 주민 배치가 생기면 입장 화면으로 바꾼다. 지금은 건물 id가 주민 slug가 아니라서 대화가 열리지 않는다.
   useEffect(() => {
-    if (!nearBuildingId) {
+    if (!nearBuildingResidentSlug) {
       return;
     }
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -102,12 +133,12 @@ function TownPage() {
       const isFormControl =
         target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(target.tagName);
       if (event.key === 'Enter' && !isFormControl) {
-        navigate(`/chat/${nearBuildingId}`);
+        navigate(`/chat/${nearBuildingResidentSlug}`);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nearBuildingId, navigate]);
+  }, [nearBuildingResidentSlug, navigate]);
 
   // 위치는 걸을 때마다 ref에만 담고, 서버 저장은 아래 시점에만 한다. 서버에 마지막으로 보낸 값과 같으면 보내지 않는다.
   const currentPositionRef = useRef<VillagePosition | null>(null);
@@ -245,11 +276,17 @@ function TownPage() {
           <span className={styles.todayLearningCta}>시작하기 →</span>
         </Link>
       )}
-      {avatar && palette && positionLoaded && (
+      {avatar && palette && buildings && positionLoaded && (
         <VillageScene
           avatar={avatar}
           palette={palette}
-          onEnterBuilding={(buildingId) => navigate(`/chat/${buildingId}`)}
+          buildings={buildings}
+          onEnterBuilding={(buildingId) => {
+            const residentSlug = buildings.find((b) => b.id === buildingId)?.residentSlug;
+            if (residentSlug) {
+              navigate(`/chat/${residentSlug}`);
+            }
+          }}
           onNearResidentChange={setNearResidentSlug}
           onNearBuildingChange={setNearBuildingId}
           initialPosition={initialPosition}
@@ -267,14 +304,19 @@ function TownPage() {
           {nearResident.name}と話す
         </button>
       )}
-      {nearBuilding && !nearResident && (
+      {nearBuilding && nearBuildingResidentSlug && !nearResident && (
         <button
           type="button"
           className={styles.talkButton}
-          onClick={() => navigate(`/chat/${nearBuilding.id}`)}
+          onClick={() => navigate(`/chat/${nearBuildingResidentSlug}`)}
         >
           {nearBuilding.label}に入る (Enter)
         </button>
+      )}
+      {buildingsErrorMessage && (
+        <p className={styles.content} role="alert">
+          {buildingsErrorMessage}
+        </p>
       )}
       {logoutErrorMessage && (
         <p className={styles.content} role="alert">

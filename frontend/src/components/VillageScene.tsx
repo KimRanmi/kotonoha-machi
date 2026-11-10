@@ -1,18 +1,20 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import type { VillagePosition } from '../api/village';
+import type { VillageBuilding, VillagePosition } from '../api/village';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
 import { collidesWithBuildings, findDoorAt } from '../lib/villageBuildings';
 import { VILLAGE_RESIDENTS, collidesWithResidents } from '../lib/villageResidents';
-import { collidesWithTrees } from '../lib/villageScenery';
+import { collidesWithTrees, createVillageLayout } from '../lib/villageScenery';
 import { createVillageWorld } from '../lib/villageScenery3d';
 import styles from './VillageScene.module.css';
 
 interface VillageSceneProps {
   avatar: Avatar;
   palette: AvatarPalette;
+  /** 서버에서 받은 마을 건물들. 길과 나무·꽃 배치도 이 목록으로 계산하며, 바뀌면 장면을 다시 만든다. */
+  buildings: VillageBuilding[];
   /** 건물 간판을 눌렀을 때 호출된다. */
   onEnterBuilding: (buildingId: string) => void;
   /** 대화 가능한 거리 안에 들어온 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
@@ -50,11 +52,6 @@ const KEY_DIRECTIONS: Record<string, [number, number]> = {
   ArrowRight: [1, -1],
   KeyD: [1, -1],
 };
-
-/** 캐릭터가 (x, z)에 설 수 없는 자리(건물이나 나무 줄기)인지. */
-function isBlocked(x: number, z: number): boolean {
-  return collidesWithBuildings(x, z) || collidesWithTrees(x, z) || collidesWithResidents(x, z);
-}
 
 /** 주민 머리 위에 띄울 이름표. 글자를 캔버스에 그려 항상 카메라를 향하는 판(Sprite)에 붙인다. */
 function createNameTag(name: string): THREE.Sprite {
@@ -107,6 +104,7 @@ function createGroundTexture(): THREE.CanvasTexture {
 function VillageScene({
   avatar,
   palette,
+  buildings,
   onEnterBuilding,
   onNearResidentChange,
   onNearBuildingChange,
@@ -114,7 +112,7 @@ function VillageScene({
   onPositionChange,
 }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // 장면은 avatar/palette가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
+  // 장면은 avatar/palette/buildings가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
   const onEnterRef = useRef(onEnterBuilding);
   useEffect(() => {
     onEnterRef.current = onEnterBuilding;
@@ -157,7 +155,13 @@ function VillageScene({
     scene.add(ground);
 
     // 건물, 길, 나무, 꽃 같은 풍경은 lib/villageScenery3d.ts가 만든다.
-    const world = createVillageWorld();
+    const layout = createVillageLayout(buildings);
+    const world = createVillageWorld(buildings, layout);
+    // 캐릭터가 (x, z)에 설 수 없는 자리(건물, 나무 줄기, 주민)인지.
+    const isBlocked = (x: number, z: number) =>
+      collidesWithBuildings(buildings, x, z) ||
+      collidesWithTrees(layout.trees, x, z) ||
+      collidesWithResidents(x, z);
     scene.add(world.group);
 
     const player = createAvatarModel(avatar, palette);
@@ -298,7 +302,7 @@ function VillageScene({
       }
 
       // 건물 문 앞에 서 있으면 마을 화면이 입장 버튼을 띄운다.
-      const door = findDoorAt(player.position.x, player.position.z);
+      const door = findDoorAt(buildings, player.position.x, player.position.z);
       const doorId = door ? door.id : null;
       if (doorId !== nearBuildingId) {
         nearBuildingId = doorId;
@@ -357,7 +361,7 @@ function VillageScene({
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [avatar, palette]);
+  }, [avatar, palette, buildings]);
 
   return <div ref={containerRef} className={styles.scene} aria-label="마을 화면" />;
 }

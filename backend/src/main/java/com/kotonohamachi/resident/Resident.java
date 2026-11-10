@@ -37,6 +37,9 @@ public class Resident {
   @Column(name = "sample_lines", nullable = false)
   private String sampleLines;
 
+  @Column(name = "work_building")
+  private String workBuilding;
+
   /** JPA가 엔티티를 만들 때 사용하는 기본 생성자. */
   protected Resident() {}
 
@@ -70,5 +73,14 @@ public class Resident {
 
   public String getSampleLines() {
     return sampleLines;
+  }
+
+  /**
+   * 주민이 속한 건물의 slug를 반환한다.
+   *
+   * @return 건물 slug. 소속이 없으면 null
+   */
+  public String getWorkBuilding() {
+    return workBuilding;
   }
 }
