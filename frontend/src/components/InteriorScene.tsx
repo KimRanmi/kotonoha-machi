@@ -5,9 +5,9 @@ import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
 import { createInteriorRoom } from '../lib/buildingInterior3d';
 import {
-  ROOM_DEPTH,
+  ROOM,
+  ROOM_CENTER,
   ROOM_ENTRANCE,
-  ROOM_WIDTH,
   collidesWithFurniture,
   isAtRoomExit,
   type BuildingInterior,
@@ -42,8 +42,8 @@ const VIEW_HEIGHT = 9; // 화면에 세로로 보이는 월드 길이(직교 카
 /** 카메라가 바라보는 높이. 캐릭터 발이 아니라 몸 가운데를 화면 중심에 둔다. */
 const CAMERA_TARGET_HEIGHT = 0.6;
 // 카메라가 따라가는 범위(방 중심 기준). 캐릭터가 방 가장자리에 가도 카메라는 이 안에서 멈춰, 방 바깥이 화면을 많이 차지하지 않는다.
-const CAMERA_RANGE_X = 2;
-const CAMERA_RANGE_Z = 1.2;
+const CAMERA_RANGE_X = 3.2;
+const CAMERA_RANGE_Z = 2.2;
 
 /** 건물 안 방. 마을과 같은 고정 쿼터뷰로 가까이서 보고, 카메라가 내 캐릭터를 따라 움직인다. */
 function InteriorScene({
@@ -145,8 +145,6 @@ function InteriorScene({
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
 
-    const limitX = ROOM_WIDTH / 2 - PLAYER_RADIUS;
-    const limitZ = ROOM_DEPTH / 2 - PLAYER_RADIUS;
     const cameraTarget = new THREE.Vector3();
     let nearResident = false;
     let nearExit = false;
@@ -170,16 +168,16 @@ function InteriorScene({
         // X, Z를 따로 검사해야 가구에 비스듬히 부딪혀도 옆으로 미끄러진다.
         const nextX = THREE.MathUtils.clamp(
           player.position.x + dx * WALK_SPEED * delta,
-          -limitX,
-          limitX,
+          ROOM.minX + PLAYER_RADIUS,
+          ROOM.maxX - PLAYER_RADIUS,
         );
         if (!isBlocked(nextX, player.position.z)) {
           player.position.x = nextX;
         }
         const nextZ = THREE.MathUtils.clamp(
           player.position.z + dz * WALK_SPEED * delta,
-          -limitZ,
-          limitZ,
+          ROOM.minZ + PLAYER_RADIUS,
+          ROOM.maxZ - PLAYER_RADIUS,
         );
         if (!isBlocked(player.position.x, nextZ)) {
           player.position.z = nextZ;
@@ -207,9 +205,11 @@ function InteriorScene({
       player.rotation.y += diff * Math.min(1, TURN_SPEED * delta);
 
       cameraTarget.set(
-        THREE.MathUtils.clamp(player.position.x, -CAMERA_RANGE_X, CAMERA_RANGE_X),
+        ROOM_CENTER.x +
+          THREE.MathUtils.clamp(player.position.x - ROOM_CENTER.x, -CAMERA_RANGE_X, CAMERA_RANGE_X),
         CAMERA_TARGET_HEIGHT,
-        THREE.MathUtils.clamp(player.position.z, -CAMERA_RANGE_Z, CAMERA_RANGE_Z),
+        ROOM_CENTER.z +
+          THREE.MathUtils.clamp(player.position.z - ROOM_CENTER.z, -CAMERA_RANGE_Z, CAMERA_RANGE_Z),
       );
       camera.position.copy(cameraTarget).add(CAMERA_OFFSET);
       camera.lookAt(cameraTarget);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
-  ROOM_DEPTH,
-  ROOM_WIDTH,
+  ROOM,
+  ROOM_CENTER,
   type BuildingInterior,
   type FurnitureKind,
   type InteriorItem,
@@ -67,28 +67,26 @@ export function createInteriorRoom(interior: BuildingInterior): InteriorRoom {
 
   // 방: 바닥과 카메라 반대편 두 벽(뒤, 왼쪽), 벽 아래 걸레받이, 현관 매트.
   // 뒤·왼쪽 구석에서 시작해 오른쪽(+x)과 앞쪽(+z)으로 FILL_SIZE만큼 뻗는다.
-  const halfWidth = ROOM_WIDTH / 2;
-  const halfDepth = ROOM_DEPTH / 2;
-  const centerX = -halfWidth + FILL_SIZE / 2;
-  const centerZ = -halfDepth + FILL_SIZE / 2;
+  const centerX = ROOM.minX + FILL_SIZE / 2;
+  const centerZ = ROOM.minZ + FILL_SIZE / 2;
   place(box(FILL_SIZE, 0.2, FILL_SIZE, interior.floorColor), centerX, -0.1, centerZ, group);
   place(
     box(FILL_SIZE + WALL_THICKNESS, WALL_HEIGHT, WALL_THICKNESS, interior.wallColor),
     centerX - WALL_THICKNESS / 2,
     WALL_HEIGHT / 2,
-    -halfDepth - WALL_THICKNESS / 2,
+    ROOM.minZ - WALL_THICKNESS / 2,
     group,
   );
   place(
     box(WALL_THICKNESS, WALL_HEIGHT, FILL_SIZE, interior.wallColor),
-    -halfWidth - WALL_THICKNESS / 2,
+    ROOM.minX - WALL_THICKNESS / 2,
     WALL_HEIGHT / 2,
     centerZ,
     group,
   );
-  place(box(FILL_SIZE, 0.25, 0.06, WOOD), centerX, 0.125, -halfDepth + 0.03, group);
-  place(box(0.06, 0.25, FILL_SIZE, WOOD), -halfWidth + 0.03, 0.125, centerZ, group);
-  place(box(1.6, 0.04, 0.7, '#a8672e'), 0, 0.02, halfDepth - 0.35, group);
+  place(box(FILL_SIZE, 0.25, 0.06, WOOD), centerX, 0.125, ROOM.minZ + 0.03, group);
+  place(box(0.06, 0.25, FILL_SIZE, WOOD), ROOM.minX + 0.03, 0.125, centerZ, group);
+  place(box(1.6, 0.04, 0.7, '#a8672e'), ROOM_CENTER.x, 0.02, ROOM.maxZ - 0.35, group);
 
   // 가구 종류별 모양. 가구 중심이 원점, 앞면이 +z인 채로 만들고 놓을 때 위치와 방향을 준다.
   const builders: Record<FurnitureKind, (g: THREE.Group, color?: string) => void> = {

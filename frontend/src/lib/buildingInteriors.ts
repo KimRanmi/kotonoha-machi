@@ -1,18 +1,19 @@
 import { PLAYER_RADIUS } from './villageBuildings';
 
 /**
- * 건물 내부(방) 데이터. 방은 모든 건물이 같은 크기이고 중심이 (0, 0)이다. 카메라가 (+x, +z) 쪽에서
- * 내려다보므로 벽은 뒤쪽(z = -ROOM_DEPTH / 2)과 왼쪽(x = -ROOM_WIDTH / 2) 두 면만 세우고,
- * 현관은 앞쪽(+z) 가장자리 가운데에 있다.
+ * 건물 내부(방) 데이터. 방은 모든 건물이 같은 크기다. 카메라가 (+x, +z) 쪽에서 내려다보므로 벽은
+ * 뒤쪽(z = minZ)과 왼쪽(x = minX) 두 면만 세우고, 현관은 앞쪽(z = maxZ) 가장자리 가운데에 있다.
+ * 가구는 벽이 있는 뒤·왼쪽에 모아 두고, 오른쪽과 앞쪽은 걸어다닐 빈 바닥으로 남긴다.
  */
-export const ROOM_WIDTH = 10; // x 방향
-export const ROOM_DEPTH = 8; // z 방향
+export const ROOM = { minX: -5, maxX: 8, minZ: -4, maxZ: 6.5 };
+/** 방 가운데. 현관과 카메라가 이 값을 기준으로 삼는다. */
+export const ROOM_CENTER = { x: (ROOM.minX + ROOM.maxX) / 2, z: (ROOM.minZ + ROOM.maxZ) / 2 };
 
-const BACK = -ROOM_DEPTH / 2; // 뒷벽의 z
-const LEFT = -ROOM_WIDTH / 2; // 왼쪽 벽의 x
+const BACK = ROOM.minZ; // 뒷벽의 z
+const LEFT = ROOM.minX; // 왼쪽 벽의 x
 
 /** 방에 들어왔을 때 캐릭터가 서는 자리(현관 매트 바로 안쪽). */
-export const ROOM_ENTRANCE = { x: 0, z: ROOM_DEPTH / 2 - 1.4 };
+export const ROOM_ENTRANCE = { x: ROOM_CENTER.x, z: ROOM.maxZ - 1.4 };
 
 /** 가구 종류. 모양은 lib/buildingInterior3d.ts가 종류별로 만든다. */
 export type FurnitureKind =
@@ -408,5 +409,5 @@ const EXIT_REACH = 0.75;
 
 /** 캐릭터가 현관 매트(앞쪽 가장자리 가운데) 위에 서 있는지. 여기서 밖으로 나갈 수 있다. */
 export function isAtRoomExit(x: number, z: number): boolean {
-  return Math.abs(x) <= EXIT_HALF_WIDTH && z >= ROOM_DEPTH / 2 - EXIT_REACH;
+  return Math.abs(x - ROOM_CENTER.x) <= EXIT_HALF_WIDTH && z >= ROOM.maxZ - EXIT_REACH;
 }
