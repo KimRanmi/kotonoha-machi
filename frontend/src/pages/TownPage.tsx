@@ -24,11 +24,10 @@ function TownPage() {
   const [nearResidentSlug, setNearResidentSlug] = useState<string | null>(null);
   const nearResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === nearResidentSlug);
   const [nearBuildingId, setNearBuildingId] = useState<string | null>(null);
-  // 마을 건물은 서버(구글 시트가 원본)에서 받아 온다. 받기 전에는 마을을 그리지 않는다.
   const [buildings, setBuildings] = useState<VillageBuilding[] | null>(null);
   const [buildingsErrorMessage, setBuildingsErrorMessage] = useState<string | null>(null);
+  const [buildingsAttempt, setBuildingsAttempt] = useState(0);
   const nearBuilding = buildings?.find((building) => building.id === nearBuildingId);
-  // 건물에 들어가면 그 건물에 속한 주민과 대화한다. 속한 주민이 없는 건물은 들어갈 수 없다.
   const nearBuildingResidentSlug = nearBuilding?.residentSlug ?? null;
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
@@ -86,6 +85,7 @@ function TownPage() {
       .then((loaded) => {
         if (!cancelled) {
           setBuildings(loaded);
+          setBuildingsErrorMessage(null);
         }
       })
       .catch((error) => {
@@ -99,7 +99,7 @@ function TownPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [buildingsAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -313,10 +313,13 @@ function TownPage() {
           {nearBuilding.label}に入る (Enter)
         </button>
       )}
-      {buildingsErrorMessage && (
-        <p className={styles.content} role="alert">
-          {buildingsErrorMessage}
-        </p>
+      {buildingsErrorMessage && !buildings && (
+        <div className={styles.content} role="alert">
+          <p>{buildingsErrorMessage}</p>
+          <button type="button" onClick={() => setBuildingsAttempt((attempt) => attempt + 1)}>
+            다시 시도
+          </button>
+        </div>
       )}
       {logoutErrorMessage && (
         <p className={styles.content} role="alert">

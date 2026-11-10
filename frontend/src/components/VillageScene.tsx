@@ -31,11 +31,10 @@ const WALK_SPEED = 4; // 초당 이동 거리
 const PLAYER_SCALE = 0.6; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
 const TALK_DISTANCE = 2; // 이 거리 안에 들어오면 주민에게 말을 걸 수 있다
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
-const MAP_HALF_SIZE = 22; // 이동 가능한 정사각형 땅의 절반 크기(건물 13개가 두 줄로 들어가는 크기)
+const MAP_HALF_SIZE = 22; // 이동 가능한 정사각형 땅의 절반 크기
 const GROUND_HALF_SIZE = 60; // 눈에 보이는 풀밭의 절반 크기. 화면 어디를 봐도 땅이 보이게 이동 범위보다 훨씬 크다
-const VIEW_HEIGHT = 18; // 화면에 세로로 보이는 월드 길이(직교 카메라). 건물 3개가 한 화면에 들어오는 크기
-// 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다. 직교 카메라라 멀리 둬도 크기는 같고, 카메라 앞쪽의 나무가
-// 시야 앞면에 잘리지 않게 숲(최대 48) 바깥까지 물러나 있다.
+const VIEW_HEIGHT = 18; // 화면에 세로로 보이는 월드 길이(직교 카메라)
+// 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다. 직교 카메라라 멀리 둬도 크기는 같다.
 const CAMERA_OFFSET = new THREE.Vector3(50, 50, 50);
 
 /**
@@ -157,7 +156,6 @@ function VillageScene({
     // 건물, 길, 나무, 꽃 같은 풍경은 lib/villageScenery3d.ts가 만든다.
     const layout = createVillageLayout(buildings);
     const world = createVillageWorld(buildings, layout);
-    // 캐릭터가 (x, z)에 설 수 없는 자리(건물, 나무 줄기, 주민)인지.
     const isBlocked = (x: number, z: number) =>
       collidesWithBuildings(buildings, x, z) ||
       collidesWithTrees(layout.trees, x, z) ||
@@ -202,7 +200,7 @@ function VillageScene({
     resize();
 
     // 간판은 3D 물체라서, 마우스 위치에서 화면 안쪽으로 광선을 쏘아 맞은 간판을 찾는다(raycaster).
-    // 건물 간판에 마우스를 올리면 강조하고, 누르면 입장한다.
+    // 들어갈 수 있는(대화할 주민이 있는) 건물의 간판만 강조하고 누를 수 있다.
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const findSign = (event: MouseEvent) => {
@@ -219,7 +217,8 @@ function VillageScene({
       return world.signs.find((sign) => hit && sign.object.getObjectById(hit.object.id));
     };
     const handlePointerMove = (event: PointerEvent) => {
-      const hovered = findSign(event);
+      const found = findSign(event);
+      const hovered = found?.building.residentSlug ? found : undefined;
       for (const sign of world.signs) {
         sign.setHighlight(sign === hovered);
       }
@@ -227,7 +226,7 @@ function VillageScene({
     };
     const handleClick = (event: MouseEvent) => {
       const clicked = findSign(event);
-      if (clicked) {
+      if (clicked?.building.residentSlug) {
         onEnterRef.current(clicked.building.id);
       }
     };

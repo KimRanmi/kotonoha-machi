@@ -94,21 +94,28 @@ class VillageControllerIntegrationTest {
   @Test
   void 로그인한_사용자는_건물_목록과_같은_장소의_주민을_받는다() throws Exception {
     // 건물·주민 데이터는 시트에서 만든 마이그레이션이 채우므로, 이 테스트는 자기만의 장소를 직접 넣어 확인한다.
+    String originalLocation = jdbcTemplate.queryForObject(
+        "SELECT location FROM resident WHERE slug = 'r01'", String.class);
     jdbcTemplate.update(
         "INSERT INTO building (slug, label, x, z, width, depth, height, color, location) "
             + "VALUES ('it_with', 'テスト', 1.5, -2, 4, 3.5, 2.5, '#112233', '통합테스트장소'), "
             + "('it_without', 'ナシ', 3, -2, 4, 3.5, 2.5, '#445566', '통합테스트빈장소')");
     jdbcTemplate.update("UPDATE resident SET location = '통합테스트장소' WHERE slug = 'r01'");
-    MockHttpSession session = newLoggedInSession();
+    try {
+      MockHttpSession session = newLoggedInSession();
 
-    mockMvc
-        .perform(get("/api/village/buildings").session(session))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$[?(@.id == 'it_with')].label").value("テスト"))
-        .andExpect(jsonPath("$[?(@.id == 'it_with')].x").value(1.5))
-        .andExpect(jsonPath("$[?(@.id == 'it_with')].color").value("#112233"))
-        .andExpect(jsonPath("$[?(@.id == 'it_with')].residentSlug").value("r01"))
-        .andExpect(jsonPath("$[?(@.id == 'it_without')].residentSlug[0]").doesNotExist());
+      mockMvc
+          .perform(get("/api/village/buildings").session(session))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].label").value("テスト"))
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].x").value(1.5))
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].color").value("#112233"))
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].residentSlug").value("r01"))
+          .andExpect(jsonPath("$[?(@.id == 'it_without')].residentSlug[0]").doesNotExist());
+    } finally {
+      jdbcTemplate.update("DELETE FROM building WHERE slug IN ('it_with', 'it_without')");
+      jdbcTemplate.update("UPDATE resident SET location = ? WHERE slug = 'r01'", originalLocation);
+    }
   }
 
   @Test
