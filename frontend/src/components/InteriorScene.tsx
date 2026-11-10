@@ -72,7 +72,7 @@ function InteriorScene({
     }
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#2b2622'); // 방 바깥(앞쪽·오른쪽 가장자리 너머)은 어둡게 비운다
+    scene.background = new THREE.Color(interior.wallColor); // 바닥과 벽이 화면을 다 덮지만, 혹시 틈이 보여도 벽 색이게
     scene.add(new THREE.AmbientLight(0xffffff, 1.5));
     const light = new THREE.DirectionalLight(0xffffff, 1.6);
     light.position.set(6, 12, 4);
