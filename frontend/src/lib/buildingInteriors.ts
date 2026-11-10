@@ -180,6 +180,15 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'plant', x: 4.4, z: -3.4 },
       { kind: 'plant', x: 4.4, z: 1.2 },
       { kind: 'plant', x: 4.4, z: 2.2 },
+      // 앞쪽: 꽃 진열 탁자와 화분.
+      { kind: 'roundTable', x: -2, z: 5.2 },
+      { kind: 'flowerBucket', x: -2.7, z: 5.2, color: '#f4a3b8' },
+      { kind: 'flowerBucket', x: -1.3, z: 5.2, color: '#fff3a8' },
+      { kind: 'flowerBucket', x: -2, z: 4.5, color: '#b9a4f0' },
+      { kind: 'flowerBucket', x: -2, z: 5.9, color: '#f7b267' },
+      { kind: 'shelf', x: -4.7, z: 5.2, turns: 1, color: '#6dbb62' },
+      { kind: 'plant', x: 0.2, z: 6 },
+      { kind: 'plant', x: 1.2, z: 4.8 },
     ],
   },
   // 빵집: 빵 진열대와 오븐.
@@ -196,6 +205,11 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'shelf', x: -4.7, z: 0.6, turns: 1, color: '#a8672e' },
       ...tableWithStools(3.1, 1.2),
       { kind: 'plant', x: -4.4, z: 3.2 },
+      // 앞쪽: 손님 탁자와 화분.
+      ...tableWithStools(-2.9, 4.9),
+      ...tableWithStools(-0.6, 5.9),
+      { kind: 'shelf', x: -4.7, z: 5.4, turns: 1, color: '#c98a4b' },
+      { kind: 'plant', x: 1.2, z: 5.2 },
     ],
   },
   // 찻집: 다다미 바닥에 낮은 상과 방석, 족자.
@@ -211,6 +225,12 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       ...lowTableWithCushions(-2, 0.3, '#7b4a8a'),
       ...lowTableWithCushions(2.8, 1.4, '#b0483a'),
       { kind: 'plant', x: -4.4, z: 3.2 },
+      // 앞쪽: 낮은 상 하나 더, 등롱과 족자.
+      ...lowTableWithCushions(-2.6, 5, '#4a6fa5'),
+      ...lowTableWithCushions(0.2, 5.1, '#7b4a8a'),
+      { kind: 'lantern', x: -4.5, z: 4.4, color: '#f5e6b8' },
+      { kind: 'lantern', x: -4.5, z: 6, color: '#f5e6b8' },
+      { kind: 'scroll', x: LEFT, z: 5.2, turns: 1 },
     ],
   },
   // 카페: 바 카운터와 손님 탁자.
@@ -230,6 +250,12 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       ...tableWithStools(-3, 1.9),
       { kind: 'plant', x: 4.4, z: -3.4 },
       { kind: 'plant', x: -4.5, z: 0.2 },
+      // 앞쪽: 손님 탁자와 창문, 화분.
+      ...tableWithStools(-2.6, 5),
+      ...tableWithStools(0, 5.7),
+      { kind: 'window', x: LEFT, z: 5.2, turns: 1 },
+      { kind: 'plant', x: -4.5, z: 5.8 },
+      { kind: 'plant', x: 1.4, z: 4.6 },
     ],
   },
   // 편의점: 음료 냉장고와 상품 진열대.
@@ -247,6 +273,11 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'rack', x: -3, z: 2.6 },
       { kind: 'rack', x: 3, z: 1.2 },
       { kind: 'rack', x: 3, z: 3 },
+      // 앞쪽: 진열대 더 놓고 벽에 냉장고.
+      { kind: 'fridge', x: -4.7, z: 5.4, turns: 1 },
+      { kind: 'rack', x: -3, z: 4.4 },
+      { kind: 'rack', x: -3, z: 6 },
+      { kind: 'rack', x: -0.8, z: 5.2 },
     ],
   },
   // 라면집: 긴 카운터 좌석과 주방.
@@ -267,6 +298,11 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'lantern', x: 4.5, z: -3.3 },
       ...tableWithStools(3.2, 1.4),
       { kind: 'lantern', x: -4.5, z: 3.4 },
+      // 앞쪽: 손님 탁자와 등.
+      ...tableWithStools(-2.6, 5.2),
+      ...tableWithStools(0, 5.2),
+      { kind: 'lantern', x: -4.5, z: 4.6 },
+      { kind: 'lantern', x: 1.6, z: 6.2 },
     ],
   },
   // 내 집: 침대, 소파와 TV, 책장.
@@ -286,6 +322,13 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'scroll', x: LEFT, z: 1.6, turns: 1 },
       { kind: 'plant', x: 4.4, z: 0.6 },
       { kind: 'plant', x: -4.5, z: 3.4 },
+      // 앞쪽: 작업 책상, 러그, 책장.
+      { kind: 'shelf', x: -4.7, z: 5, turns: 1 },
+      { kind: 'desk', x: -3.2, z: 5.4 },
+      { kind: 'stool', x: -3.2, z: 6.1 },
+      { kind: 'rug', x: -0.6, z: 5.2, color: '#8fb8d8' },
+      { kind: 'plant', x: 1.2, z: 6 },
+      { kind: 'plant', x: -4.5, z: 6.1 },
     ],
   },
   // 학교: 칠판과 줄지어 놓인 책걸상.
@@ -307,6 +350,16 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'desk', x: 3.2, z: 1.5 },
       { kind: 'shelf', x: 3.8, z: -3.7 },
       { kind: 'plant', x: -4.4, z: -3.4 },
+      // 앞쪽: 책걸상 줄을 더 늘리고 창문과 화분.
+      { kind: 'desk', x: -3.2, z: 3.4 },
+      { kind: 'desk', x: -1.7, z: 3.4 },
+      { kind: 'desk', x: -0.2, z: 3.4 },
+      { kind: 'desk', x: -3.2, z: 5.3 },
+      { kind: 'desk', x: -1.7, z: 5.3 },
+      { kind: 'desk', x: -0.2, z: 5.3 },
+      { kind: 'desk', x: 1.3, z: 5.3 },
+      { kind: 'window', x: LEFT, z: 4.2, turns: 1 },
+      { kind: 'plant', x: -4.4, z: 6 },
     ],
   },
   // 도서관: 벽을 채운 책장과 읽는 자리.
@@ -326,6 +379,13 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       ...tableWithStools(-1.6, 0.6),
       ...tableWithStools(2.8, 1.6),
       { kind: 'plant', x: 4.4, z: 3.2 },
+      // 앞쪽: 책장을 이어 놓고 읽는 자리를 더한다.
+      { kind: 'shelf', x: -4.7, z: 3.6, turns: 1 },
+      { kind: 'shelf', x: -4.7, z: 5.2, turns: 1 },
+      { kind: 'rug', x: -2.4, z: 5, color: '#8a6f9a' },
+      ...tableWithStools(-2.4, 5),
+      ...tableWithStools(0.4, 5.8),
+      { kind: 'plant', x: 1.4, z: 4.8 },
     ],
   },
   // 오토바이 가게: 전시된 오토바이, 공구 선반, 타이어.
@@ -343,6 +403,14 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'motorcycle', x: -2.8, z: 0.6, color: '#3b6fb5' },
       { kind: 'motorcycle', x: -2.8, z: 2.2, color: '#f0b94a' },
       { kind: 'motorcycle', x: 3.2, z: 1.6, turns: 1, color: '#2f2f2f' },
+      // 앞쪽: 전시 오토바이를 더 세우고 타이어와 공구 선반.
+      { kind: 'motorcycle', x: -2.8, z: 3.8, color: '#7a4ab5' },
+      { kind: 'motorcycle', x: -2.8, z: 5.4, color: '#4aa3a2' },
+      { kind: 'tires', x: -4.5, z: 4.6 },
+      { kind: 'tires', x: -4.5, z: 5.4 },
+      { kind: 'tires', x: -4.5, z: 6.2 },
+      { kind: 'shelf', x: -0.2, z: 5.8, color: '#8a8f96' },
+      { kind: 'motorcycle', x: 0.2, z: 4.5, turns: 1, color: '#c8473d' },
     ],
   },
   // 절: 불상과 향로, 새전함.
@@ -363,6 +431,16 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'cushion', x: -0.9, z: 1.4, color: '#7b4a8a' },
       { kind: 'cushion', x: 0.9, z: 1.4, color: '#7b4a8a' },
       { kind: 'plant', x: -4.4, z: -3.4 },
+      // 앞쪽: 참배 방석을 늘리고 등롱, 족자, 화분.
+      { kind: 'cushion', x: -0.9, z: 2.4, color: '#7b4a8a' },
+      { kind: 'cushion', x: 0.9, z: 2.4, color: '#7b4a8a' },
+      { kind: 'cushion', x: -0.9, z: 3.4, color: '#7b4a8a' },
+      { kind: 'cushion', x: 0.9, z: 3.4, color: '#7b4a8a' },
+      { kind: 'lantern', x: -2.6, z: 5.4, color: '#f5e6b8' },
+      { kind: 'lantern', x: -0.2, z: 5.4, color: '#f5e6b8' },
+      { kind: 'scroll', x: LEFT, z: 5.2, turns: 1 },
+      { kind: 'plant', x: -4.4, z: 4.4 },
+      { kind: 'plant', x: -4.4, z: 6 },
     ],
   },
   // 타코야끼 가게: 철판과 붉은 등, 서서 먹는 탁자.
@@ -379,6 +457,13 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'barrel', x: 4.3, z: -3.4 },
       ...tableWithStools(-3, 1.2),
       ...tableWithStools(3, 1.2),
+      // 앞쪽: 서서 먹는 탁자를 더 놓고 술통 대신 통, 등.
+      ...tableWithStools(-3, 3.6),
+      ...tableWithStools(-2.9, 5.6),
+      { kind: 'barrel', x: -4.5, z: 4.4 },
+      { kind: 'barrel', x: -4.5, z: 5.2 },
+      { kind: 'lantern', x: 0, z: 6 },
+      { kind: 'lantern', x: 1.4, z: 6 },
     ],
   },
   // 술집: 카운터 좌석, 술병 선반과 술통, 좌식 자리.
@@ -399,6 +484,11 @@ const BUILDING_INTERIORS: Record<string, BuildingInterior> = {
       { kind: 'lantern', x: 4.5, z: -2.5 },
       ...lowTableWithCushions(3, 1.2, '#b0483a'),
       ...lowTableWithCushions(-3, 1.8, '#b0483a'),
+      // 앞쪽: 좌식 자리를 더 놓고 술통과 등.
+      ...lowTableWithCushions(-3, 5, '#b0483a'),
+      ...lowTableWithCushions(0, 5.2, '#4f7a4a'),
+      { kind: 'barrel', x: -4.6, z: 6.2 },
+      { kind: 'lantern', x: 1.6, z: 6.2 },
     ],
   },
 };
@@ -411,6 +501,10 @@ const DEFAULT_INTERIOR: BuildingInterior = {
   items: [
     { kind: 'window', x: 0, z: BACK },
     { kind: 'plant', x: -4.4, z: -3.4 },
+    { kind: 'window', x: LEFT, z: 5.2, turns: 1 },
+    { kind: 'rug', x: -1.5, z: 4.6, color: '#d9776b' },
+    { kind: 'plant', x: -4.4, z: 5.6 },
+    { kind: 'plant', x: 1, z: 5.8 },
   ],
 };
 
