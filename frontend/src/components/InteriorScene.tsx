@@ -23,7 +23,7 @@ import {
 } from '../lib/sceneCommon';
 import { PLAYER_RADIUS } from '../lib/villageBuildings';
 import { RESIDENT_RADIUS, type VillageResident } from '../lib/villageResidents';
-import styles from './VillageScene.module.css';
+import styles from './InteriorScene.module.css';
 
 interface InteriorSceneProps {
   avatar: Avatar;
@@ -38,13 +38,14 @@ interface InteriorSceneProps {
   onNearExitChange: (near: boolean) => void;
 }
 
-// 방 전체가 화면에 들어오도록 보이는 범위를 정한다. 세로는 최소 이만큼, 가로는 방 대각선 길이만큼 보여야 한다.
-const MIN_VIEW_HEIGHT = 13;
-const MIN_VIEW_WIDTH = 15.5;
-/** 카메라가 바라보는 지점. 벽이 위로 솟아 있어 바닥 중심보다 조금 위를 본다. */
-const CAMERA_TARGET = new THREE.Vector3(0, 1.2, 0);
+const VIEW_HEIGHT = 9; // 화면에 세로로 보이는 월드 길이(직교 카메라). 마을(18)보다 가까이서 봐 방이 화면을 채운다
+/** 카메라가 바라보는 높이. 캐릭터 발이 아니라 몸 가운데를 화면 중심에 둔다. */
+const CAMERA_TARGET_HEIGHT = 0.6;
+// 카메라가 따라가는 범위(방 중심 기준). 캐릭터가 방 가장자리에 가도 카메라는 이 안에서 멈춰, 방 바깥이 화면을 많이 차지하지 않는다.
+const CAMERA_RANGE_X = 2;
+const CAMERA_RANGE_Z = 1.2;
 
-/** 건물 안 방. 카메라는 마을과 같은 고정 쿼터뷰이고, 방이 한 화면에 들어오므로 캐릭터를 따라가지 않는다. */
+/** 건물 안 방. 마을과 같은 고정 쿼터뷰로 가까이서 보고, 카메라가 내 캐릭터를 따라 움직인다. */
 function InteriorScene({
   avatar,
   palette,
@@ -71,7 +72,7 @@ function InteriorScene({
     }
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#2b2622'); // 방 바깥은 어둡게 비워 방만 떠 보이게 한다
+    scene.background = new THREE.Color('#2b2622'); // 방 바깥(앞쪽·오른쪽 가장자리 너머)은 어둡게 비운다
     scene.add(new THREE.AmbientLight(0xffffff, 1.5));
     const light = new THREE.DirectionalLight(0xffffff, 1.6);
     light.position.set(6, 12, 4);
@@ -104,8 +105,6 @@ function InteriorScene({
     }
 
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
-    camera.position.copy(CAMERA_TARGET).add(CAMERA_OFFSET);
-    camera.lookAt(CAMERA_TARGET);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
@@ -113,13 +112,11 @@ function InteriorScene({
     const resize = () => {
       const { clientWidth, clientHeight } = container;
       const aspect = clientWidth / Math.max(clientHeight, 1);
-      // 화면이 좁으면 가로로 방이 잘리지 않게 보이는 범위를 넓힌다.
-      const viewHeight = Math.max(MIN_VIEW_HEIGHT, MIN_VIEW_WIDTH / aspect);
       renderer.setSize(clientWidth, clientHeight);
-      camera.left = (-viewHeight * aspect) / 2;
-      camera.right = (viewHeight * aspect) / 2;
-      camera.top = viewHeight / 2;
-      camera.bottom = -viewHeight / 2;
+      camera.left = (-VIEW_HEIGHT * aspect) / 2;
+      camera.right = (VIEW_HEIGHT * aspect) / 2;
+      camera.top = VIEW_HEIGHT / 2;
+      camera.bottom = -VIEW_HEIGHT / 2;
       camera.updateProjectionMatrix();
     };
     resize();
@@ -150,6 +147,7 @@ function InteriorScene({
 
     const limitX = ROOM_WIDTH / 2 - PLAYER_RADIUS;
     const limitZ = ROOM_DEPTH / 2 - PLAYER_RADIUS;
+    const cameraTarget = new THREE.Vector3();
     let nearResident = false;
     let nearExit = false;
     let targetAngle = player.rotation.y;
@@ -208,6 +206,13 @@ function InteriorScene({
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
       player.rotation.y += diff * Math.min(1, TURN_SPEED * delta);
 
+      cameraTarget.set(
+        THREE.MathUtils.clamp(player.position.x, -CAMERA_RANGE_X, CAMERA_RANGE_X),
+        CAMERA_TARGET_HEIGHT,
+        THREE.MathUtils.clamp(player.position.z, -CAMERA_RANGE_Z, CAMERA_RANGE_Z),
+      );
+      camera.position.copy(cameraTarget).add(CAMERA_OFFSET);
+      camera.lookAt(cameraTarget);
       renderer.render(scene, camera);
       frameId = requestAnimationFrame(animate);
     };

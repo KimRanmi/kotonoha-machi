@@ -7,7 +7,8 @@ import {
   type InteriorItem,
 } from './buildingInteriors';
 
-const WALL_HEIGHT = 3.2;
+// 카메라가 캐릭터를 따라가며 가까이서 보므로, 벽 위쪽 끝이 화면에 보이지 않을 만큼 높게 세운다.
+const WALL_HEIGHT = 12;
 const WALL_THICKNESS = 0.2;
 const WOOD = '#8a5a3c';
 const DARK_WOOD = '#5a3a24';
