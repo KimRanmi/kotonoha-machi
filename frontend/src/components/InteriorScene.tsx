@@ -43,7 +43,10 @@ const VIEW_HEIGHT = 9; // 화면에 세로로 보이는 월드 길이(직교 카
 const CAMERA_TARGET_HEIGHT = 0.6;
 // 방의 맨 아래 꼭짓점 (ROOM.maxX, ROOM.maxZ)이 화면 아래 끝에 닿는 카메라 위치(x + z)의 한계. 카메라는 (50, 50, 50)에서
 // 내려다보므로(고도각의 sin이 1/√3), 화면 가운데에서 아래 끝까지 VIEW_HEIGHT / 2만큼이 땅에서는 각 축 (VIEW_HEIGHT / 2) × √1.5다.
-const CAMERA_BOTTOM_LIMIT = ROOM.maxX + ROOM.maxZ - 2 * (VIEW_HEIGHT / 2) * Math.sqrt(1.5);
+// 꼭짓점 가까이 선 캐릭터의 발이 화면 끝에 잘리지 않게, 각 축으로 CAMERA_BOTTOM_MARGIN만큼 더 아래까지 가서 꼭짓점을 화면 안쪽으로 올린다.
+const CAMERA_BOTTOM_MARGIN = 0.8;
+const CAMERA_BOTTOM_LIMIT =
+  ROOM.maxX + ROOM.maxZ - 2 * ((VIEW_HEIGHT / 2) * Math.sqrt(1.5) - CAMERA_BOTTOM_MARGIN);
 
 /** 건물 안 방. 마을과 같은 고정 쿼터뷰로 가까이서 보고, 카메라가 내 캐릭터를 따라 움직인다. */
 function InteriorScene({
@@ -103,6 +106,7 @@ function InteriorScene({
       residentModel = createAvatarModel(resident.avatar, palette);
       residentModel.scale.setScalar(PLAYER_SCALE);
       residentModel.position.set(spot.x, 0, spot.z);
+      residentModel.rotation.y = Math.atan2(ROOM_ENTRANCE.x - spot.x, ROOM_ENTRANCE.z - spot.z);
       nameTag = createNameTag(resident.name);
       residentModel.add(nameTag);
       scene.add(residentModel);

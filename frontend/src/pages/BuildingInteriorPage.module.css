@@ -38,7 +38,9 @@
 
 .actionButton {
   position: fixed;
-  bottom: var(--space-6, 32px);
+  top: calc(
+    64px + var(--space-4)
+  ); /* 헤더(64px) 바로 아래. 매트가 있는 화면 아래쪽을 가리지 않는다 */
   left: 50%;
   z-index: 2;
   transform: translateX(-50%);

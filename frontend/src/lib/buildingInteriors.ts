@@ -20,8 +20,6 @@ export const ROOM = {
   minZ: ROOM_LAYOUT.minZ * ROOM_SCALE,
   maxZ: ROOM_LAYOUT.maxZ * ROOM_SCALE,
 };
-/** 방 가운데(월드 좌표). 현관과 카메라가 이 값을 기준으로 삼는다. */
-export const ROOM_CENTER = { x: (ROOM.minX + ROOM.maxX) / 2, z: (ROOM.minZ + ROOM.maxZ) / 2 };
 
 const BACK = ROOM_LAYOUT.minZ; // 뒷벽의 z(배치 좌표)
 const LEFT = ROOM_LAYOUT.minX; // 왼쪽 벽의 x(배치 좌표)
