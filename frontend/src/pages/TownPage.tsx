@@ -7,12 +7,12 @@ import {
   getVillageBuildings,
   getVillagePosition,
   saveVillagePosition,
+  type VillageBuilding,
   type VillagePosition,
 } from '../api/village';
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import VillageScene from '../components/VillageScene';
-import { VILLAGE_BUILDINGS } from '../lib/villageBuildings';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
@@ -24,14 +24,17 @@ function TownPage() {
   const [nearResidentSlug, setNearResidentSlug] = useState<string | null>(null);
   const nearResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === nearResidentSlug);
   const [nearBuildingId, setNearBuildingId] = useState<string | null>(null);
-  const nearBuilding = VILLAGE_BUILDINGS.find((building) => building.id === nearBuildingId);
+  const [buildings, setBuildings] = useState<VillageBuilding[] | null>(null);
+  const [buildingsErrorMessage, setBuildingsErrorMessage] = useState<string | null>(null);
+  const [buildingsAttempt, setBuildingsAttempt] = useState(0);
+  const nearBuilding = buildings?.find((building) => building.id === nearBuildingId);
+  const nearBuildingResidentSlug = nearBuilding?.residentSlug ?? null;
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [palette, setPalette] = useState<AvatarPalette | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutErrorMessage, setLogoutErrorMessage] = useState<string | null>(null);
   const [todayTheme, setTodayTheme] = useState<Theme | null>(null);
-  const [unlockedBuildingIds, setUnlockedBuildingIds] = useState<ReadonlySet<string>>(new Set());
   // 마지막 위치를 받아 오기 전에는 마을을 그리지 않는다. 그려 버리면 기본 위치에서 시작했다가 순간이동하게 된다.
   const [positionLoaded, setPositionLoaded] = useState(false);
   const [initialPosition, setInitialPosition] = useState<VillagePosition | null>(null);
@@ -79,23 +82,24 @@ function TownPage() {
     let cancelled = false;
 
     getVillageBuildings()
-      .then((buildings) => {
+      .then((loaded) => {
         if (!cancelled) {
-          setUnlockedBuildingIds(
-            new Set(
-              buildings.filter((building) => building.unlocked).map((building) => building.id),
-            ),
-          );
+          setBuildings(loaded);
+          setBuildingsErrorMessage(null);
         }
       })
-      .catch(() => {
-        // 건물 열림 정보는 보조 정보라 실패해도 마을을 막지 않는다. 이 경우 모든 건물을 잠금으로 본다.
+      .catch((error) => {
+        if (!cancelled) {
+          setBuildingsErrorMessage(
+            error instanceof ApiError ? error.message : '마을 건물을 불러오지 못했습니다.',
+          );
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [buildingsAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,9 +124,8 @@ function TownPage() {
     };
   }, []);
 
-  // TODO: 건물 안 주민 배치가 생기면 입장 화면으로 바꾼다. 지금은 건물 id가 주민 slug가 아니라서 대화가 열리지 않는다.
   useEffect(() => {
-    if (!nearBuildingId) {
+    if (!nearBuildingResidentSlug) {
       return;
     }
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -130,12 +133,12 @@ function TownPage() {
       const isFormControl =
         target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(target.tagName);
       if (event.key === 'Enter' && !isFormControl) {
-        navigate(`/chat/${nearBuildingId}`);
+        navigate(`/chat/${nearBuildingResidentSlug}`);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nearBuildingId, navigate]);
+  }, [nearBuildingResidentSlug, navigate]);
 
   // 위치는 걸을 때마다 ref에만 담고, 서버 저장은 아래 시점에만 한다. 서버에 마지막으로 보낸 값과 같으면 보내지 않는다.
   const currentPositionRef = useRef<VillagePosition | null>(null);
@@ -273,12 +276,17 @@ function TownPage() {
           <span className={styles.todayLearningCta}>시작하기 →</span>
         </Link>
       )}
-      {avatar && palette && positionLoaded && (
+      {avatar && palette && buildings && positionLoaded && (
         <VillageScene
           avatar={avatar}
           palette={palette}
-          onEnterBuilding={(buildingId) => navigate(`/chat/${buildingId}`)}
-          unlockedBuildingIds={unlockedBuildingIds}
+          buildings={buildings}
+          onEnterBuilding={(buildingId) => {
+            const residentSlug = buildings.find((b) => b.id === buildingId)?.residentSlug;
+            if (residentSlug) {
+              navigate(`/chat/${residentSlug}`);
+            }
+          }}
           onNearResidentChange={setNearResidentSlug}
           onNearBuildingChange={setNearBuildingId}
           initialPosition={initialPosition}
@@ -296,14 +304,32 @@ function TownPage() {
           {nearResident.name}と話す
         </button>
       )}
-      {nearBuilding && !nearResident && (
+      {nearBuilding && nearBuildingResidentSlug && !nearResident && (
         <button
           type="button"
           className={styles.talkButton}
-          onClick={() => navigate(`/chat/${nearBuilding.id}`)}
+          onClick={() => navigate(`/chat/${nearBuildingResidentSlug}`)}
         >
           {nearBuilding.label}に入る (Enter)
         </button>
+      )}
+      {!buildings && !buildingsErrorMessage && (
+        <p className={styles.content}>마을을 불러오는 중…</p>
+      )}
+      {!buildings && buildingsErrorMessage && (
+        <div className={styles.content} role="alert">
+          <p>{buildingsErrorMessage}</p>
+          <button
+            type="button"
+            className={styles.talkButton}
+            onClick={() => {
+              setBuildingsErrorMessage(null);
+              setBuildingsAttempt((attempt) => attempt + 1);
+            }}
+          >
+            다시 시도
+          </button>
+        </div>
       )}
       {logoutErrorMessage && (
         <p className={styles.content} role="alert">

@@ -20,7 +20,6 @@ import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
-import com.kotonohamachi.village.service.VillageService;
 import com.kotonohamachi.vocabulary.service.VocabularyService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -55,7 +54,6 @@ public class ThemeService {
   private final ThemeExampleRepository themeExampleRepository;
   private final ThemeReadingPassageRepository themeReadingPassageRepository;
   private final UserRepository userRepository;
-  private final VillageService villageService;
   private final VocabularyService vocabularyService;
 
   /**
@@ -68,7 +66,6 @@ public class ThemeService {
    * @param themeExampleRepository 테마 예문 콘텐츠 저장소
    * @param themeReadingPassageRepository 테마 독해 지문 콘텐츠 저장소
    * @param userRepository 사용자 저장소
-   * @param villageService 마을 건물 열림 서비스(테마 완료 시 건물 해금)
    * @param vocabularyService 단어장 서비스
    */
   public ThemeService(
@@ -79,7 +76,6 @@ public class ThemeService {
       ThemeExampleRepository themeExampleRepository,
       ThemeReadingPassageRepository themeReadingPassageRepository,
       UserRepository userRepository,
-      VillageService villageService,
       VocabularyService vocabularyService) {
     this.themeRepository = themeRepository;
     this.themeProgressRepository = themeProgressRepository;
@@ -88,7 +84,6 @@ public class ThemeService {
     this.themeExampleRepository = themeExampleRepository;
     this.themeReadingPassageRepository = themeReadingPassageRepository;
     this.userRepository = userRepository;
-    this.villageService = villageService;
     this.vocabularyService = vocabularyService;
   }
 
@@ -176,9 +171,6 @@ public class ThemeService {
       throw new ApiException(ThemeErrorCode.STAGE_OUT_OF_ORDER);
     }
     progress.completeCurrentStage();
-    if (progress.isCompleted()) {
-      villageService.unlockBuildings(userId);
-    }
     vocabularyService.saveThemeWords(userId, themeId, stage);
 
     return new ThemeProgressResponse(themeId, progress.getCurrentStage(), progress.isCompleted());

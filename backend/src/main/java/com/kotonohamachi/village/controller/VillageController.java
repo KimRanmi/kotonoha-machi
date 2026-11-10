@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 마을 건물의 열림 상태와 마지막 위치 조회·저장 API. */
+/** 마을 건물 목록과 마지막 위치 조회·저장 API. */
 @RestController
 public class VillageController {
 
@@ -24,22 +24,22 @@ public class VillageController {
   /**
    * 생성자.
    *
-   * @param villageService 마을 건물 서비스
+   * @param villageService 마을 서비스
    */
   public VillageController(VillageService villageService) {
     this.villageService = villageService;
   }
 
   /**
-   * 로그인한 사용자의 마을 건물(집, 카페, 상점) 열림 상태를 조회한다.
+   * 마을 건물 목록을 조회한다. 모든 건물이 모든 사용자에게 열려 있다.
    *
    * @param authentication 현재 요청의 인증 정보
-   * @return 건물 3개의 열림 상태(항상 집, 카페, 상점 순서)
+   * @return 건물 목록(등록된 순서)
    */
   @GetMapping("/api/village/buildings")
   public List<VillageBuildingResponse> getBuildings(Authentication authentication) {
-    User user = AuthPrincipal.resolve(authentication);
-    return villageService.getBuildings(user.getId());
+    AuthPrincipal.resolve(authentication);
+    return villageService.getBuildings();
   }
 
   /**

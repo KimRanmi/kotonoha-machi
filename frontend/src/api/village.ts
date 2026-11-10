@@ -1,13 +1,22 @@
 import { apiFetch } from './client';
 
-/** 마을 건물 하나의 열림 상태. 서버가 사용자별로 저장한 값이다. */
-export interface VillageBuildingStatus {
+/** 마을 건물 하나. 위치(x, z)는 건물 중심, width는 x 방향, depth는 z 방향 길이다. 값의 원본은 서버(구글 시트)다. */
+export interface VillageBuilding {
   id: string;
-  unlocked: boolean;
+  /** 간판에 일본어로 적히는 이름. */
+  label: string;
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+  height: number;
+  color: string;
+  /** 입장하면 대화할 주민의 slug. 이 건물에 속한 주민이 없으면 null. */
+  residentSlug: string | null;
 }
 
-/** 로그인한 사용자의 마을 건물(집, 카페, 상점) 열림 상태를 가져온다. */
-export async function getVillageBuildings(): Promise<VillageBuildingStatus[]> {
+/** 마을 건물 목록을 가져온다. 모든 건물이 처음부터 열려 있다. */
+export async function getVillageBuildings(): Promise<VillageBuilding[]> {
   const response = await apiFetch('/api/village/buildings');
   return response.json();
 }

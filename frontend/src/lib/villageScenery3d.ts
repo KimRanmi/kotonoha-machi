@@ -1,18 +1,7 @@
 import * as THREE from 'three';
-import {
-  DOOR_WIDTH,
-  ROOF_HEIGHT,
-  VILLAGE_BUILDINGS,
-  type VillageBuilding,
-} from './villageBuildings';
-import {
-  TREE_RADIUS,
-  VILLAGE_BUSHES,
-  VILLAGE_FLOWERS,
-  VILLAGE_FOREST,
-  VILLAGE_PATHS,
-  VILLAGE_TREES,
-} from './villageScenery';
+import type { VillageBuilding } from '../api/village';
+import { DOOR_WIDTH, ROOF_HEIGHT } from './villageBuildings';
+import { TREE_RADIUS, VILLAGE_FOREST, type VillageLayout } from './villageScenery';
 
 const FLOWER_COLORS = ['#f4a3b8', '#fff3a8', '#ffffff', '#b9a4f0', '#f7b267'];
 const WINDOW_COLOR = '#cfe8ff';
@@ -23,6 +12,8 @@ const SIGN_STYLES: Record<string, { background: string; text: string; accent: st
   shop: { background: '#1f3d6b', text: '#ffffff', accent: '#f2c230' },
   home: { background: '#7a3f3a', text: '#fff4e0', accent: '#f0c987' },
 };
+// 시트에 새로 추가한 건물처럼 위 목록에 없는 건물은 이 기본 모양으로 그린다.
+const DEFAULT_SIGN_STYLE = { background: '#3d3d3d', text: '#ffffff', accent: '#cccccc' };
 const SIGN_WIDTH = 3.2;
 const SIGN_HEIGHT = 0.9;
 const SIGN_FONT = '"Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Apple SD Gothic Neo", sans-serif';
@@ -32,8 +23,6 @@ export interface VillageSign {
   building: VillageBuilding;
   object: THREE.Object3D;
   setHighlight: (on: boolean) => void;
-  /** 간판 글자를 잠김("準備中" 표시) 또는 열림 모양으로 다시 그린다. */
-  setLocked: (locked: boolean) => void;
 }
 
 export interface VillageWorld {
@@ -43,7 +32,10 @@ export interface VillageWorld {
 }
 
 /** 건물, 길, 나무, 꽃, 덤불로 이루어진 마을 풍경을 만든다. 호출한 쪽이 dispose()로 정리한다. */
-export function createVillageWorld(): VillageWorld {
+export function createVillageWorld(
+  buildings: VillageBuilding[],
+  layout: VillageLayout,
+): VillageWorld {
   const group = new THREE.Group();
   const geometries: THREE.BufferGeometry[] = [];
   const materials: THREE.Material[] = [];
@@ -74,7 +66,7 @@ export function createVillageWorld(): VillageWorld {
 
   // 길
   const pathMaterial = material('#e8d5a8');
-  for (const path of VILLAGE_PATHS) {
+  for (const path of layout.paths) {
     const mesh = new THREE.Mesh(
       geometry(new THREE.BoxGeometry(path.width, 0.04, path.depth)),
       pathMaterial,
@@ -270,21 +262,17 @@ export function createVillageWorld(): VillageWorld {
     place(box(0.35, 0.25, 0.5, '#d9534f'), 1.2, 1, front + 1.6, house);
   };
 
-  /** 간판 판 그림을 만든다. 돌려주는 draw(locked)로 잠김/열림 모양을 언제든 다시 그릴 수 있다. */
+  /** 간판 판 그림을 만든다. */
   const createSignTexture = (building: VillageBuilding) => {
-    const style = SIGN_STYLES[building.id];
+    const style = SIGN_STYLES[building.id] ?? DEFAULT_SIGN_STYLE;
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 144;
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     textures.push(texture);
-    const draw = (locked: boolean) => {
-      const context = canvas.getContext('2d');
-      if (!context) {
-        return;
-      }
-      context.clearRect(0, 0, 512, 144);
+    const context = canvas.getContext('2d');
+    if (context) {
       context.fillStyle = style.background;
       context.fillRect(0, 0, 512, 144);
       context.strokeStyle = style.accent;
@@ -293,17 +281,11 @@ export function createVillageWorld(): VillageWorld {
       context.textAlign = 'center';
       context.textBaseline = 'middle';
       context.fillStyle = style.text;
-      context.font = `bold ${locked ? 68 : 78}px ${SIGN_FONT}`;
-      context.fillText(building.label, 256, locked ? 58 : 74);
-      if (locked) {
-        context.fillStyle = style.accent;
-        context.font = `bold 28px ${SIGN_FONT}`;
-        context.fillText('準備中', 256, 112);
-      }
+      context.font = `bold 78px ${SIGN_FONT}`;
+      context.fillText(building.label, 256, 74);
       texture.needsUpdate = true;
-    };
-    draw(true); // 서버에서 열림 값을 받기 전에는 잠김으로 시작한다.
-    return { texture, draw };
+    }
+    return texture;
   };
 
   const createSign = (building: VillageBuilding): VillageSign => {
@@ -318,7 +300,7 @@ export function createVillageWorld(): VillageWorld {
       object,
     );
     const signTexture = createSignTexture(building);
-    const faceMaterial = new THREE.MeshBasicMaterial({ map: signTexture.texture });
+    const faceMaterial = new THREE.MeshBasicMaterial({ map: signTexture });
     materials.push(faceMaterial);
     const face = new THREE.Mesh(
       geometry(new THREE.PlaneGeometry(SIGN_WIDTH, SIGN_HEIGHT)),
@@ -329,7 +311,6 @@ export function createVillageWorld(): VillageWorld {
       building,
       object,
       setHighlight: (on) => faceMaterial.color.setScalar(on ? 1.3 : 1),
-      setLocked: signTexture.draw,
     };
   };
 
@@ -378,7 +359,7 @@ export function createVillageWorld(): VillageWorld {
     return house;
   }
 
-  for (const building of VILLAGE_BUILDINGS) {
+  for (const building of buildings) {
     group.add(createBuilding(building));
   }
 
@@ -390,7 +371,7 @@ export function createVillageWorld(): VillageWorld {
   const pineLowGeometry = geometry(new THREE.ConeGeometry(1.2, 1.8, 7));
   const pineHighGeometry = geometry(new THREE.ConeGeometry(0.9, 1.6, 7));
   const pineMaterial = material('#3f8f55', true);
-  for (const tree of VILLAGE_TREES) {
+  for (const tree of layout.trees) {
     const holder = new THREE.Group();
     holder.position.set(tree.x, 0, tree.z);
     holder.rotation.y = (tree.x * 7 + tree.z * 3) % (Math.PI * 2); // 나무마다 조금씩 다른 방향
@@ -435,7 +416,7 @@ export function createVillageWorld(): VillageWorld {
   // 덤불
   const bushGeometry = geometry(new THREE.IcosahedronGeometry(0.6, 0));
   const bushMaterial = material('#6dbb62', true);
-  for (const bush of VILLAGE_BUSHES) {
+  for (const bush of layout.bushes) {
     const mesh = new THREE.Mesh(bushGeometry, bushMaterial);
     mesh.scale.set(1.2, 0.8, 1);
     place(mesh, bush.x, 0.4, bush.z, group);
@@ -446,7 +427,7 @@ export function createVillageWorld(): VillageWorld {
   const stemMaterial = material('#4f9a4a');
   const blossomGeometry = geometry(new THREE.SphereGeometry(0.12, 8, 6));
   const blossomMaterials = FLOWER_COLORS.map((color) => material(color));
-  for (const flower of VILLAGE_FLOWERS) {
+  for (const flower of layout.flowers) {
     place(new THREE.Mesh(stemGeometry, stemMaterial), flower.x, 0.18, flower.z, group);
     place(
       new THREE.Mesh(blossomGeometry, blossomMaterials[flower.variant % blossomMaterials.length]),

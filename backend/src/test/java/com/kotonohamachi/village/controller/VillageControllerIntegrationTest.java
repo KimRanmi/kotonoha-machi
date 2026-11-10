@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,7 +28,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** 마을 건물 조회와 마지막 위치 조회·저장 API의 인증과 응답 형태를 실제 Postgres와 Security 필터 체인으로 검증한다. */
+/** 마을 건물 목록 조회와 마지막 위치 조회·저장 API의 인증과 응답 형태를 실제 Postgres와 Security 필터 체인으로 검증한다. */
 @Testcontainers
 @SpringBootTest
 class VillageControllerIntegrationTest {
@@ -38,6 +39,9 @@ class VillageControllerIntegrationTest {
 
   @Autowired
   private WebApplicationContext webApplicationContext;
+
+  @Autowired
+  private JdbcTemplate jdbcTemplate;
 
   @MockitoBean
   private EmailSender emailSender;
@@ -88,19 +92,30 @@ class VillageControllerIntegrationTest {
   }
 
   @Test
-  void 로그인한_신규_사용자는_집만_열린_건물_3개를_순서대로_받는다() throws Exception {
-    MockHttpSession session = newLoggedInSession();
+  void 로그인한_사용자는_건물_목록과_같은_장소의_주민을_받는다() throws Exception {
+    // 건물·주민 데이터는 시트에서 만든 마이그레이션이 채우므로, 이 테스트는 자기만의 장소를 직접 넣어 확인한다.
+    String originalLocation = jdbcTemplate.queryForObject(
+        "SELECT location FROM resident WHERE slug = 'r01'", String.class);
+    jdbcTemplate.update(
+        "INSERT INTO building (slug, label, x, z, width, depth, height, color, location) "
+            + "VALUES ('it_with', 'テスト', 1.5, -2, 4, 3.5, 2.5, '#112233', '통합테스트장소'), "
+            + "('it_without', 'ナシ', 3, -2, 4, 3.5, 2.5, '#445566', '통합테스트빈장소')");
+    jdbcTemplate.update("UPDATE resident SET location = '통합테스트장소' WHERE slug = 'r01'");
+    try {
+      MockHttpSession session = newLoggedInSession();
 
-    mockMvc
-        .perform(get("/api/village/buildings").session(session))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(3))
-        .andExpect(jsonPath("$[0].id").value("home"))
-        .andExpect(jsonPath("$[0].unlocked").value(true))
-        .andExpect(jsonPath("$[1].id").value("cafe"))
-        .andExpect(jsonPath("$[1].unlocked").value(false))
-        .andExpect(jsonPath("$[2].id").value("shop"))
-        .andExpect(jsonPath("$[2].unlocked").value(false));
+      mockMvc
+          .perform(get("/api/village/buildings").session(session))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].label").value("テスト"))
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].x").value(1.5))
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].color").value("#112233"))
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].residentSlug").value("r01"))
+          .andExpect(jsonPath("$[?(@.id == 'it_without')].residentSlug[0]").doesNotExist());
+    } finally {
+      jdbcTemplate.update("DELETE FROM building WHERE slug IN ('it_with', 'it_without')");
+      jdbcTemplate.update("UPDATE resident SET location = ? WHERE slug = 'r01'", originalLocation);
+    }
   }
 
   @Test

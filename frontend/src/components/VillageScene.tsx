@@ -1,25 +1,25 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import type { VillagePosition } from '../api/village';
+import type { VillageBuilding, VillagePosition } from '../api/village';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
 import { collidesWithBuildings, findDoorAt } from '../lib/villageBuildings';
 import { VILLAGE_RESIDENTS, collidesWithResidents } from '../lib/villageResidents';
-import { collidesWithTrees } from '../lib/villageScenery';
+import { collidesWithTrees, createVillageLayout } from '../lib/villageScenery';
 import { createVillageWorld } from '../lib/villageScenery3d';
 import styles from './VillageScene.module.css';
 
 interface VillageSceneProps {
   avatar: Avatar;
   palette: AvatarPalette;
-  /** 열려 있는 건물의 간판을 눌렀을 때 호출된다. */
+  /** 서버에서 받은 마을 건물들. 길과 나무·꽃 배치도 이 목록으로 계산하며, 바뀌면 장면을 다시 만든다. */
+  buildings: VillageBuilding[];
+  /** 건물 간판을 눌렀을 때 호출된다. */
   onEnterBuilding: (buildingId: string) => void;
-  /** 서버가 열려 있다고 알려 준 건물 id들. 여기에 없는 건물은 잠긴 것으로 본다. */
-  unlockedBuildingIds: ReadonlySet<string>;
   /** 대화 가능한 거리 안에 들어온 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
   onNearResidentChange: (residentSlug: string | null) => void;
-  /** 열려 있는 건물의 문 앞에 선 동안 그 건물 id. 아니면 null. 바뀔 때만 호출된다. */
+  /** 건물 문 앞에 선 동안 그 건물 id. 아니면 null. 바뀔 때만 호출된다. */
   onNearBuildingChange: (buildingId: string | null) => void;
   /** 서버에 저장된 마지막 위치. 없거나 지금은 설 수 없는 자리면 기본 시작 위치에서 시작한다. 장면을 만들 때 한 번만 읽는다. */
   initialPosition: VillagePosition | null;
@@ -31,11 +31,10 @@ const WALK_SPEED = 4; // 초당 이동 거리
 const PLAYER_SCALE = 0.6; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
 const TALK_DISTANCE = 2; // 이 거리 안에 들어오면 주민에게 말을 걸 수 있다
 const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
-const MAP_HALF_SIZE = 18; // 이동 가능한 정사각형 땅의 절반 크기
+const MAP_HALF_SIZE = 22; // 이동 가능한 정사각형 땅의 절반 크기
 const GROUND_HALF_SIZE = 60; // 눈에 보이는 풀밭의 절반 크기. 화면 어디를 봐도 땅이 보이게 이동 범위보다 훨씬 크다
-const VIEW_HEIGHT = 18; // 화면에 세로로 보이는 월드 길이(직교 카메라). 건물 3개가 한 화면에 들어오는 크기
-// 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다. 직교 카메라라 멀리 둬도 크기는 같고, 카메라 앞쪽의 나무가
-// 시야 앞면에 잘리지 않게 숲(최대 48) 바깥까지 물러나 있다.
+const VIEW_HEIGHT = 18; // 화면에 세로로 보이는 월드 길이(직교 카메라)
+// 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다. 직교 카메라라 멀리 둬도 크기는 같다.
 const CAMERA_OFFSET = new THREE.Vector3(50, 50, 50);
 
 /**
@@ -52,11 +51,6 @@ const KEY_DIRECTIONS: Record<string, [number, number]> = {
   ArrowRight: [1, -1],
   KeyD: [1, -1],
 };
-
-/** 캐릭터가 (x, z)에 설 수 없는 자리(건물이나 나무 줄기)인지. */
-function isBlocked(x: number, z: number): boolean {
-  return collidesWithBuildings(x, z) || collidesWithTrees(x, z) || collidesWithResidents(x, z);
-}
 
 /** 주민 머리 위에 띄울 이름표. 글자를 캔버스에 그려 항상 카메라를 향하는 판(Sprite)에 붙인다. */
 function createNameTag(name: string): THREE.Sprite {
@@ -109,26 +103,19 @@ function createGroundTexture(): THREE.CanvasTexture {
 function VillageScene({
   avatar,
   palette,
+  buildings,
   onEnterBuilding,
-  unlockedBuildingIds,
   onNearResidentChange,
   onNearBuildingChange,
   initialPosition,
   onPositionChange,
 }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // 장면은 avatar/palette가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
+  // 장면은 avatar/palette/buildings가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
   const onEnterRef = useRef(onEnterBuilding);
   useEffect(() => {
     onEnterRef.current = onEnterBuilding;
   }, [onEnterBuilding]);
-  // 열림 값도 같은 방식으로 ref에 담아 두고, 값이 바뀌면 장면을 다시 만들지 않고 간판 모양만 갱신한다.
-  const unlockedRef = useRef(unlockedBuildingIds);
-  const applyUnlockedRef = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    unlockedRef.current = unlockedBuildingIds;
-    applyUnlockedRef.current?.();
-  }, [unlockedBuildingIds]);
   const onNearRef = useRef(onNearResidentChange);
   useEffect(() => {
     onNearRef.current = onNearResidentChange;
@@ -167,15 +154,13 @@ function VillageScene({
     scene.add(ground);
 
     // 건물, 길, 나무, 꽃 같은 풍경은 lib/villageScenery3d.ts가 만든다.
-    const world = createVillageWorld();
+    const layout = createVillageLayout(buildings);
+    const world = createVillageWorld(buildings, layout);
+    const isBlocked = (x: number, z: number) =>
+      collidesWithBuildings(buildings, x, z) ||
+      collidesWithTrees(layout.trees, x, z) ||
+      collidesWithResidents(x, z);
     scene.add(world.group);
-    const applyUnlocked = () => {
-      for (const sign of world.signs) {
-        sign.setLocked(!unlockedRef.current.has(sign.building.id));
-      }
-    };
-    applyUnlockedRef.current = applyUnlocked;
-    applyUnlocked();
 
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
@@ -215,7 +200,7 @@ function VillageScene({
     resize();
 
     // 간판은 3D 물체라서, 마우스 위치에서 화면 안쪽으로 광선을 쏘아 맞은 간판을 찾는다(raycaster).
-    // 열려 있는 건물 간판만 반응하고, 잠긴 건물 간판은 눌러도 아무 일도 없다.
+    // 들어갈 수 있는(대화할 주민이 있는) 건물의 간판만 강조하고 누를 수 있다.
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const findSign = (event: MouseEvent) => {
@@ -231,18 +216,17 @@ function VillageScene({
       )[0];
       return world.signs.find((sign) => hit && sign.object.getObjectById(hit.object.id));
     };
-    const isUnlocked = (buildingId: string) => unlockedRef.current.has(buildingId);
     const handlePointerMove = (event: PointerEvent) => {
-      const hovered = findSign(event);
+      const found = findSign(event);
+      const hovered = found?.building.residentSlug ? found : undefined;
       for (const sign of world.signs) {
-        sign.setHighlight(sign === hovered && isUnlocked(sign.building.id));
+        sign.setHighlight(sign === hovered);
       }
-      renderer.domElement.style.cursor =
-        hovered && isUnlocked(hovered.building.id) ? 'pointer' : '';
+      renderer.domElement.style.cursor = hovered ? 'pointer' : '';
     };
     const handleClick = (event: MouseEvent) => {
       const clicked = findSign(event);
-      if (clicked && isUnlocked(clicked.building.id)) {
+      if (clicked?.building.residentSlug) {
         onEnterRef.current(clicked.building.id);
       }
     };
@@ -316,9 +300,9 @@ function VillageScene({
         onPositionRef.current({ x: player.position.x, z: player.position.z });
       }
 
-      // 열린 건물의 문 앞에 서 있으면 마을 화면이 입장 버튼을 띄운다.
-      const door = findDoorAt(player.position.x, player.position.z);
-      const doorId = door && isUnlocked(door.id) ? door.id : null;
+      // 건물 문 앞에 서 있으면 마을 화면이 입장 버튼을 띄운다.
+      const door = findDoorAt(buildings, player.position.x, player.position.z);
+      const doorId = door ? door.id : null;
       if (doorId !== nearBuildingId) {
         nearBuildingId = doorId;
         onNearBuildingRef.current(nearBuildingId);
@@ -371,13 +355,12 @@ function VillageScene({
       groundTexture.dispose();
       renderer.domElement.removeEventListener('pointermove', handlePointerMove);
       renderer.domElement.removeEventListener('click', handleClick);
-      applyUnlockedRef.current = null;
       world.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [avatar, palette]);
+  }, [avatar, palette, buildings]);
 
   return <div ref={containerRef} className={styles.scene} aria-label="마을 화면" />;
 }

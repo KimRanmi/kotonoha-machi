@@ -22,6 +22,7 @@
 | appearance_job | O | 외모·직업 |
 | core_features | O | 핵심 특징 |
 | hobby | | 취미 |
+| location | | 주민이 지내는 장소(최대 30자). 같은 이름의 건물(`scripts/import-buildings` 시트의 `location`)이 있으면 그 건물에 속하고, 건물이 없는 값(예: `거리`)이나 빈 칸은 건물 밖에서 지낸다 |
 
 ## 변환 규칙 (시트 -> resident 테이블)
 
@@ -32,6 +33,7 @@
 | personality | 시트 값 그대로 |
 | current_context | 모든 주민 공통 `마을에서 평소처럼 하루를 보내고 있다.` (`import.mjs` 상단 상수. 나중에 대화 시작 시 실제 위치로 덮어쓸 예정) |
 | speech_style, sample_lines | 빈 문자열 |
+| location | location 값. 빈 칸이면 NULL. **시트에 `location` 열이 아예 없으면 이 열은 SQL에 넣지 않아** 기존 값이 지워지지 않는다 |
 | background | `외모·직업: …` / `핵심 특징: …` / `취미: …` 세 줄 (최대 500자) |
 
 길이는 변환 후 값 기준으로 검사한다. 값에 `{` `}`를 쓸 수 없다. 빈 행은 무시하고, 데이터가 0행이면 거부한다.
