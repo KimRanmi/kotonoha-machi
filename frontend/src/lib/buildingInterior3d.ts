@@ -12,7 +12,7 @@ const WALL_HEIGHT = 12;
 const WALL_THICKNESS = 0.2;
 // 바닥과 벽은 방 크기보다 훨씬 길게 만든다. 방의 앞쪽·오른쪽 끝 너머까지 이어져, 화면 어디에도 빈 배경이 보이지 않는다.
 const FILL_SIZE = 60;
-const MAT_WIDTH = 1.6; // 현관 매트의 가로 길이(배치 좌표)
+const MAT_WIDTH = 2.4; // 현관 매트와 문턱 틈의 가로 길이(배치 좌표)
 // 방 앞쪽 가장자리에 두르는 낮은 문턱. 캐릭터 발목 높이라 방 안을 가리지 않는다.
 const SILL_HEIGHT = 0.25;
 const SILL_DEPTH = 0.2;

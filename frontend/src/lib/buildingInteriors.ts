@@ -426,7 +426,7 @@ export function collidesWithFurniture(
   });
 }
 
-const EXIT_HALF_WIDTH = 1; // 월드 좌표. 3D 매트(배치 좌표 너비 1.6)의 절반과 거의 같다
+const EXIT_HALF_WIDTH = 1.5; // 월드 좌표. 3D 매트(배치 좌표 너비 2.4)의 절반과 거의 같다
 const EXIT_REACH = 1;
 
 /** 캐릭터가 현관 매트(앞쪽 가장자리 가운데) 위에 서 있는지. 여기서 밖으로 나갈 수 있다. */
