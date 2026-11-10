@@ -313,10 +313,20 @@ function TownPage() {
           {nearBuilding.label}に入る (Enter)
         </button>
       )}
-      {buildingsErrorMessage && !buildings && (
+      {!buildings && !buildingsErrorMessage && (
+        <p className={styles.content}>마을을 불러오는 중…</p>
+      )}
+      {!buildings && buildingsErrorMessage && (
         <div className={styles.content} role="alert">
           <p>{buildingsErrorMessage}</p>
-          <button type="button" onClick={() => setBuildingsAttempt((attempt) => attempt + 1)}>
+          <button
+            type="button"
+            className={styles.talkButton}
+            onClick={() => {
+              setBuildingsErrorMessage(null);
+              setBuildingsAttempt((attempt) => attempt + 1);
+            }}
+          >
             다시 시도
           </button>
         </div>
