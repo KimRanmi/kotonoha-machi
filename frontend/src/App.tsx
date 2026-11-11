@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import BuildingInteriorPage from './pages/BuildingInteriorPage';
-import ChatPage from './pages/ChatPage';
 import CompletedThemesPage from './pages/CompletedThemesPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import LoginPage from './pages/LoginPage';
@@ -24,7 +23,6 @@ function App() {
         <Route path="/town/buildings/:buildingId" element={<BuildingInteriorPage />} />
         <Route path="/town/themes" element={<CompletedThemesPage />} />
         <Route path="/town/themes/:themeId" element={<ThemeLearningPage />} />
-        <Route path="/chat/:residentSlug" element={<ChatPage />} />
         <Route path="/vocabulary" element={<VocabularyPage />} />
       </Route>
     </Routes>

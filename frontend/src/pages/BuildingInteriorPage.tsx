@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
 import { getVillageBuildings, type VillageBuilding } from '../api/village';
 import InteriorScene from '../components/InteriorScene';
+import ResidentChatModal from '../components/ResidentChatModal';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import { getBuildingInterior } from '../lib/buildingInteriors';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
@@ -56,6 +57,10 @@ function BuildingInteriorPage() {
     [building],
   );
   const nearResident = residents.find((candidate) => candidate.slug === nearResidentSlug) ?? null;
+  // 대화창이 열린 주민. 페이지를 이동하지 않고 방 위에 모달로 띄운다.
+  const [chatResidentSlug, setChatResidentSlug] = useState<string | null>(null);
+  const chatResident = residents.find((candidate) => candidate.slug === chatResidentSlug) ?? null;
+  const closeChat = useCallback(() => setChatResidentSlug(null), []);
   // 같은 건물이면 같은 객체를 넘겨야 장면을 다시 만들지 않는다.
   const interior = useMemo(
     () => (buildingId ? getBuildingInterior(buildingId) : null),
@@ -64,7 +69,7 @@ function BuildingInteriorPage() {
 
   // 현관 매트 위에서 Enter를 누르면 마을로 나간다.
   useEffect(() => {
-    if (!nearExit) {
+    if (!nearExit || chatResident) {
       return;
     }
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -77,7 +82,7 @@ function BuildingInteriorPage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nearExit, navigate]);
+  }, [nearExit, chatResident, navigate]);
 
   return (
     <main className={styles.page}>
@@ -101,10 +106,17 @@ function BuildingInteriorPage() {
         <button
           type="button"
           className={styles.actionButton}
-          onClick={() => navigate(`/chat/${nearResident.slug}`)}
+          onClick={() => setChatResidentSlug(nearResident.slug)}
         >
           {nearResident.name}と話す
         </button>
+      )}
+      {chatResident && (
+        <ResidentChatModal
+          residentSlug={chatResident.slug}
+          residentName={chatResident.name}
+          onClose={closeChat}
+        />
       )}
       {nearExit && !nearResident && (
         <button type="button" className={styles.actionButton} onClick={() => navigate('/town')}>

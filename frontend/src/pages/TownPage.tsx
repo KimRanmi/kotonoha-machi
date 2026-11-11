@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../api/auth';
 import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
@@ -14,6 +14,7 @@ import {
 } from '../api/village';
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
+import ResidentChatModal from '../components/ResidentChatModal';
 import VillageScene from '../components/VillageScene';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
@@ -25,6 +26,10 @@ function TownPage() {
   const navigate = useNavigate();
   const [nearResidentSlug, setNearResidentSlug] = useState<string | null>(null);
   const nearResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === nearResidentSlug);
+  // 대화창이 열린 주민. 페이지를 이동하지 않고 마을 위에 모달로 띄운다.
+  const [chatResidentSlug, setChatResidentSlug] = useState<string | null>(null);
+  const chatResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === chatResidentSlug);
+  const closeChat = useCallback(() => setChatResidentSlug(null), []);
   const [nearBuildingId, setNearBuildingId] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<VillageBuilding[] | null>(null);
   const [map, setMap] = useState<VillageMap | null>(null);
@@ -128,7 +133,7 @@ function TownPage() {
   }, []);
 
   useEffect(() => {
-    if (!nearBuildingId) {
+    if (!nearBuildingId || chatResident) {
       return;
     }
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -141,7 +146,7 @@ function TownPage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nearBuildingId, navigate]);
+  }, [nearBuildingId, chatResident, navigate]);
 
   // 위치는 걸을 때마다 ref에만 담고, 서버 저장은 아래 시점에만 한다. 서버에 마지막으로 보낸 값과 같으면 보내지 않는다.
   const currentPositionRef = useRef<VillagePosition | null>(null);
@@ -298,10 +303,17 @@ function TownPage() {
         <button
           type="button"
           className={styles.talkButton}
-          onClick={() => navigate(`/chat/${nearResident.slug}`)}
+          onClick={() => setChatResidentSlug(nearResident.slug)}
         >
           {nearResident.name}と話す
         </button>
+      )}
+      {chatResident && (
+        <ResidentChatModal
+          residentSlug={chatResident.slug}
+          residentName={chatResident.name}
+          onClose={closeChat}
+        />
       )}
       {nearBuilding && !nearResident && (
         <button
