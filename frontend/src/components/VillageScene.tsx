@@ -5,7 +5,8 @@ import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
 import { collidesWithBuildings, findDoorAt } from '../lib/villageBuildings';
-import { VILLAGE_RESIDENTS, collidesWithResidents } from '../lib/villageResidents';
+import { addAccessory } from '../lib/residentAccessories';
+import { collidesWithResidents, placeResidents } from '../lib/villageResidents';
 import { collidesWithTrees, createVillageLayout } from '../lib/villageScenery';
 import { createVillageWorld } from '../lib/villageScenery3d';
 import styles from './VillageScene.module.css';
@@ -156,10 +157,11 @@ function VillageScene({
     // 건물, 길, 나무, 꽃 같은 풍경은 lib/villageScenery3d.ts가 만든다.
     const layout = createVillageLayout(buildings);
     const world = createVillageWorld(buildings, layout);
+    const residents = placeResidents(buildings);
     const isBlocked = (x: number, z: number) =>
       collidesWithBuildings(buildings, x, z) ||
       collidesWithTrees(layout.trees, x, z) ||
-      collidesWithResidents(x, z);
+      collidesWithResidents(residents, x, z);
     scene.add(world.group);
 
     const player = createAvatarModel(avatar, palette);
@@ -170,13 +172,22 @@ function VillageScene({
     }
     scene.add(player);
 
-    // 주민은 고정 위치에 서서 광장 쪽을 바라본다. 장면이 사라질 때 정리할 수 있게 목록으로 들고 있는다.
-    const residentModels = VILLAGE_RESIDENTS.map((resident) => {
-      const model = createAvatarModel(resident.avatar, palette);
+    // 주민은 소속 건물 문 앞(없으면 길 위)에 서서 남쪽(화면 아래)을 바라본다.
+    // 몸(체형 배율 적용)과 이름표를 따로 두려고 묶음(model) 안에 몸을 넣는다. 장면이 사라질 때 정리할 수 있게 목록으로 들고 있는다.
+    const residentModels = residents.map((resident) => {
+      const model = new THREE.Group();
       model.scale.setScalar(PLAYER_SCALE);
       model.position.set(resident.x, 0, resident.z);
-      model.rotation.y = Math.atan2(-resident.x, -resident.z);
+      const height = resident.build?.height ?? 1;
+      const width = resident.build?.width ?? 1;
+      const body = createAvatarModel(resident.avatar, palette);
+      for (const accessory of resident.accessories ?? []) {
+        addAccessory(body, accessory);
+      }
+      body.scale.set(width, height, width);
+      model.add(body);
       const nameTag = createNameTag(resident.name);
+      nameTag.position.y *= height;
       model.add(nameTag);
       scene.add(model);
       return { model, nameTag };
@@ -311,7 +322,7 @@ function VillageScene({
       // 가장 가까운 주민이 말 걸 수 있는 거리 안이면 마을 화면이 대화 버튼을 띄운다.
       let closest: string | null = null;
       let closestDistance = TALK_DISTANCE;
-      for (const resident of VILLAGE_RESIDENTS) {
+      for (const resident of residents) {
         const distance = Math.hypot(player.position.x - resident.x, player.position.z - resident.z);
         if (distance < closestDistance) {
           closest = resident.slug;

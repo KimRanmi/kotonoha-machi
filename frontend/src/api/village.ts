@@ -13,6 +13,8 @@ export interface VillageBuilding {
   color: string;
   /** 입장하면 대화할 주민의 slug. 이 건물에 속한 주민이 없으면 null. */
   residentSlug: string | null;
+  /** 이 건물에 속한 모든 주민의 slug. 마을에서 이 건물 문 앞에 서 있는다. */
+  residentSlugs: string[];
 }
 
 /** 마을 건물 목록을 가져온다. 모든 건물이 처음부터 열려 있다. */
