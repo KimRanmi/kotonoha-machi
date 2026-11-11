@@ -28,36 +28,112 @@ export const KEY_DIRECTIONS: Record<string, [number, number]> = {
   KeyD: [1, -1],
 };
 
-/** 주민 머리 위에 띄울 이름표. 글자를 캔버스에 그려 항상 카메라를 향하는 판(Sprite)에 붙인다. */
-export function createNameTag(name: string): THREE.Sprite {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 64;
+const NAME_TAG_WIDTH = 256;
+const NAME_TAG_HEIGHT = 112;
+const NAME_TAG_PILL_Y = 56; // 이름 알약의 위쪽 y. 그 위 공간에 하트를 그린다
+const NAME_TAG_UNIT = 2.4 / NAME_TAG_WIDTH; // 캔버스 1픽셀이 월드에서 차지하는 길이
+
+/** 하트 모양 경로를 만든다. (centerX, topY)에서 위쪽 가운데 오목한 곳이 시작하고 size는 너비다. */
+function traceHeart(
+  context: CanvasRenderingContext2D,
+  centerX: number,
+  topY: number,
+  size: number,
+) {
+  const half = size / 2;
+  context.beginPath();
+  context.moveTo(centerX, topY + size * 0.3);
+  context.bezierCurveTo(centerX, topY, centerX - half, topY, centerX - half, topY + size * 0.32);
+  context.bezierCurveTo(
+    centerX - half,
+    topY + size * 0.62,
+    centerX - size * 0.2,
+    topY + size * 0.78,
+    centerX,
+    topY + size * 0.95,
+  );
+  context.bezierCurveTo(
+    centerX + size * 0.2,
+    topY + size * 0.78,
+    centerX + half,
+    topY + size * 0.62,
+    centerX + half,
+    topY + size * 0.32,
+  );
+  context.bezierCurveTo(centerX + half, topY, centerX, topY, centerX, topY + size * 0.3);
+  context.closePath();
+}
+
+/** 이름표를 캔버스에 그린다. 위쪽에 하트(친밀도만큼 아래에서부터 채움), 아래쪽에 이름 알약. */
+function drawNameTag(canvas: HTMLCanvasElement, name: string, friendshipLevel: number) {
   const context = canvas.getContext('2d');
-  if (context) {
-    context.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    context.beginPath();
-    context.roundRect(0, 8, 256, 48, 24);
-    context.fill();
-    context.fillStyle = '#3d3a36';
-    context.font = 'bold 30px sans-serif';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillText(name, 128, 33);
+  if (!context) {
+    return;
   }
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  const heartSize = 44;
+  const heartTop = 4;
+  const heartBottom = heartTop + heartSize * 0.95;
+  const ratio = Math.min(Math.max(friendshipLevel, 0), 100) / 100;
+  context.save();
+  traceHeart(context, canvas.width / 2, heartTop, heartSize);
+  context.fillStyle = '#ffffff';
+  context.fill();
+  context.clip();
+  context.fillStyle = '#ff5c7a';
+  context.fillRect(0, heartBottom - (heartBottom - heartTop) * ratio, canvas.width, canvas.height);
+  context.restore();
+  traceHeart(context, canvas.width / 2, heartTop, heartSize);
+  context.lineWidth = 3;
+  context.strokeStyle = '#c94a64';
+  context.stroke();
+
+  context.fillStyle = 'rgba(255, 255, 255, 0.85)';
+  context.beginPath();
+  context.roundRect(0, NAME_TAG_PILL_Y, 256, 48, 24);
+  context.fill();
+  context.fillStyle = '#3d3a36';
+  context.font = 'bold 30px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(name, 128, NAME_TAG_PILL_Y + 25);
+}
+
+/**
+ * 주민 머리 위에 띄울 이름표. 하트와 글자를 캔버스에 그려 항상 카메라를 향하는 판(Sprite)에 붙인다.
+ * 하트는 친밀도(0~100)만큼 아래에서부터 색이 채워진다.
+ */
+export function createNameTag(name: string, friendshipLevel: number): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = NAME_TAG_WIDTH;
+  canvas.height = NAME_TAG_HEIGHT;
+  drawNameTag(canvas, name, friendshipLevel);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
   sprite.renderOrder = 1; // 다른 물체에 가려지지 않게 맨 위에 그린다
-  sprite.scale.set(2.4, 0.6, 1);
-  sprite.position.y = 2.6; // 주민 모델(배율 적용 전) 머리 위
+  sprite.scale.set(2.4, NAME_TAG_HEIGHT * NAME_TAG_UNIT, 1);
+  // 이름 알약의 중심이 예전 이름표 자리(머리 위 2.6)에 오도록, 캔버스 중심과의 차이만큼 올린다
+  sprite.position.y = 2.6 + (NAME_TAG_PILL_Y + 24 - NAME_TAG_HEIGHT / 2) * NAME_TAG_UNIT;
   return sprite;
+}
+
+/** 이름표의 하트를 새 친밀도로 다시 그린다. */
+export function updateNameTag(nameTag: THREE.Sprite, name: string, friendshipLevel: number) {
+  const texture = nameTag.material.map;
+  if (texture && texture.image instanceof HTMLCanvasElement) {
+    drawNameTag(texture.image, name, friendshipLevel);
+    texture.needsUpdate = true;
+  }
 }
 
 /** 장면에 놓인 주민 한 명. 몸(체형·소품 적용)과 머리 위 이름표를 한 묶음(model)으로 들고 있는다. */
 export interface ResidentModel {
   model: THREE.Group;
   nameTag: THREE.Sprite;
+  /** 이름표의 하트를 새 친밀도(0~100)로 다시 그린다. */
+  setFriendship: (level: number) => void;
 }
 
 /**
@@ -67,6 +143,7 @@ export interface ResidentModel {
 export function createResidentModel(
   resident: VillageResident,
   palette: AvatarPalette,
+  friendshipLevel: number,
 ): ResidentModel {
   const model = new THREE.Group();
   model.scale.setScalar(PLAYER_SCALE);
@@ -78,10 +155,14 @@ export function createResidentModel(
   }
   body.scale.set(width, height, width);
   model.add(body);
-  const nameTag = createNameTag(resident.name);
+  const nameTag = createNameTag(resident.name, friendshipLevel);
   nameTag.position.y *= height;
   model.add(nameTag);
-  return { model, nameTag };
+  return {
+    model,
+    nameTag,
+    setFriendship: (level) => updateNameTag(nameTag, resident.name, level),
+  };
 }
 
 /** `createResidentModel`로 만든 주민 모델이 쓴 GPU 자원을 해제한다. */

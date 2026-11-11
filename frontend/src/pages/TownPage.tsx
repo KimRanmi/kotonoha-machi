@@ -16,6 +16,7 @@ import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import ResidentChatModal from '../components/ResidentChatModal';
 import VillageScene from '../components/VillageScene';
+import { useFriendships } from '../hooks/useFriendships';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import styles from './TownPage.module.css';
@@ -30,6 +31,7 @@ function TownPage() {
   const [chatResidentSlug, setChatResidentSlug] = useState<string | null>(null);
   const chatResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === chatResidentSlug);
   const closeChat = useCallback(() => setChatResidentSlug(null), []);
+  const { friendships, setFriendshipLevel } = useFriendships();
   const [nearBuildingId, setNearBuildingId] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<VillageBuilding[] | null>(null);
   const [map, setMap] = useState<VillageMap | null>(null);
@@ -303,6 +305,7 @@ function TownPage() {
           onPositionChange={(position) => {
             currentPositionRef.current = position;
           }}
+          friendships={friendships}
         />
       )}
       {nearResident && (
@@ -319,6 +322,8 @@ function TownPage() {
           residentSlug={chatResident.slug}
           residentName={chatResident.name}
           voice={chatResident.voice}
+          friendshipLevel={friendships[chatResident.slug] ?? 0}
+          onFriendshipChange={setFriendshipLevel}
           onClose={closeChat}
         />
       )}

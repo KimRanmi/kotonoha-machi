@@ -34,6 +34,36 @@
   font-size: 1.1rem;
 }
 
+.friendship {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-right: auto;
+  margin-left: var(--space-2);
+}
+
+/* 하트 한 개를 친밀도(--fill)만큼 아래에서부터 채운다. */
+.heart {
+  font-size: 1.6rem;
+  line-height: 1;
+  background: linear-gradient(to top, #ff5c7a var(--fill), #e8dcdf var(--fill));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.friendshipLevel {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.friendshipGain {
+  color: #e0476a;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
 .closeButton {
   padding: var(--space-1) var(--space-2);
 }

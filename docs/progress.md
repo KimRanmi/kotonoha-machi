@@ -959,3 +959,8 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   모달은 기록 불러오기 오류를 전송 오류와 따로 보이고 불러오는 동안 안내를 보인다.
   - 검증: 백엔드 `spotlessApply`·`test`, 프런트 `prettier`·`lint`·`build` 통과.
   - 확인 못 한 것: 실제 화면.
+- 주민 친밀도를 올리고 화면에 보이게 했다(`0028`, 검토 중). 새 테이블 없이 기존 `resident_friendship`에 `today_gain`·`last_gain_date`(`V32`)를 더했고, 대답을 받은 대화마다 첫 대화 +5·이후 +1·주민당 하루 10(한국 시간)·최대 100으로 오른다(`ResidentFriendship.earnChatGain`).
+  `GET /api/residents/friendships`를 추가했고 대화 응답에 `friendshipLevel`·`friendshipGain`을 담는다. 주민 이름표 위에 하트 한 개가 친밀도만큼 아래부터 차오르고(마을·건물 내부), 대화창 헤더에도 하트와 수치, 오른 양(+N)이 보인다.
+  - 검증: 백엔드 `spotlessApply`·`test`, 프런트 `prettier`·`lint`·`build` (결과는 아래 확인).
+  - 확인 못 한 것: 실제 화면에서 하트가 차오르는 모습과 이름표 위치.
+  - 다음 할 일: 친밀도별 말투·비밀 공개, 주민 방문 보상 여부.

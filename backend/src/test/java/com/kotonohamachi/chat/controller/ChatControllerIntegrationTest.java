@@ -155,4 +155,39 @@ class ChatControllerIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(0));
   }
+
+  @Test
+  void 대화하면_친밀도가_오르고_하루_한도에서_멈춘다() throws Exception {
+    when(geminiClient.generate(any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    MockHttpSession session = signUpVerifyAndLogin();
+
+    // 첫 대화 +5, 이후 +1씩 5번(+5)으로 하루 한도 10에 닿고, 그 뒤로는 오르지 않는다.
+    expectChat(session, 5, 5);
+    for (int level = 6; level <= 10; level++) {
+      expectChat(session, level, 1);
+    }
+    expectChat(session, 10, 0);
+
+    mockMvc
+        .perform(get("/api/residents/friendships").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[?(@.residentSlug == 'r01')].level").value(10))
+        .andExpect(jsonPath("$[?(@.residentSlug == 'r02')].level").value(0));
+  }
+
+  @Test
+  void 친밀도_조회는_로그인하지_않으면_401을_반환한다() throws Exception {
+    mockMvc.perform(get("/api/residents/friendships")).andExpect(status().isUnauthorized());
+  }
+
+  private void expectChat(MockHttpSession session, int level, int gain) throws Exception {
+    mockMvc
+        .perform(post("/api/residents/r01/chat")
+            .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"message\":\"こんにちは\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.friendshipLevel").value(level))
+        .andExpect(jsonPath("$.friendshipGain").value(gain));
+  }
 }

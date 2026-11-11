@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,12 +14,15 @@ import com.kotonohamachi.chat.ChatMessage;
 import com.kotonohamachi.chat.ChatSpeaker;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatResponse;
+import com.kotonohamachi.chat.dto.ChatResultResponse;
 import com.kotonohamachi.chat.repository.ChatMessageRepository;
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.resident.Resident;
 import com.kotonohamachi.resident.ResidentFriendship;
+import com.kotonohamachi.resident.dto.FriendshipChange;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
+import com.kotonohamachi.resident.service.ResidentFriendshipService;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +47,9 @@ class ChatServiceTest {
   private ChatMessageRepository chatMessageRepository;
 
   @Mock
+  private ResidentFriendshipService friendshipService;
+
+  @Mock
   private GeminiClient geminiClient;
 
   private ChatService chatService;
@@ -50,7 +57,14 @@ class ChatServiceTest {
   @BeforeEach
   void setUp() {
     chatService = new ChatService(
-        residentRepository, friendshipRepository, chatMessageRepository, geminiClient);
+        residentRepository,
+        friendshipRepository,
+        chatMessageRepository,
+        friendshipService,
+        geminiClient);
+    lenient()
+        .when(friendshipService.recordChat(any(), any()))
+        .thenReturn(new FriendshipChange(0, 0));
   }
 
   private Resident resident() {
@@ -134,7 +148,7 @@ class ChatServiceTest {
         .thenReturn(Optional.of(friendship));
     when(geminiClient.generate(any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
 
-    ChatResponse response = chatService.chat(1L, "r01", "こんにちは");
+    ChatResultResponse response = chatService.chat(1L, "r01", "こんにちは");
 
     ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
     verify(geminiClient).generate(prompt.capture(), eq("こんにちは"));
@@ -147,7 +161,7 @@ class ChatServiceTest {
         .doesNotContain("{personality}")
         .doesNotContain("{friendshipLevel}")
         .doesNotContain("{currentContext}");
-    assertThat(response).isEqualTo(new ChatResponse("やあ", "안녕"));
+    assertThat(response).isEqualTo(new ChatResultResponse("やあ", "안녕", 0, 0));
   }
 
   @Test
@@ -308,5 +322,30 @@ class ChatServiceTest {
         catchThrowableOfType(ApiException.class, () -> chatService.history(1L, "r99"));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  void chat_대답을_받으면_친밀도를_올리고_결과를_함께_돌려준다() {
+    Resident resident = resident();
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
+    when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
+    when(geminiClient.generate(any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(friendshipService.recordChat(1L, resident)).thenReturn(new FriendshipChange(5, 5));
+
+    ChatResultResponse response = chatService.chat(1L, "r01", "こんにちは");
+
+    assertThat(response).isEqualTo(new ChatResultResponse("やあ", "안녕", 5, 5));
+  }
+
+  @Test
+  void chat_대답을_못_받으면_친밀도도_올리지_않는다() {
+    Resident resident = resident();
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
+    when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
+    when(geminiClient.generate(any(), any())).thenThrow(new RuntimeException("gemini down"));
+
+    catchThrowableOfType(RuntimeException.class, () -> chatService.chat(1L, "r01", "こんにちは"));
+
+    verify(friendshipService, never()).recordChat(any(), any());
   }
 }

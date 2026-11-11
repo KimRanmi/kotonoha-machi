@@ -7,6 +7,7 @@ import InteriorScene from '../components/InteriorScene';
 import ResidentChatModal from '../components/ResidentChatModal';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import { getBuildingInterior } from '../lib/buildingInteriors';
+import { useFriendships } from '../hooks/useFriendships';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import styles from './BuildingInteriorPage.module.css';
 
@@ -61,6 +62,7 @@ function BuildingInteriorPage() {
   const [chatResidentSlug, setChatResidentSlug] = useState<string | null>(null);
   const chatResident = residents.find((candidate) => candidate.slug === chatResidentSlug) ?? null;
   const closeChat = useCallback(() => setChatResidentSlug(null), []);
+  const { friendships, setFriendshipLevel } = useFriendships();
   // 같은 건물이면 같은 객체를 넘겨야 장면을 다시 만들지 않는다.
   const interior = useMemo(
     () => (buildingId ? getBuildingInterior(buildingId) : null),
@@ -106,6 +108,7 @@ function BuildingInteriorPage() {
           residents={residents}
           onNearResidentChange={setNearResidentSlug}
           onNearExitChange={setNearExit}
+          friendships={friendships}
         />
       )}
       {nearResident && (
@@ -122,6 +125,8 @@ function BuildingInteriorPage() {
           residentSlug={chatResident.slug}
           residentName={chatResident.name}
           voice={chatResident.voice}
+          friendshipLevel={friendships[chatResident.slug] ?? 0}
+          onFriendshipChange={setFriendshipLevel}
           onClose={closeChat}
         />
       )}
