@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { sendChatMessage } from '../api/chat';
 import JapaneseInput from '../components/JapaneseInput';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 
 /** 서버가 받는 메시지 최대 길이. */
@@ -22,6 +23,13 @@ function ChatPage() {
   const [lines, setLines] = useState<ChatLine[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const {
+    isSupported: speechSupported,
+    isListening,
+    errorMessage: speechErrorMessage,
+    start: startListening,
+    cancel: cancelListening,
+  } = useSpeechRecognition();
 
   if (!resident) {
     return (
@@ -59,6 +67,11 @@ function ChatPage() {
     }
   };
 
+  /** 마이크로 말한 내용을 입력란에 채운다. 오인식을 고칠 수 있도록 자동 전송하지 않는다. */
+  const handleVoiceInput = () => {
+    startListening(setText);
+  };
+
   return (
     <main>
       <Link to="/town">← 마을로</Link>
@@ -72,8 +85,19 @@ function ChatPage() {
         ))}
       </ul>
       {errorMessage && <p role="alert">{errorMessage}</p>}
+      {speechErrorMessage && <p role="alert">{speechErrorMessage}</p>}
+      {!speechSupported && (
+        <p role="alert">이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 이용해주세요.</p>
+      )}
       <form onSubmit={handleSubmit}>
         <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
+        <button
+          type="button"
+          onClick={isListening ? cancelListening : handleVoiceInput}
+          disabled={!speechSupported || isSending}
+        >
+          {isListening ? '✕ 듣기 취소' : '🎤 말하기'}
+        </button>
         <button
           type="submit"
           disabled={isSending || !text.trim() || text.length > MAX_MESSAGE_LENGTH}
