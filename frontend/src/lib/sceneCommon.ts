@@ -29,8 +29,8 @@ export const KEY_DIRECTIONS: Record<string, [number, number]> = {
 };
 
 const NAME_TAG_WIDTH = 256;
-const NAME_TAG_HEIGHT = 112;
-const NAME_TAG_PILL_Y = 56; // 이름 알약의 위쪽 y. 그 위 공간에 하트를 그린다
+const NAME_TAG_HEIGHT = 128;
+const NAME_TAG_PILL_Y = 72; // 이름 알약의 위쪽 y. 그 위 공간에 하트를 그린다
 const NAME_TAG_UNIT = 2.4 / NAME_TAG_WIDTH; // 캔버스 1픽셀이 월드에서 차지하는 길이
 
 /** 하트 모양 경로를 만든다. (centerX, topY)에서 위쪽 가운데 오목한 곳이 시작하고 size는 너비다. */
@@ -72,7 +72,7 @@ function drawNameTag(canvas: HTMLCanvasElement, name: string, friendshipLevel: n
   }
   context.clearRect(0, 0, canvas.width, canvas.height);
 
-  const heartSize = 44;
+  const heartSize = 66;
   const heartTop = 4;
   const heartBottom = heartTop + heartSize * 0.95;
   const ratio = Math.min(Math.max(friendshipLevel, 0), 100) / 100;
@@ -85,7 +85,7 @@ function drawNameTag(canvas: HTMLCanvasElement, name: string, friendshipLevel: n
   context.fillRect(0, heartBottom - (heartBottom - heartTop) * ratio, canvas.width, canvas.height);
   context.restore();
   traceHeart(context, canvas.width / 2, heartTop, heartSize);
-  context.lineWidth = 3;
+  context.lineWidth = 4;
   context.strokeStyle = '#c94a64';
   context.stroke();
 
