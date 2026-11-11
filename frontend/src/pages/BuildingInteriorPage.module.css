@@ -53,3 +53,14 @@
 .actionButton:hover {
   background-color: var(--color-primary-hover);
 }
+
+.retryButton {
+  padding: var(--space-3) var(--space-5);
+  color: var(--color-surface);
+  background-color: var(--color-primary);
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+}
+.retryButton:hover {
+  background-color: var(--color-primary-hover);
+}

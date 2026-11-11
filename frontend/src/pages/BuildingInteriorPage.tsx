@@ -17,6 +17,7 @@ function BuildingInteriorPage() {
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [palette, setPalette] = useState<AvatarPalette | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [nearResident, setNearResident] = useState(false);
   const [nearExit, setNearExit] = useState(false);
 
@@ -43,7 +44,7 @@ function BuildingInteriorPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   const building = buildings?.find((candidate) => candidate.id === buildingId);
   const resident =
@@ -105,9 +106,19 @@ function BuildingInteriorPage() {
       )}
       {!buildings && !errorMessage && <p className={styles.content}>건물을 불러오는 중…</p>}
       {errorMessage && (
-        <p className={styles.content} role="alert">
-          {errorMessage}
-        </p>
+        <div className={styles.content} role="alert">
+          <p>{errorMessage}</p>
+          <button
+            type="button"
+            className={styles.retryButton}
+            onClick={() => {
+              setErrorMessage(null);
+              setAttempt((previous) => previous + 1);
+            }}
+          >
+            다시 시도
+          </button>
+        </div>
       )}
       {buildings && !building && (
         <p className={styles.content} role="alert">

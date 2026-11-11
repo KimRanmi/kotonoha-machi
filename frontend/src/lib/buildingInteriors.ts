@@ -507,7 +507,10 @@ const DEFAULT_INTERIOR: BuildingInterior = {
 };
 
 export function getBuildingInterior(buildingId: string): BuildingInterior {
-  return BUILDING_INTERIORS[buildingId] ?? DEFAULT_INTERIOR;
+  // 일반 객체라 'constructor' 같은 id가 Object.prototype의 값을 돌려주지 않도록 자기 속성만 본다.
+  return Object.prototype.hasOwnProperty.call(BUILDING_INTERIORS, buildingId)
+    ? BUILDING_INTERIORS[buildingId]
+    : DEFAULT_INTERIOR;
 }
 
 /** 캐릭터(원)가 월드 좌표 (worldX, worldZ)에 서 있을 때 어느 가구(사각형)와든 겹치는지 검사한다. */
