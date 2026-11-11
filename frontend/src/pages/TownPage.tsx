@@ -133,20 +133,26 @@ function TownPage() {
   }, []);
 
   useEffect(() => {
-    if (!nearBuildingId || chatResident) {
+    // 주민이 가까우면 대화가 먼저다(화면의 버튼도 주민이 우선). 대화창이 열려 있으면 Enter는 전송에 쓰인다.
+    if (chatResident || (!nearResidentSlug && !nearBuildingId)) {
       return;
     }
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
       const isFormControl =
         target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(target.tagName);
-      if (event.key === 'Enter' && !isFormControl) {
+      if (event.key !== 'Enter' || isFormControl) {
+        return;
+      }
+      if (nearResidentSlug) {
+        setChatResidentSlug(nearResidentSlug);
+      } else if (nearBuildingId) {
         navigate(`/town/buildings/${nearBuildingId}`);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nearBuildingId, chatResident, navigate]);
+  }, [nearResidentSlug, nearBuildingId, chatResident, navigate]);
 
   // 위치는 걸을 때마다 ref에만 담고, 서버 저장은 아래 시점에만 한다. 서버에 마지막으로 보낸 값과 같으면 보내지 않는다.
   const currentPositionRef = useRef<VillagePosition | null>(null);
@@ -305,7 +311,7 @@ function TownPage() {
           className={styles.talkButton}
           onClick={() => setChatResidentSlug(nearResident.slug)}
         >
-          {nearResident.name}と話す
+          {nearResident.name}と話す (Enter)
         </button>
       )}
       {chatResident && (

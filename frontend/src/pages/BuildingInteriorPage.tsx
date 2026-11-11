@@ -69,20 +69,26 @@ function BuildingInteriorPage() {
 
   // 현관 매트 위에서 Enter를 누르면 마을로 나간다.
   useEffect(() => {
-    if (!nearExit || chatResident) {
+    // 주민이 가까우면 대화가 먼저다(화면의 버튼도 주민이 우선). 대화창이 열려 있으면 Enter는 전송에 쓰인다.
+    if (chatResident || (!nearResidentSlug && !nearExit)) {
       return;
     }
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
       const isFormControl =
         target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(target.tagName);
-      if (event.key === 'Enter' && !isFormControl) {
+      if (event.key !== 'Enter' || isFormControl) {
+        return;
+      }
+      if (nearResident) {
+        setChatResidentSlug(nearResident.slug);
+      } else if (nearExit) {
         navigate('/town');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nearExit, chatResident, navigate]);
+  }, [nearResidentSlug, nearResident, nearExit, chatResident, navigate]);
 
   return (
     <main className={styles.page}>
@@ -108,7 +114,7 @@ function BuildingInteriorPage() {
           className={styles.actionButton}
           onClick={() => setChatResidentSlug(nearResident.slug)}
         >
-          {nearResident.name}と話す
+          {nearResident.name}と話す (Enter)
         </button>
       )}
       {chatResident && (
