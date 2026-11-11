@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.kotonohamachi.auth.service.EmailSender;
+import com.kotonohamachi.village.VillageMap;
 import jakarta.servlet.Filter;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -97,9 +98,9 @@ class VillageControllerIntegrationTest {
     String originalLocation = jdbcTemplate.queryForObject(
         "SELECT location FROM resident WHERE slug = 'r01'", String.class);
     jdbcTemplate.update(
-        "INSERT INTO building (slug, label, x, z, width, depth, height, color, location) "
-            + "VALUES ('it_with', 'テスト', 1.5, -2, 4, 3.5, 2.5, '#112233', '통합테스트장소'), "
-            + "('it_without', 'ナシ', 3, -2, 4, 3.5, 2.5, '#445566', '통합테스트빈장소')");
+        "INSERT INTO building (slug, label, x, z, width, depth, height, rotation, color, location) "
+            + "VALUES ('it_with', 'テスト', 1.5, -2, 4, 3.5, 2.5, 95, '#112233', '통합테스트장소'), "
+            + "('it_without', 'ナシ', 3, -2, 4, 3.5, 2.5, 0, '#445566', '통합테스트빈장소')");
     jdbcTemplate.update("UPDATE resident SET location = '통합테스트장소' WHERE slug = 'r01'");
     try {
       MockHttpSession session = newLoggedInSession();
@@ -110,8 +111,9 @@ class VillageControllerIntegrationTest {
           .andExpect(jsonPath("$[?(@.id == 'it_with')].label").value("テスト"))
           .andExpect(jsonPath("$[?(@.id == 'it_with')].x").value(1.5))
           .andExpect(jsonPath("$[?(@.id == 'it_with')].color").value("#112233"))
-          .andExpect(jsonPath("$[?(@.id == 'it_with')].residentSlug").value("r01"))
-          .andExpect(jsonPath("$[?(@.id == 'it_without')].residentSlug[0]").doesNotExist());
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].rotation").value(95.0))
+          .andExpect(jsonPath("$[?(@.id == 'it_with')].residentSlugs[0]").value("r01"))
+          .andExpect(jsonPath("$[?(@.id == 'it_without')].residentSlugs[0]").doesNotExist());
     } finally {
       jdbcTemplate.update("DELETE FROM building WHERE slug IN ('it_with', 'it_without')");
       jdbcTemplate.update("UPDATE resident SET location = ? WHERE slug = 'r01'", originalLocation);
@@ -173,5 +175,52 @@ class VillageControllerIntegrationTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"x\":1}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 마을_경계_좌표는_저장되고_경계를_넘으면_400을_반환한다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    int max = VillageMap.MAX_WALK_COORDINATE;
+    double over = max + 0.5;
+
+    mockMvc
+        .perform(put("/api/village/position")
+            .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"x\":" + max + ",\"z\":" + -max + "}"))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(get("/api/village/position").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.x").value((double) max))
+        .andExpect(jsonPath("$.z").value((double) -max));
+
+    mockMvc
+        .perform(put("/api/village/position")
+            .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"x\":" + over + ",\"z\":0}"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(put("/api/village/position")
+            .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"x\":0,\"z\":" + -over + "}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 마을_땅_크기_조회는_로그인하지_않으면_401을_반환한다() throws Exception {
+    mockMvc.perform(get("/api/village/map")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void 로그인한_사용자는_마을_땅_크기를_받는다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+
+    mockMvc
+        .perform(get("/api/village/map").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.halfSize").value(VillageMap.HALF_SIZE));
   }
 }

@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { createAvatarModel, disposeAvatarModel } from './avatarModel';
+import type { AvatarPalette } from './avatarPreview';
+import { addAccessory } from './residentAccessories';
+import type { VillageResident } from './villageResidents';
 
 /** 마을과 건물 내부 장면이 함께 쓰는 값들. */
 
@@ -48,4 +52,41 @@ export function createNameTag(name: string): THREE.Sprite {
   sprite.scale.set(2.4, 0.6, 1);
   sprite.position.y = 2.6; // 주민 모델(배율 적용 전) 머리 위
   return sprite;
+}
+
+/** 장면에 놓인 주민 한 명. 몸(체형·소품 적용)과 머리 위 이름표를 한 묶음(model)으로 들고 있는다. */
+export interface ResidentModel {
+  model: THREE.Group;
+  nameTag: THREE.Sprite;
+}
+
+/**
+ * 주민 한 명의 모델을 만든다. 체형 배율은 몸에만 적용하고, 이름표는 배율에 찌그러지지 않게 묶음 쪽에 둔다.
+ * 위치와 방향은 부르는 쪽이 정하고, 쓰고 나면 `disposeResidentModel`로 정리해야 한다.
+ */
+export function createResidentModel(
+  resident: VillageResident,
+  palette: AvatarPalette,
+): ResidentModel {
+  const model = new THREE.Group();
+  model.scale.setScalar(PLAYER_SCALE);
+  const height = resident.build?.height ?? 1;
+  const width = resident.build?.width ?? 1;
+  const body = createAvatarModel(resident.avatar, palette);
+  for (const accessory of resident.accessories ?? []) {
+    addAccessory(body, accessory);
+  }
+  body.scale.set(width, height, width);
+  model.add(body);
+  const nameTag = createNameTag(resident.name);
+  nameTag.position.y *= height;
+  model.add(nameTag);
+  return { model, nameTag };
+}
+
+/** `createResidentModel`로 만든 주민 모델이 쓴 GPU 자원을 해제한다. */
+export function disposeResidentModel({ model, nameTag }: ResidentModel) {
+  disposeAvatarModel(model);
+  nameTag.material.map?.dispose();
+  nameTag.material.dispose();
 }

@@ -41,6 +41,9 @@ public class Building {
   private double height;
 
   @Column(nullable = false)
+  private double rotation;
+
+  @Column(nullable = false)
   private String color;
 
   @Column(nullable = false)
@@ -75,6 +78,15 @@ public class Building {
 
   public double getHeight() {
     return height;
+  }
+
+  /**
+   * 건물이 향한 방향을 도(degree) 단위로 반환한다. 0이면 문이 +z 쪽이고, three.js의 y축 회전 방향을 따른다.
+   *
+   * @return 회전 각도(도)
+   */
+  public double getRotation() {
+    return rotation;
   }
 
   public String getColor() {

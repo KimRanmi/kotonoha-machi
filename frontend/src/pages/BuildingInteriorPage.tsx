@@ -18,7 +18,7 @@ function BuildingInteriorPage() {
   const [palette, setPalette] = useState<AvatarPalette | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [nearResident, setNearResident] = useState(false);
+  const [nearResidentSlug, setNearResidentSlug] = useState<string | null>(null);
   const [nearExit, setNearExit] = useState(false);
 
   useEffect(() => {
@@ -47,8 +47,15 @@ function BuildingInteriorPage() {
   }, [attempt]);
 
   const building = buildings?.find((candidate) => candidate.id === buildingId);
-  const resident =
-    VILLAGE_RESIDENTS.find((candidate) => candidate.slug === building?.residentSlug) ?? null;
+  // 이 건물에 속한 주민들. building이 바뀔 때만 새로 만들어야 장면을 다시 만들지 않는다.
+  const residents = useMemo(
+    () =>
+      (building?.residentSlugs ?? [])
+        .map((slug) => VILLAGE_RESIDENTS.find((candidate) => candidate.slug === slug))
+        .filter((candidate) => candidate !== undefined),
+    [building],
+  );
+  const nearResident = residents.find((candidate) => candidate.slug === nearResidentSlug) ?? null;
   // 같은 건물이면 같은 객체를 넘겨야 장면을 다시 만들지 않는다.
   const interior = useMemo(
     () => (buildingId ? getBuildingInterior(buildingId) : null),
@@ -85,18 +92,18 @@ function BuildingInteriorPage() {
           avatar={avatar}
           palette={palette}
           interior={interior}
-          resident={resident}
-          onNearResidentChange={setNearResident}
+          residents={residents}
+          onNearResidentChange={setNearResidentSlug}
           onNearExitChange={setNearExit}
         />
       )}
-      {resident && nearResident && (
+      {nearResident && (
         <button
           type="button"
           className={styles.actionButton}
-          onClick={() => navigate(`/chat/${resident.slug}`)}
+          onClick={() => navigate(`/chat/${nearResident.slug}`)}
         >
-          {resident.name}と話す
+          {nearResident.name}と話す
         </button>
       )}
       {nearExit && !nearResident && (

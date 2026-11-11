@@ -2,10 +2,14 @@ package com.kotonohamachi.village.service;
 
 import com.kotonohamachi.resident.Resident;
 import com.kotonohamachi.resident.repository.ResidentRepository;
+import com.kotonohamachi.village.Building;
+import com.kotonohamachi.village.VillageMap;
 import com.kotonohamachi.village.dto.VillageBuildingResponse;
+import com.kotonohamachi.village.dto.VillageMapResponse;
 import com.kotonohamachi.village.dto.VillagePositionResponse;
 import com.kotonohamachi.village.repository.BuildingRepository;
 import com.kotonohamachi.village.repository.UserVillagePositionRepository;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,29 +41,46 @@ public class VillageService {
   }
 
   /**
-   * 마을 건물 목록을 등록된 순서로 조회한다. 건물마다 같은 장소(location)에서 지내는 주민 중 가장 먼저 등록된 한 명의
-   * slug를 함께 준다(입장하면 그 주민과 대화한다). 그런 주민이 없으면 null이다.
+   * 마을 땅 크기를 조회한다.
+   *
+   * @return 땅의 절반 크기와 설 수 있는 가장 바깥 좌표
+   */
+  public VillageMapResponse getMap() {
+    return new VillageMapResponse(VillageMap.HALF_SIZE, VillageMap.MAX_WALK_COORDINATE);
+  }
+
+  /**
+   * 마을 건물 목록을 등록된 순서로 조회한다. 건물마다 같은 장소(location)에서 지내는 모든 주민의 slug를 등록된 순서로 함께
+   * 준다. 그런 주민이 없으면 목록은 비어 있다.
    *
    * @return 건물 목록
    */
   @Transactional(readOnly = true)
   public List<VillageBuildingResponse> getBuildings() {
-    Map<String, String> residentByLocation = new HashMap<>();
+    Map<String, List<String>> residentsByLocation = new HashMap<>();
     for (Resident resident : residentRepository.findAllByLocationIsNotNullOrderByIdAsc()) {
-      residentByLocation.putIfAbsent(resident.getLocation(), resident.getSlug());
+      residentsByLocation
+          .computeIfAbsent(resident.getLocation(), location -> new ArrayList<>())
+          .add(resident.getSlug());
     }
     return buildingRepository.findAllByOrderByIdAsc().stream()
-        .map(building -> new VillageBuildingResponse(
-            building.getSlug(),
-            building.getLabel(),
-            building.getX(),
-            building.getZ(),
-            building.getWidth(),
-            building.getDepth(),
-            building.getHeight(),
-            building.getColor(),
-            residentByLocation.get(building.getLocation())))
+        .map(building -> toResponse(
+            building, residentsByLocation.getOrDefault(building.getLocation(), List.of())))
         .toList();
+  }
+
+  private VillageBuildingResponse toResponse(Building building, List<String> residentSlugs) {
+    return new VillageBuildingResponse(
+        building.getSlug(),
+        building.getLabel(),
+        building.getX(),
+        building.getZ(),
+        building.getWidth(),
+        building.getDepth(),
+        building.getHeight(),
+        building.getRotation(),
+        building.getColor(),
+        residentSlugs);
   }
 
   /**

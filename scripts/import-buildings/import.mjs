@@ -18,8 +18,8 @@ const MIGRATION_DIR = path.join(
 );
 
 const FETCH_TIMEOUT_MS = 15000;
-const COLUMNS = ['id', 'label', 'x', 'z', 'width', 'depth', 'height', 'color', 'location'];
-const NUMBER_COLUMNS = ['x', 'z', 'width', 'depth', 'height'];
+const COLUMNS = ['id', 'label', 'x', 'z', 'width', 'depth', 'height', 'rotation', 'color', 'location'];
+const NUMBER_COLUMNS = ['x', 'z', 'width', 'depth', 'height', 'rotation'];
 const POSITIVE_COLUMNS = ['width', 'depth', 'height'];
 const SLUG_PATTERN = /^[a-z][a-z0-9_]{0,19}$/;
 const COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
@@ -218,7 +218,7 @@ function sqlEscape(value) {
 }
 
 function buildSql(buildings) {
-  const columns = ['slug', 'label', 'x', 'z', 'width', 'depth', 'height', 'color', 'location'];
+  const columns = COLUMNS.map((c) => (c === 'id' ? 'slug' : c)); // 시트의 id가 DB의 slug다
   const updatable = columns.filter((c) => c !== 'slug');
   const header =
     '-- scripts/import-buildings 가 구글 시트에서 생성한 마을 건물 upsert. 검토 후 커밋한다.\n' +

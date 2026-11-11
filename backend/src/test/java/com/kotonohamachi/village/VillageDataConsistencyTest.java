@@ -16,7 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * 시트에서 만든 마이그레이션 데이터를 검증한다. 주민과 건물은 장소 이름(location) 글자로만 이어져서, 시트에 오타가 있으면
- * 에러 없이 연결이 끊기기 때문에 여기서 잡는다.
+ * 에러 없이 연결이 끊기고, 건물 좌표가 땅 밖이면 걸어서 갈 수 없기 때문에 여기서 잡는다.
  */
 @Testcontainers
 @SpringBootTest
@@ -44,5 +44,16 @@ class VillageDataConsistencyTest {
         OUTDOORS);
 
     assertThat(orphanLocations).isEmpty();
+  }
+
+  @Test
+  void 모든_건물은_걸어_다닐_수_있는_땅_안에_있다() {
+    List<String> outsideSlugs = jdbcTemplate.queryForList(
+        "SELECT slug FROM building WHERE ABS(x) > ? OR ABS(z) > ?",
+        String.class,
+        VillageMap.MAX_WALK_COORDINATE,
+        VillageMap.MAX_WALK_COORDINATE);
+
+    assertThat(outsideSlugs).isEmpty();
   }
 }
