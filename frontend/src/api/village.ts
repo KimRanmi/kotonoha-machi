@@ -10,11 +10,25 @@ export interface VillageBuilding {
   width: number;
   depth: number;
   height: number;
+  /** 건물이 향한 방향(도). 0이면 문이 +z 쪽이고 three.js의 y축 회전 방향을 따른다. */
+  rotation: number;
   color: string;
-  /** 건물 안에 서 있는 주민의 slug. 이 건물에 속한 주민이 없으면 null. */
-  residentSlug: string | null;
-  /** 이 건물에 속한 모든 주민의 slug. 마을에서 이 건물 문 앞에 서 있는다. */
+  /** 이 건물 안에 있는 모든 주민의 slug(등록된 순서). 주민이 없으면 빈 배열. */
   residentSlugs: string[];
+}
+
+/** 마을 땅의 크기. 값의 원본은 서버다. */
+export interface VillageMap {
+  /** 이동 가능한 정사각형 땅의 절반 크기. 원점이 땅의 가운데다. */
+  halfSize: number;
+  /** 캐릭터가 설 수 있는 가장 바깥 좌표(절대값). 서버의 위치 저장 검증과 같은 값이다. */
+  maxWalkCoordinate: number;
+}
+
+/** 마을 땅의 크기를 가져온다. */
+export async function getVillageMap(): Promise<VillageMap> {
+  const response = await apiFetch('/api/village/map');
+  return response.json();
 }
 
 /** 마을 건물 목록을 가져온다. 모든 건물이 처음부터 열려 있다. */

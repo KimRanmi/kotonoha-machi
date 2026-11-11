@@ -3,6 +3,7 @@ package com.kotonohamachi.village.controller;
 import com.kotonohamachi.auth.service.AuthPrincipal;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.village.dto.VillageBuildingResponse;
+import com.kotonohamachi.village.dto.VillageMapResponse;
 import com.kotonohamachi.village.dto.VillagePositionRequest;
 import com.kotonohamachi.village.dto.VillagePositionResponse;
 import com.kotonohamachi.village.service.VillageService;
@@ -15,7 +16,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 마을 건물 목록과 마지막 위치 조회·저장 API. */
+/** 마을 땅 크기, 건물 목록, 마지막 위치 조회·저장 API. */
 @RestController
 public class VillageController {
 
@@ -28,6 +29,18 @@ public class VillageController {
    */
   public VillageController(VillageService villageService) {
     this.villageService = villageService;
+  }
+
+  /**
+   * 마을 땅 크기를 조회한다. 프런트가 이동 범위와 풍경 범위를 이 값으로 정한다.
+   *
+   * @param authentication 현재 요청의 인증 정보
+   * @return 땅의 절반 크기와 설 수 있는 가장 바깥 좌표
+   */
+  @GetMapping("/api/village/map")
+  public VillageMapResponse getMap(Authentication authentication) {
+    AuthPrincipal.resolve(authentication);
+    return villageService.getMap();
   }
 
   /**

@@ -1,4 +1,5 @@
 import { PLAYER_RADIUS } from './villageBuildings';
+import { RESIDENT_RADIUS } from './villageResidents';
 
 /**
  * 건물 내부(방) 데이터. 방은 모든 건물이 같은 크기다. 카메라가 (+x, +z) 쪽에서 내려다보므로 벽은
@@ -92,7 +93,7 @@ export interface InteriorItem {
 export interface BuildingInterior {
   floorColor: string;
   wallColor: string;
-  /** 이 건물에 속한 주민이 서 있는 자리(배치 좌표). 주민이 없는 건물에서는 쓰이지 않는다. */
+  /** 건물 안 첫 주민이 서는 자리(배치 좌표)이자 나머지 주민 자리를 찾는 기준점. 주민이 없는 건물에서는 쓰이지 않는다. */
   residentSpot: { x: number; z: number };
   items: InteriorItem[];
 }
@@ -513,16 +514,17 @@ export function getBuildingInterior(buildingId: string): BuildingInterior {
     : DEFAULT_INTERIOR;
 }
 
-/** 캐릭터(원)가 월드 좌표 (worldX, worldZ)에 서 있을 때 어느 가구(사각형)와든 겹치는지 검사한다. */
+/** 반지름 `bodyRadius`(기본은 내 캐릭터)인 원이 월드 좌표 (worldX, worldZ)에 서 있을 때 어느 가구(사각형)와든 겹치는지 검사한다. */
 export function collidesWithFurniture(
   items: InteriorItem[],
   worldX: number,
   worldZ: number,
+  bodyRadius = PLAYER_RADIUS,
 ): boolean {
   // 가구가 배치 좌표로 적혀 있으므로 캐릭터 위치와 반지름을 배치 좌표로 바꿔서 비교한다.
   const x = worldX / ROOM_SCALE;
   const z = worldZ / ROOM_SCALE;
-  const radius = PLAYER_RADIUS / ROOM_SCALE;
+  const radius = bodyRadius / ROOM_SCALE;
   return items.some((item) => {
     const footprint = FOOTPRINTS[item.kind];
     if (!footprint) {
@@ -548,4 +550,56 @@ export function isAtRoomExit(x: number, z: number): boolean {
   const inward = -(dx + dz) * INWARD;
   const across = (dx - dz) * INWARD;
   return Math.abs(across) <= ROOM_MAT.length / 2 && Math.abs(inward) <= EXIT_DEPTH;
+}
+
+const SPOT_STEP = 0.5; // 주민 자리 후보를 이 간격(배치 좌표)으로 훑는다
+const SPOT_GAP = 1.1; // 주민끼리 이만큼(배치 좌표) 이상 떨어져 선다
+const SPOT_CLEARANCE = RESIDENT_RADIUS + 0.1; // 주민 몸통에 여유를 더해, 가구와 이만큼(월드 좌표) 떨어진 자리만 쓴다
+
+/**
+ * 방 안에 주민 `count`명이 설 자리를 월드 좌표로 돌려준다. 첫 번째는 방 데이터의 `residentSpot`이고,
+ * 나머지는 그 자리에서 가까운 빈 바닥 중에서 가구·현관 매트·다른 주민과 겹치지 않는 곳을 골라 자동으로 정한다.
+ * 그래서 건물마다 주민 자리를 따로 적지 않아도 주민이 몇 명이든 선다. 빈 바닥이 모자라면 자리를 더 주지 못한다.
+ */
+export function findResidentSpots(
+  interior: BuildingInterior,
+  count: number,
+): { x: number; z: number }[] {
+  if (count <= 0) {
+    return [];
+  }
+  const spots = [interior.residentSpot];
+  if (count === 1) {
+    return spots.map((spot) => ({ x: spot.x * ROOM_SCALE, z: spot.z * ROOM_SCALE }));
+  }
+  const candidates: { x: number; z: number }[] = [];
+  for (let x = ROOM_LAYOUT.minX + 1; x <= ROOM_LAYOUT.maxX - 1; x += SPOT_STEP) {
+    for (let z = ROOM_LAYOUT.minZ + 1; z <= ROOM_LAYOUT.maxZ - 1.5; z += SPOT_STEP) {
+      const worldX = x * ROOM_SCALE;
+      const worldZ = z * ROOM_SCALE;
+      // 주민 몸통이 가구에 걸치지 않고, 현관 매트 위나 입장 지점 곁이 아닌 자리만 쓴다.
+      if (
+        !collidesWithFurniture(interior.items, worldX, worldZ, SPOT_CLEARANCE) &&
+        !isAtRoomExit(worldX, worldZ) &&
+        Math.hypot(worldX - ROOM_ENTRANCE.x, worldZ - ROOM_ENTRANCE.z) >=
+          PLAYER_RADIUS + RESIDENT_RADIUS
+      ) {
+        candidates.push({ x, z });
+      }
+    }
+  }
+  const distance = (a: { x: number; z: number }, b: { x: number; z: number }) =>
+    Math.hypot(a.x - b.x, a.z - b.z);
+  candidates.sort(
+    (a, b) => distance(a, interior.residentSpot) - distance(b, interior.residentSpot),
+  );
+  for (const candidate of candidates) {
+    if (spots.length >= count) {
+      break;
+    }
+    if (spots.every((spot) => distance(spot, candidate) >= SPOT_GAP)) {
+      spots.push(candidate);
+    }
+  }
+  return spots.map((spot) => ({ x: spot.x * ROOM_SCALE, z: spot.z * ROOM_SCALE }));
 }

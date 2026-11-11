@@ -4,7 +4,7 @@ import * as THREE from 'three';
  * 주민의 직업·특징을 드러내는 소품. 캐릭터 모델(+z가 앞, 머리 중심 y=1.35, 몸통 중심 y≈0.62)에
  * 단순한 도형 몇 개를 덧붙인다. 소품을 단 모델은 `disposeAvatarModel`로 함께 정리된다.
  */
-export type AccessoryKind =
+type AccessoryKind =
   | 'glasses'
   | 'strawHat'
   | 'headphones'
@@ -55,13 +55,7 @@ function addStrawHat(model: THREE.Object3D, color: string) {
 }
 
 function addHeadphones(model: THREE.Object3D, color: string) {
-  const band = mesh(
-    model,
-    new THREE.TorusGeometry(0.66, 0.04, 8, 24, Math.PI),
-    color,
-    [0, 1.35, 0],
-  );
-  band.rotation.z = 0;
+  mesh(model, new THREE.TorusGeometry(0.66, 0.04, 8, 24, Math.PI), color, [0, 1.35, 0]);
   for (const x of [-0.66, 0.66]) {
     mesh(model, new THREE.CylinderGeometry(0.17, 0.17, 0.12, 16), color, [x, 1.35, 0]).rotation.z =
       Math.PI / 2;

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import type { VillageBuilding, VillagePosition } from '../api/village';
+import type { VillageBuilding, VillageMap, VillagePosition } from '../api/village';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
@@ -11,10 +11,10 @@ import {
   TALK_DISTANCE,
   TURN_SPEED,
   WALK_SPEED,
-  createNameTag,
+  createResidentModel,
+  disposeResidentModel,
 } from '../lib/sceneCommon';
 import { collidesWithBuildings, findDoorAt } from '../lib/villageBuildings';
-import { addAccessory } from '../lib/residentAccessories';
 import { collidesWithResidents, placeResidents } from '../lib/villageResidents';
 import { collidesWithTrees, createVillageLayout } from '../lib/villageScenery';
 import { createVillageWorld } from '../lib/villageScenery3d';
@@ -25,6 +25,8 @@ interface VillageSceneProps {
   palette: AvatarPalette;
   /** 서버에서 받은 마을 건물들. 길과 나무·꽃 배치도 이 목록으로 계산하며, 바뀌면 장면을 다시 만든다. */
   buildings: VillageBuilding[];
+  /** 서버에서 받은 마을 땅 크기. 이동 범위와 풍경(나무·숲·풀밭) 범위가 이 값으로 정해진다. */
+  map: VillageMap;
   /** 건물 간판을 눌렀을 때 호출된다. */
   onEnterBuilding: (buildingId: string) => void;
   /** 대화 가능한 거리 안에 들어온 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
@@ -37,11 +39,10 @@ interface VillageSceneProps {
   onPositionChange: (position: VillagePosition) => void;
 }
 
-const MAP_HALF_SIZE = 22; // 이동 가능한 정사각형 땅의 절반 크기
-const GROUND_HALF_SIZE = 60; // 눈에 보이는 풀밭의 절반 크기. 화면 어디를 봐도 땅이 보이게 이동 범위보다 훨씬 크다
+const GROUND_SCALE = 2.5; // 눈에 보이는 풀밭의 절반 크기 = 이동 가능한 땅의 절반 크기 × 이 값. 화면 어디를 봐도 땅이 보이게 훨씬 크게 잡는다
 const VIEW_HEIGHT = 18; // 화면에 세로로 보이는 월드 길이(직교 카메라)
 
-function createGroundTexture(): THREE.CanvasTexture {
+function createGroundTexture(groundHalfSize: number): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 64;
@@ -58,7 +59,7 @@ function createGroundTexture(): THREE.CanvasTexture {
   texture.magFilter = THREE.NearestFilter;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(GROUND_HALF_SIZE, GROUND_HALF_SIZE);
+  texture.repeat.set(groundHalfSize, groundHalfSize);
   return texture;
 }
 
@@ -67,6 +68,7 @@ function VillageScene({
   avatar,
   palette,
   buildings,
+  map,
   onEnterBuilding,
   onNearResidentChange,
   onNearBuildingChange,
@@ -74,7 +76,7 @@ function VillageScene({
   onPositionChange,
 }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // 장면은 avatar/palette/buildings가 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
+  // 장면은 avatar/palette/buildings/map이 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
   const onEnterRef = useRef(onEnterBuilding);
   useEffect(() => {
     onEnterRef.current = onEnterBuilding;
@@ -108,16 +110,17 @@ function VillageScene({
     sun.position.set(6, 12, 4);
     scene.add(sun);
 
-    const groundTexture = createGroundTexture();
+    const groundHalfSize = map.halfSize * GROUND_SCALE;
+    const groundTexture = createGroundTexture(groundHalfSize);
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(GROUND_HALF_SIZE * 2, GROUND_HALF_SIZE * 2),
+      new THREE.PlaneGeometry(groundHalfSize * 2, groundHalfSize * 2),
       new THREE.MeshLambertMaterial({ map: groundTexture }),
     );
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
     // 건물, 길, 나무, 꽃 같은 풍경은 lib/villageScenery3d.ts가 만든다.
-    const layout = createVillageLayout(buildings);
+    const layout = createVillageLayout(buildings, map.halfSize);
     const world = createVillageWorld(buildings, layout);
     const residents = placeResidents(buildings);
     const isBlocked = (x: number, z: number) =>
@@ -129,30 +132,25 @@ function VillageScene({
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
     const start = initialPositionRef.current;
-    if (start && !isBlocked(start.x, start.z)) {
+    // 저장된 자리가 땅 밖이거나(땅을 줄인 경우) 막힌 자리면 기본 시작 위치에서 시작한다.
+    const limit = map.maxWalkCoordinate;
+    if (
+      start &&
+      Math.abs(start.x) <= limit &&
+      Math.abs(start.z) <= limit &&
+      !isBlocked(start.x, start.z)
+    ) {
       player.position.set(start.x, 0, start.z);
     }
     scene.add(player);
 
-    // 주민은 소속 건물 문 앞(없으면 길 위)에 서서 남쪽(화면 아래)을 바라본다.
-    // 몸(체형 배율 적용)과 이름표를 따로 두려고 묶음(model) 안에 몸을 넣는다. 장면이 사라질 때 정리할 수 있게 목록으로 들고 있는다.
+    // 건물에 속하지 않은 주민만 마을 길 위에 서서 남쪽(화면 아래)을 바라본다. 건물 소속 주민은 건물 안에 있다.
+    // 장면이 사라질 때 정리할 수 있게 목록으로 들고 있는다.
     const residentModels = residents.map((resident) => {
-      const model = new THREE.Group();
-      model.scale.setScalar(PLAYER_SCALE);
-      model.position.set(resident.x, 0, resident.z);
-      const height = resident.build?.height ?? 1;
-      const width = resident.build?.width ?? 1;
-      const body = createAvatarModel(resident.avatar, palette);
-      for (const accessory of resident.accessories ?? []) {
-        addAccessory(body, accessory);
-      }
-      body.scale.set(width, height, width);
-      model.add(body);
-      const nameTag = createNameTag(resident.name);
-      nameTag.position.y *= height;
-      model.add(nameTag);
-      scene.add(model);
-      return { model, nameTag };
+      const residentModel = createResidentModel(resident, palette);
+      residentModel.model.position.set(resident.x, 0, resident.z);
+      scene.add(residentModel.model);
+      return residentModel;
     });
 
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
@@ -249,7 +247,7 @@ function VillageScene({
       if (length > 0) {
         dx /= length;
         dz /= length;
-        const limit = MAP_HALF_SIZE - 1;
+        const limit = map.maxWalkCoordinate;
         // X, Z를 따로 검사해야 건물에 비스듬히 부딪혀도 벽을 따라 미끄러진다.
         const nextX = THREE.MathUtils.clamp(
           player.position.x + dx * WALK_SPEED * delta,
@@ -316,11 +314,7 @@ function VillageScene({
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
       disposeAvatarModel(player);
-      for (const { model, nameTag } of residentModels) {
-        disposeAvatarModel(model);
-        nameTag.material.map?.dispose();
-        nameTag.material.dispose();
-      }
+      residentModels.forEach(disposeResidentModel);
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();
@@ -331,7 +325,7 @@ function VillageScene({
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [avatar, palette, buildings]);
+  }, [avatar, palette, buildings, map]);
 
   return <div ref={containerRef} className={styles.scene} aria-label="마을 화면" />;
 }

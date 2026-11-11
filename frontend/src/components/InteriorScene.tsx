@@ -11,6 +11,7 @@ import {
   collidesWithFurniture,
   isAtRoomExit,
   type BuildingInterior,
+  findResidentSpots,
 } from '../lib/buildingInteriors';
 import {
   CAMERA_OFFSET,
@@ -19,7 +20,8 @@ import {
   TALK_DISTANCE,
   TURN_SPEED,
   WALK_SPEED,
-  createNameTag,
+  createResidentModel,
+  disposeResidentModel,
 } from '../lib/sceneCommon';
 import { PLAYER_RADIUS } from '../lib/villageBuildings';
 import { RESIDENT_RADIUS, type VillageResident } from '../lib/villageResidents';
@@ -30,10 +32,10 @@ interface InteriorSceneProps {
   palette: AvatarPalette;
   /** 이 건물의 방 꾸밈(바닥·벽 색, 가구 목록). 바뀌면 장면을 다시 만든다. */
   interior: BuildingInterior;
-  /** 방 안에 서 있는 주민. 주민이 없는 건물(집)이면 null. */
-  resident: VillageResident | null;
-  /** 주민에게 말을 걸 수 있는 거리 안에 있는지. 바뀔 때만 호출된다. */
-  onNearResidentChange: (near: boolean) => void;
+  /** 방 안에 서 있는 주민들. 주민이 없는 건물(집)이면 빈 배열. 같은 내용이면 같은 배열을 넘겨야 장면을 다시 만들지 않는다. */
+  residents: VillageResident[];
+  /** 말을 걸 수 있는 거리 안에 든 가장 가까운 주민의 slug. 아무도 없으면 null. 바뀔 때만 호출된다. */
+  onNearResidentChange: (residentSlug: string | null) => void;
   /** 현관 매트 위에 서 있는지. 바뀔 때만 호출된다. */
   onNearExitChange: (near: boolean) => void;
 }
@@ -53,12 +55,12 @@ function InteriorScene({
   avatar,
   palette,
   interior,
-  resident,
+  residents,
   onNearResidentChange,
   onNearExitChange,
 }: InteriorSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // 장면은 avatar/palette/interior/resident가 바뀔 때만 다시 만들고, 콜백은 최신 값을 ref로 읽는다.
+  // 장면은 avatar/palette/interior/residents가 바뀔 때만 다시 만들고, 콜백은 최신 값을 ref로 읽는다.
   const onNearResidentRef = useRef(onNearResidentChange);
   useEffect(() => {
     onNearResidentRef.current = onNearResidentChange;
@@ -84,14 +86,17 @@ function InteriorScene({
     const room = createInteriorRoom(interior);
     scene.add(room.group);
 
-    // 주민 자리는 배치 좌표로 적혀 있어 월드 좌표로 바꾼다.
-    const spot = {
-      x: interior.residentSpot.x * ROOM_SCALE,
-      z: interior.residentSpot.z * ROOM_SCALE,
-    };
+    // 첫 주민은 방 데이터의 자리에, 나머지는 가까운 빈 바닥에 선다(월드 좌표).
+    const spots = findResidentSpots(interior, residents.length);
+    const standing = residents.slice(0, spots.length).map((resident, index) => ({
+      resident,
+      spot: spots[index],
+    }));
     const isBlocked = (x: number, z: number) =>
       collidesWithFurniture(interior.items, x, z) ||
-      (resident !== null && Math.hypot(x - spot.x, z - spot.z) < PLAYER_RADIUS + RESIDENT_RADIUS);
+      standing.some(
+        ({ spot }) => Math.hypot(x - spot.x, z - spot.z) < PLAYER_RADIUS + RESIDENT_RADIUS,
+      );
 
     const player = createAvatarModel(avatar, palette);
     player.scale.setScalar(PLAYER_SCALE);
@@ -99,18 +104,17 @@ function InteriorScene({
     player.rotation.y = (-3 * Math.PI) / 4; // 맨 아래 모서리의 매트에서 방 안쪽(-x, -z)을 보고 들어온다
     scene.add(player);
 
-    // 주민은 정해진 자리에 서서 현관 쪽을 바라본다.
-    let residentModel: THREE.Group | null = null;
-    let nameTag: THREE.Sprite | null = null;
-    if (resident) {
-      residentModel = createAvatarModel(resident.avatar, palette);
-      residentModel.scale.setScalar(PLAYER_SCALE);
-      residentModel.position.set(spot.x, 0, spot.z);
-      residentModel.rotation.y = Math.atan2(ROOM_ENTRANCE.x - spot.x, ROOM_ENTRANCE.z - spot.z);
-      nameTag = createNameTag(resident.name);
-      residentModel.add(nameTag);
-      scene.add(residentModel);
-    }
+    // 주민은 정해진 자리에 서서 현관 쪽을 바라본다. 체형·소품은 마을과 같이 입힌다.
+    const residentModels = standing.map(({ resident, spot }) => {
+      const residentModel = createResidentModel(resident, palette);
+      residentModel.model.position.set(spot.x, 0, spot.z);
+      residentModel.model.rotation.y = Math.atan2(
+        ROOM_ENTRANCE.x - spot.x,
+        ROOM_ENTRANCE.z - spot.z,
+      );
+      scene.add(residentModel.model);
+      return residentModel;
+    });
 
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -156,7 +160,7 @@ function InteriorScene({
     // 계산대 같은 가구가 커진 만큼, 그 너머의 주민에게 말을 걸 수 있는 거리도 같이 늘린다.
     const talkDistance = TALK_DISTANCE * ROOM_SCALE;
     const cameraTarget = new THREE.Vector3();
-    let nearResident = false;
+    let nearSlug: string | null = null;
     let nearExit = false;
     let targetAngle = player.rotation.y;
     let previousTime = performance.now();
@@ -201,12 +205,18 @@ function InteriorScene({
         onNearExitRef.current(nearExit);
       }
 
-      const canTalk =
-        resident !== null &&
-        Math.hypot(player.position.x - spot.x, player.position.z - spot.z) < talkDistance;
-      if (canTalk !== nearResident) {
-        nearResident = canTalk;
-        onNearResidentRef.current(nearResident);
+      let closest: string | null = null;
+      let closestDistance = talkDistance;
+      for (const { resident, spot } of standing) {
+        const distance = Math.hypot(player.position.x - spot.x, player.position.z - spot.z);
+        if (distance < closestDistance) {
+          closest = resident.slug;
+          closestDistance = distance;
+        }
+      }
+      if (closest !== nearSlug) {
+        nearSlug = closest;
+        onNearResidentRef.current(nearSlug);
       }
 
       // 현재 각도에서 목표 각도로 가장 짧은 방향으로 부드럽게 돈다.
@@ -231,7 +241,7 @@ function InteriorScene({
     frameId = requestAnimationFrame(animate);
 
     return () => {
-      onNearResidentRef.current(false);
+      onNearResidentRef.current(null);
       onNearExitRef.current(false);
       cancelAnimationFrame(frameId);
       observer.disconnect();
@@ -239,19 +249,13 @@ function InteriorScene({
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
       disposeAvatarModel(player);
-      if (residentModel) {
-        disposeAvatarModel(residentModel);
-      }
-      if (nameTag) {
-        nameTag.material.map?.dispose();
-        nameTag.material.dispose();
-      }
+      residentModels.forEach(disposeResidentModel);
       room.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [avatar, palette, interior, resident]);
+  }, [avatar, palette, interior, residents]);
 
   return <div ref={containerRef} className={styles.scene} aria-label="건물 내부 화면" />;
 }

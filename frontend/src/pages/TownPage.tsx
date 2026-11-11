@@ -5,9 +5,11 @@ import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
 import { getTodayRecommendation, type Theme } from '../api/theme';
 import {
   getVillageBuildings,
+  getVillageMap,
   getVillagePosition,
   saveVillagePosition,
   type VillageBuilding,
+  type VillageMap,
   type VillagePosition,
 } from '../api/village';
 import { ApiError } from '../api/client';
@@ -25,6 +27,7 @@ function TownPage() {
   const nearResident = VILLAGE_RESIDENTS.find((resident) => resident.slug === nearResidentSlug);
   const [nearBuildingId, setNearBuildingId] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<VillageBuilding[] | null>(null);
+  const [map, setMap] = useState<VillageMap | null>(null);
   const [buildingsErrorMessage, setBuildingsErrorMessage] = useState<string | null>(null);
   const [buildingsAttempt, setBuildingsAttempt] = useState(0);
   const nearBuilding = buildings?.find((building) => building.id === nearBuildingId);
@@ -80,10 +83,11 @@ function TownPage() {
   useEffect(() => {
     let cancelled = false;
 
-    getVillageBuildings()
-      .then((loaded) => {
+    Promise.all([getVillageBuildings(), getVillageMap()])
+      .then(([loaded, loadedMap]) => {
         if (!cancelled) {
           setBuildings(loaded);
+          setMap(loadedMap);
           setBuildingsErrorMessage(null);
         }
       })
@@ -275,11 +279,12 @@ function TownPage() {
           <span className={styles.todayLearningCta}>시작하기 →</span>
         </Link>
       )}
-      {avatar && palette && buildings && positionLoaded && (
+      {avatar && palette && buildings && map && positionLoaded && (
         <VillageScene
           avatar={avatar}
           palette={palette}
           buildings={buildings}
+          map={map}
           onEnterBuilding={(buildingId) => navigate(`/town/buildings/${buildingId}`)}
           onNearResidentChange={setNearResidentSlug}
           onNearBuildingChange={setNearBuildingId}

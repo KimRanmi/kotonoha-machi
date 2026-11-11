@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { VillageBuilding } from '../api/village';
-import { DOOR_WIDTH, ROOF_HEIGHT } from './villageBuildings';
-import { TREE_RADIUS, VILLAGE_FOREST, type VillageLayout } from './villageScenery';
+import { DOOR_WIDTH, ROOF_HEIGHT, buildingAngle } from './villageBuildings';
+import { TREE_RADIUS, type VillageLayout } from './villageScenery';
 
 const FLOWER_COLORS = ['#f4a3b8', '#fff3a8', '#ffffff', '#b9a4f0', '#f7b267'];
 const WINDOW_COLOR = '#cfe8ff';
@@ -9,7 +9,6 @@ const WINDOW_COLOR = '#cfe8ff';
 // 간판: 나무 테두리 + 글씨를 그린 캔버스 판. 글씨는 3D 글자가 아니라 캔버스에 그린 그림을 판에 붙인다.
 const SIGN_STYLES: Record<string, { background: string; text: string; accent: string }> = {
   cafe: { background: '#4a2f1e', text: '#fbf1dc', accent: '#e0a95a' },
-  shop: { background: '#1f3d6b', text: '#ffffff', accent: '#f2c230' },
   home: { background: '#7a3f3a', text: '#fff4e0', accent: '#f0c987' },
 };
 // 시트에 새로 추가한 건물처럼 위 목록에 없는 건물은 이 기본 모양으로 그린다.
@@ -71,10 +70,11 @@ export function createVillageWorld(
       geometry(new THREE.BoxGeometry(path.width, 0.04, path.depth)),
       pathMaterial,
     );
+    mesh.rotation.y = path.angle;
     place(mesh, path.x, 0.02, path.z, group);
   }
 
-  // 건물: 벽 상자 + 뾰족 지붕 + 문. 창문과 장식은 건물별 함수가 카메라가 보는 +z, +x 벽에 단다.
+  // 건물: 벽 상자 + 뾰족 지붕 + 문. 창문과 장식은 건물별 함수가 건물 로컬 좌표(문이 +z)로 단다.
   const doorMaterial = material('#6b4a32');
   const doorGeometry = geometry(new THREE.BoxGeometry(DOOR_WIDTH, 1.8, 0.1));
   const roofGeometry = geometry(new THREE.ConeGeometry(1, ROOF_HEIGHT, 4));
@@ -187,49 +187,6 @@ export function createVillageWorld(
     addCafeTable(house, 3, front + 0.5, '#f0b94a');
   };
 
-  const addShop = (house: THREE.Group, building: VillageBuilding) => {
-    const front = building.depth / 2;
-    const itemColors = ['#e4572e', '#f3c13a', '#4aa3a2', '#9b5de5'];
-    for (const side of [-1, 1]) {
-      addWindow(house, building, side * 1.6, 1.4, [1.5, 1.2], '#ffffff');
-      // 창 아래 진열대와 상품
-      place(box(1.5, 0.06, 0.4, '#8a5a3c'), side * 1.6, 0.8, front + 0.15, house);
-      itemColors.forEach((color, i) => {
-        place(
-          box(0.25, 0.25, 0.25, color),
-          side * 1.6 - 0.55 + i * 0.37,
-          0.96,
-          front + 0.15,
-          house,
-        );
-      });
-    }
-    addAwning(house, building, ['#3d6fb5', '#ffffff']);
-    // 과일 상자 두 개와 통
-    for (const [x, fruit] of [
-      [-2.2, '#d9342b'],
-      [-1.4, '#f5921e'],
-    ] as const) {
-      place(box(0.7, 0.45, 0.55, '#b8844f'), x, 0.225, front + 0.8, house);
-      for (const offset of [-0.2, 0, 0.2]) {
-        place(sphere(0.13, fruit), x + offset, 0.52, front + 0.8, house);
-      }
-    }
-    place(cylinder(0.33, 0.33, 0.75, '#7a5230'), 2.2, 0.375, front + 0.8, house);
-    for (const y of [0.2, 0.55]) {
-      place(cylinder(0.345, 0.345, 0.06, '#3a2a1c'), 2.2, y, front + 0.8, house);
-    }
-    // 벽에서 튀어나온 팔에 매단 금화 간판
-    const side = building.width / 2;
-    place(box(1.4, 0.08, 0.08, '#3a2a1c'), side + 0.6, 2.3, front - 0.6, house);
-    place(box(0.04, 0.35, 0.04, '#3a2a1c'), side + 0.3, 2.1, front - 0.6, house);
-    place(box(0.04, 0.35, 0.04, '#3a2a1c'), side + 1.2, 2.1, front - 0.6, house);
-    place(box(1.1, 0.6, 0.08, '#b8844f'), side + 0.75, 1.75, front - 0.6, house);
-    const coin = cylinder(0.2, 0.2, 0.05, '#f2c230');
-    coin.rotation.x = Math.PI / 2;
-    place(coin, side + 0.75, 1.75, front - 0.54, house);
-  };
-
   const addHome = (house: THREE.Group, building: VillageBuilding) => {
     const front = building.depth / 2;
     // 창문과 그 아래 화단
@@ -246,7 +203,16 @@ export function createVillageWorld(
         );
       }
     }
-    place(box(0.1, 0.8, 0.8, WINDOW_COLOR), building.width / 2 + 0.03, 1.4, 0, house);
+    // 건물이 돌아가 있어도 카메라 쪽 옆벽에 창이 보이게 양쪽 옆벽에 단다.
+    for (const side of [-1, 1]) {
+      place(
+        box(0.1, 0.8, 0.8, WINDOW_COLOR),
+        (side * building.width) / 2 + side * 0.03,
+        1.4,
+        0,
+        house,
+      );
+    }
     // 현관 계단
     place(box(1.8, 0.12, 0.7, '#d8cfc0'), 0, 0.06, front + 0.45, house);
     // 굴뚝
@@ -318,13 +284,13 @@ export function createVillageWorld(
     Record<string, (house: THREE.Group, building: VillageBuilding) => void>
   > = {
     cafe: addCafe,
-    shop: addShop,
     home: addHome,
   };
 
   function createBuilding(building: VillageBuilding): THREE.Group {
     const house = new THREE.Group();
     house.position.set(building.x, 0, building.z);
+    house.rotation.y = buildingAngle(building); // 시트의 rotation(도)만큼 돌린다
 
     const wallMaterial = material(building.color);
     const roofMaterial = material(
@@ -389,14 +355,14 @@ export function createVillageWorld(
 
   // 숲: 수백 그루라서 나무를 하나씩 만들지 않고, 같은 부품(줄기·잎)을 한 번에 여러 개 그리는
   // InstancedMesh로 만든다. 위에서 만든 나무 모양·재질을 그대로 나눠 쓴다.
-  const roundTrees = VILLAGE_FOREST.filter((tree) => tree.variant === 0);
-  const pineTrees = VILLAGE_FOREST.filter((tree) => tree.variant === 1);
+  const roundTrees = layout.forest.filter((tree) => tree.variant === 0);
+  const pineTrees = layout.forest.filter((tree) => tree.variant === 1);
   const instancedMeshes: THREE.InstancedMesh[] = [];
   const matrix = new THREE.Matrix4();
   const addInstances = (
     part: THREE.BufferGeometry,
     partMaterial: THREE.Material,
-    trees: typeof VILLAGE_FOREST,
+    trees: VillageLayout['forest'],
     height: number,
     scale: number,
   ) => {
@@ -408,7 +374,7 @@ export function createVillageWorld(
     instancedMeshes.push(instanced);
     group.add(instanced);
   };
-  addInstances(trunkGeometry, trunkMaterial, VILLAGE_FOREST, 0.6, 1.4);
+  addInstances(trunkGeometry, trunkMaterial, layout.forest, 0.6, 1.4);
   addInstances(roundLeafGeometry, roundLeafMaterial, roundTrees, 2.3, 1.4);
   addInstances(pineLowGeometry, pineMaterial, pineTrees, 2, 1.4);
   addInstances(pineHighGeometry, pineMaterial, pineTrees, 3.1, 1.4);
