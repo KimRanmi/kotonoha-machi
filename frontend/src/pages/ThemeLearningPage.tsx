@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { cancelSpeechRecognition } from '../lib/speechRecognition';
 import { speakJapanese, stopSpeaking } from '../lib/speechSynthesis';
 import { calculateTextSimilarity, toHiragana, toKatakana } from '../lib/textSimilarity';
 import {
@@ -95,7 +96,6 @@ function ThemeLearningPage() {
     isListening,
     errorMessage: speechErrorMessage,
     start: startListening,
-    cancel: cancelSpeechRecognition,
     clearError: clearSpeechError,
   } = useSpeechRecognition();
   const [speechAccuracy, setSpeechAccuracy] = useState<number | null>(null);
@@ -189,7 +189,7 @@ function ThemeLearningPage() {
     return () => {
       cancelled = true;
     };
-  }, [theme, activeStage, isNotTodayTheme, cancelSpeechRecognition, clearSpeechError]);
+  }, [theme, activeStage, isNotTodayTheme, clearSpeechError]);
 
   // 페이지를 떠날 때 재생 중인 소리를 멈춘다(마이크 인식은 useSpeechRecognition이 멈춘다).
   useEffect(() => stopSpeaking, []);
@@ -223,6 +223,8 @@ function ThemeLearningPage() {
 
   function handleNextQuizItem() {
     stopSpeaking();
+    // 듣는 도중 다음 문제로 넘어가면, 늦게 도착한 인식 결과가 새 문제에 반영되지 않게 멈춘다.
+    cancelSpeechRecognition();
     setCurrentIndex((index) => index + 1);
     setWrongCount(0);
     setIsRevealed(false);

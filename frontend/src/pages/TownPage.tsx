@@ -318,6 +318,7 @@ function TownPage() {
         <ResidentChatModal
           residentSlug={chatResident.slug}
           residentName={chatResident.name}
+          voice={chatResident.voice}
           onClose={closeChat}
         />
       )}
