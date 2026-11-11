@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { ApiError } from '../api/client';
 import { sendChatMessage } from '../api/chat';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { speakJapanese, stopSpeaking } from '../lib/speechSynthesis';
 import JapaneseInput from './JapaneseInput';
 import styles from './ResidentChatModal.module.css';
 
@@ -45,9 +46,11 @@ function ResidentChatModal({ residentSlug, residentName, onClose }: ResidentChat
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    const message = text.trim();
+  // 대화창을 닫으면 읽던 주민 음성을 멈춘다(마이크 인식은 useSpeechRecognition이 멈춘다).
+  useEffect(() => stopSpeaking, []);
+
+  const sendMessage = async (rawMessage: string) => {
+    const message = rawMessage.trim();
     if (!message || isSending) {
       return;
     }
@@ -61,6 +64,7 @@ function ResidentChatModal({ residentSlug, residentName, onClose }: ResidentChat
         ...previous,
         { speaker: 'resident', text: answer.reply, translation: answer.translation },
       ]);
+      speakJapanese(answer.reply);
     } catch (error) {
       setErrorMessage(
         error instanceof ApiError
@@ -72,9 +76,22 @@ function ResidentChatModal({ residentSlug, residentName, onClose }: ResidentChat
     }
   };
 
-  /** 마이크로 말한 내용을 입력란에 채운다. 오인식을 고칠 수 있도록 자동 전송하지 않는다. */
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    void sendMessage(text);
+  };
+
+  /** 마이크로 말한 내용을 바로 보낸다. 너무 길면 보내지 않고 입력란에 채워 고칠 수 있게 한다. */
   const handleVoiceInput = () => {
-    startListening(setText);
+    // 주민 목소리가 마이크에 섞여 인식되지 않도록 읽던 음성을 먼저 멈춘다.
+    stopSpeaking();
+    startListening((transcript) => {
+      if (transcript.trim().length > MAX_MESSAGE_LENGTH) {
+        setText(transcript);
+        return;
+      }
+      void sendMessage(transcript);
+    });
   };
 
   return (
