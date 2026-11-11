@@ -27,6 +27,9 @@ public class ChatService {
 
   static final int MAX_MESSAGE_LENGTH = 200;
 
+  // 플레이어의 말이 비어 있을 때 돌려주는 안내.
+  private static final ChatResponse ASK_AGAIN = new ChatResponse("もう一度お願いします。", "다시 말씀해주세요.");
+
   // {…} 자리는 코드에서 치환한다. 플레이어의 입력은 여기에 섞지 않고 user content로 따로 보낸다.
   private static final String SYSTEM_PROMPT_TEMPLATE = """
       [Role & Setting]
@@ -81,12 +84,12 @@ public class ChatService {
    * @param userId 대화하는 사용자 ID
    * @param residentSlug 대화할 주민의 고유 키(예: r01)
    * @param message 플레이어의 메시지
-   * @return 주민의 일본어 대사·한국어 번역과 대화 뒤의 친밀도
-   * @throws ApiException 메시지가 비었거나 너무 길면(400), 주민이 없으면(404), 대화할 수 없으면(502/503)
+   * @return 주민의 일본어 대사·한국어 번역과 대화 뒤의 친밀도(메시지가 비었으면 다시 말해 달라는 안내)
+   * @throws ApiException 메시지가 너무 길면(400), 주민이 없으면(404), 대화할 수 없으면(502/503)
    */
   public ChatResultResponse chat(Long userId, String residentSlug, String message) {
     String normalizedMessage = message == null ? "" : message.strip();
-    if (normalizedMessage.isEmpty() || normalizedMessage.length() > MAX_MESSAGE_LENGTH) {
+    if (normalizedMessage.length() > MAX_MESSAGE_LENGTH) {
       throw new ApiException(ChatErrorCode.MESSAGE_INVALID);
     }
     Resident resident = residentRepository
@@ -96,6 +99,11 @@ public class ChatService {
         .findByUserIdAndResidentId(userId, resident.getId())
         .map(ResidentFriendship::getLevel)
         .orElse(0);
+
+    // 말이 비었으면 Gemini를 부르지 않고 다시 말해 달라고 한다. 기록·친밀도 상승도 없다.
+    if (normalizedMessage.isEmpty()) {
+      return new ChatResultResponse(ASK_AGAIN.reply(), ASK_AGAIN.translation(), friendshipLevel, 0);
+    }
 
     String systemPrompt = fillTemplate(Map.of(
         "villagerName", resident.getName(),
