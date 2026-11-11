@@ -4,7 +4,7 @@ PR #21 시점의 상태 정리("마을 화면의 주민"과 "마을 배치·건�
 한국어 번역 표시), 대화 API(`POST /api/residents/{slug}/chat`)다. 아래는 아직 안 된 것이다. 확정되지 않은 항목은 "정할 것"으로
 표시했다.
 
-## 1. 대화창 (`frontend/src/pages/ChatPage.tsx`)
+## 1. 대화창 (`frontend/src/components/ResidentChatModal.tsx`)
 
 - **디자인**: 지금은 `ul` 목록 + 입력란뿐이다. 말풍선(내 말/주민 말 구분), 주민 이름·외형 표시, 자동 스크롤, 입력창 하단 고정이 필요하다.
 - **로딩·오류 UX**: 전송 중 표시는 버튼 문구뿐이다. 실패 시 재시도 버튼, 502(Gemini 실패)·503(대화 불가) 메시지 구분이 없다
@@ -14,7 +14,7 @@ PR #21 시점의 상태 정리("마을 화면의 주민"과 "마을 배치·건�
 
 ## 2. 음성 (요구사항 "주민과의 대화", "주민 음성(TTS)")
 
-- **음성 입력**: 타이핑과 같이 제공한다. `ChatPage`의 🎤 버튼이 `hooks/useSpeechRecognition.ts`(`lib/speechRecognition.ts` 사용)로 입력란에 채워 넣고, 확인 뒤 직접 보낸다(자동 전송 안 함). 발음 체크는 아직 연결하지 않았다.
+- **음성 입력**: 타이핑과 같이 제공한다. `ResidentChatModal`의 🎤 버튼이 `hooks/useSpeechRecognition.ts`(`lib/speechRecognition.ts` 사용)로 입력란에 채워 넣고, 확인 뒤 직접 보낸다(자동 전송 안 함). 발음 체크는 아직 연결하지 않았다.
 - **발음 체크**: 음성 입력 시 테마 학습(REVIEW)과 같은 방식(`lib/textSimilarity.ts`)으로 적용한다.
 - **주민 음성(TTS)**: 브라우저 Web Speech API로 주민마다 다른 목소리를 배정하고, "다시 듣기" 버튼만 둔다(`lib/speechSynthesis.ts` 재사용 검토).
   일본어 보이스가 없는 환경의 폴백은 정할 것.
