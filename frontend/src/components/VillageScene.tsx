@@ -4,6 +4,15 @@ import type { VillageBuilding, VillagePosition } from '../api/village';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
+import {
+  CAMERA_OFFSET,
+  KEY_DIRECTIONS,
+  PLAYER_SCALE,
+  TALK_DISTANCE,
+  TURN_SPEED,
+  WALK_SPEED,
+  createNameTag,
+} from '../lib/sceneCommon';
 import { collidesWithBuildings, findDoorAt } from '../lib/villageBuildings';
 import { addAccessory } from '../lib/residentAccessories';
 import { collidesWithResidents, placeResidents } from '../lib/villageResidents';
@@ -28,56 +37,9 @@ interface VillageSceneProps {
   onPositionChange: (position: VillagePosition) => void;
 }
 
-const WALK_SPEED = 4; // 초당 이동 거리
-const PLAYER_SCALE = 0.6; // 캐릭터 크기 배율. 문(높이 1.8)보다 작아야 집이 커 보인다
-const TALK_DISTANCE = 2; // 이 거리 안에 들어오면 주민에게 말을 걸 수 있다
-const TURN_SPEED = 14; // 클수록 방향 전환이 빠르다
 const MAP_HALF_SIZE = 22; // 이동 가능한 정사각형 땅의 절반 크기
 const GROUND_HALF_SIZE = 60; // 눈에 보이는 풀밭의 절반 크기. 화면 어디를 봐도 땅이 보이게 이동 범위보다 훨씬 크다
 const VIEW_HEIGHT = 18; // 화면에 세로로 보이는 월드 길이(직교 카메라)
-// 고정 쿼터뷰: 캐릭터를 항상 이 각도로 본다. 직교 카메라라 멀리 둬도 크기는 같다.
-const CAMERA_OFFSET = new THREE.Vector3(50, 50, 50);
-
-/**
- * 화면 기준 방향키 → 월드 방향. 카메라가 (+x, +y, +z)에서 원점을 내려다보므로 화면 위쪽은 월드의
- * (-x, -z), 오른쪽은 (+x, -z)다.
- */
-const KEY_DIRECTIONS: Record<string, [number, number]> = {
-  ArrowUp: [-1, -1],
-  KeyW: [-1, -1],
-  ArrowDown: [1, 1],
-  KeyS: [1, 1],
-  ArrowLeft: [-1, 1],
-  KeyA: [-1, 1],
-  ArrowRight: [1, -1],
-  KeyD: [1, -1],
-};
-
-/** 주민 머리 위에 띄울 이름표. 글자를 캔버스에 그려 항상 카메라를 향하는 판(Sprite)에 붙인다. */
-function createNameTag(name: string): THREE.Sprite {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 64;
-  const context = canvas.getContext('2d');
-  if (context) {
-    context.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    context.beginPath();
-    context.roundRect(0, 8, 256, 48, 24);
-    context.fill();
-    context.fillStyle = '#3d3a36';
-    context.font = 'bold 30px sans-serif';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillText(name, 128, 33);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
-  sprite.renderOrder = 1; // 다른 물체에 가려지지 않게 맨 위에 그린다
-  sprite.scale.set(2.4, 0.6, 1);
-  sprite.position.y = 2.6; // 주민 모델(배율 적용 전) 머리 위
-  return sprite;
-}
 
 function createGroundTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -211,7 +173,6 @@ function VillageScene({
     resize();
 
     // 간판은 3D 물체라서, 마우스 위치에서 화면 안쪽으로 광선을 쏘아 맞은 간판을 찾는다(raycaster).
-    // 들어갈 수 있는(대화할 주민이 있는) 건물의 간판만 강조하고 누를 수 있다.
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const findSign = (event: MouseEvent) => {
@@ -228,8 +189,7 @@ function VillageScene({
       return world.signs.find((sign) => hit && sign.object.getObjectById(hit.object.id));
     };
     const handlePointerMove = (event: PointerEvent) => {
-      const found = findSign(event);
-      const hovered = found?.building.residentSlug ? found : undefined;
+      const hovered = findSign(event);
       for (const sign of world.signs) {
         sign.setHighlight(sign === hovered);
       }
@@ -237,7 +197,7 @@ function VillageScene({
     };
     const handleClick = (event: MouseEvent) => {
       const clicked = findSign(event);
-      if (clicked?.building.residentSlug) {
+      if (clicked) {
         onEnterRef.current(clicked.building.id);
       }
     };
