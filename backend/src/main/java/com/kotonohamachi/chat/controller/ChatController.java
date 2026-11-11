@@ -1,11 +1,14 @@
 package com.kotonohamachi.chat.controller;
 
 import com.kotonohamachi.auth.service.AuthPrincipal;
+import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatRequest;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.chat.service.ChatService;
 import com.kotonohamachi.user.User;
+import java.util.List;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -41,5 +44,19 @@ public class ChatController {
       @RequestBody ChatRequest request) {
     User user = AuthPrincipal.resolve(authentication);
     return chatService.chat(user.getId(), residentSlug, request.message());
+  }
+
+  /**
+   * 주민과 나눈 최근 대화를 오래된 순으로 돌려준다.
+   *
+   * @param authentication 현재 요청의 인증 정보
+   * @param residentSlug 주민의 고유 키(예: r01)
+   * @return 최근 대화(플레이어의 말과 주민의 대답)
+   */
+  @GetMapping("/api/residents/{residentSlug}/chat")
+  public List<ChatHistoryItem> history(
+      Authentication authentication, @PathVariable String residentSlug) {
+    User user = AuthPrincipal.resolve(authentication);
+    return chatService.history(user.getId(), residentSlug);
   }
 }

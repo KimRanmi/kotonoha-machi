@@ -3,6 +3,7 @@ import type { VillageBuilding } from '../api/village';
 import { PLAYER_RADIUS } from './villageBuildings';
 import { spotsAlongRoads } from './villageScenery';
 import type { Accessory } from './residentAccessories';
+import type { VoiceProfile } from './speechSynthesis';
 
 /** 주민 한 명의 생김새. 위치는 서버의 소속 장소(건물)에서 정하므로 여기에 두지 않는다. */
 export interface VillageResident {
@@ -16,6 +17,8 @@ export interface VillageResident {
   build?: { height: number; width: number };
   /** 직업·특징을 드러내는 소품. */
   accessories?: Accessory[];
+  /** 대화에서 주민 답장을 읽을 때의 목소리. 음높이(pitch)와 속도(rate)로 성별·나이·성격 차이를 낸다. */
+  voice: VoiceProfile;
 }
 
 /** 마을에 놓인 주민: 생김새와 서 있는 자리. */
@@ -47,6 +50,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r01',
     name: 'カイト',
+    voice: { pitch: 0.6, rate: 0.8 },
     avatar: look('TAN', 'BLACK', 'SHORT', 'OVERALLS', 'SKY'),
     build: { height: 1.15, width: 1.2 },
     accessories: [accessory('bandana', '#e8e2d0')],
@@ -55,6 +59,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r02',
     name: 'ソラ',
+    voice: { pitch: 1.5, rate: 0.95 },
     avatar: look('FAIR', 'BROWN', 'SHORT', 'PLAIN', 'YELLOW'),
     build: { height: 0.78, width: 0.9 },
   },
@@ -62,6 +67,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r03',
     name: 'ユイ',
+    voice: { pitch: 1.4, rate: 0.85 },
     avatar: look('LIGHT', 'BROWN', 'BOB', 'ONEPIECE', 'PINK'),
     accessories: [accessory('apron', '#fff6e8')],
   },
@@ -69,6 +75,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r04',
     name: 'ダイスケ',
+    voice: { pitch: 0.9, rate: 0.85 },
     avatar: look('FAIR', 'BLACK', 'SHORT', 'STRIPES', 'CREAM'),
     build: { height: 0.95, width: 1.3 },
     accessories: [accessory('glasses'), accessory('bandana', '#f6f3ee')],
@@ -77,6 +84,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r05',
     name: 'レイカ',
+    voice: { pitch: 1.0, rate: 0.7 },
     avatar: look('LIGHT', 'BLACK', 'PONYTAIL', 'ONEPIECE', 'CORAL'),
     build: { height: 1.1, width: 0.95 },
   },
@@ -84,6 +92,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r06',
     name: 'ハヤト',
+    voice: { pitch: 1.1, rate: 0.9 },
     avatar: look('FAIR', 'BLACK', 'PONYTAIL', 'PLAIN', 'CREAM'),
     build: { height: 1.05, width: 0.95 },
     accessories: [accessory('bandana', '#2f3a6b')],
@@ -92,6 +101,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r07',
     name: 'ミク',
+    voice: { pitch: 1.8, rate: 0.95 },
     avatar: look('LIGHT', 'BLONDE', 'BUNS', 'ONEPIECE', 'PINK', 'PINK'),
     build: { height: 0.95, width: 0.9 },
   },
@@ -99,6 +109,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r08',
     name: 'ゲンゾウ',
+    voice: { pitch: 0.5, rate: 0.85 },
     avatar: look('TAN', 'GRAY', 'SHORT', 'OVERALLS', 'MINT'),
     build: { height: 0.82, width: 1.0 },
     accessories: [accessory('strawHat'), accessory('beard')],
@@ -107,6 +118,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r09',
     name: 'ナナ',
+    voice: { pitch: 1.0, rate: 0.7 },
     avatar: look('LIGHT', 'BROWN', 'BOB', 'CARDIGAN', 'MINT'),
     accessories: [accessory('glasses'), accessory('bag')],
   },
@@ -114,6 +126,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r10',
     name: 'ドウゲン',
+    voice: { pitch: 0.7, rate: 0.65 },
     avatar: look('FAIR', 'BLACK', 'SHORT', 'PLAIN', 'LAVENDER'),
     accessories: [accessory('robe')],
   },
@@ -121,6 +134,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r11',
     name: 'リク',
+    voice: { pitch: 1.3, rate: 1.0 },
     avatar: look('TAN', 'BLACK', 'MOHAWK', 'STRIPES', 'SKY', 'SKY'),
     build: { height: 1.05, width: 0.9 },
     accessories: [accessory('headphones', '#3b82f6')],
@@ -129,6 +143,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r12',
     name: 'マリエ',
+    voice: { pitch: 0.8, rate: 0.9 },
     avatar: look('LIGHT', 'BROWN', 'BOB', 'ONEPIECE', 'LAVENDER'),
     build: { height: 1.12, width: 0.9 },
   },
@@ -136,6 +151,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r13',
     name: 'ショウタ',
+    voice: { pitch: 1.2, rate: 0.9 },
     avatar: look('FAIR', 'BROWN', 'SHORT', 'PLAIN', 'PEACH'),
     accessories: [accessory('apron', '#fff6e8')],
   },
@@ -143,6 +159,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r14',
     name: 'アカネ',
+    voice: { pitch: 0.6, rate: 0.85 },
     avatar: look('FAIR', 'RED', 'PONYTAIL', 'PLAIN', 'CORAL'),
     accessories: [accessory('apron', '#f08a24'), accessory('bandana', '#f08a24')],
   },
@@ -150,6 +167,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r15',
     name: 'セイジ',
+    voice: { pitch: 1.0, rate: 0.75 },
     avatar: look('LIGHT', 'BROWN', 'PONYTAIL', 'CARDIGAN', 'CREAM'),
     build: { height: 1.08, width: 0.9 },
     accessories: [accessory('case')],
@@ -158,6 +176,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r16',
     name: 'ハルカ',
+    voice: { pitch: 1.1, rate: 0.75 },
     avatar: look('LIGHT', 'BLACK', 'BOB', 'CARDIGAN', 'CREAM'),
     accessories: [accessory('apron', '#ffffff')],
   },
@@ -165,6 +184,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r17',
     name: 'カツラ',
+    voice: { pitch: 0.7, rate: 0.85 },
     avatar: look('FAIR', 'GRAY', 'BUNS', 'CARDIGAN', 'LAVENDER'),
     build: { height: 0.78, width: 0.95 },
     accessories: [accessory('shawl')],
@@ -173,6 +193,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r18',
     name: 'レン',
+    voice: { pitch: 1.9, rate: 0.9 },
     avatar: look('LIGHT', 'GRAY', 'BOB', 'PLAIN', 'SKY', 'SKY'),
     build: { height: 1.05, width: 0.85 },
   },
@@ -180,6 +201,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r19',
     name: 'サクラ',
+    voice: { pitch: 0.65, rate: 0.85 },
     avatar: look('FAIR', 'BLACK', 'SHORT', 'OVERALLS', 'BEIGE'),
     accessories: [accessory('bandana', '#555a66')],
   },
@@ -187,6 +209,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r20',
     name: 'アキラ',
+    voice: { pitch: 0.6, rate: 0.7 },
     avatar: look('LIGHT', 'BLACK', 'SHORT', 'PLAIN', 'CREAM'),
     build: { height: 1.08, width: 0.9 },
     accessories: [accessory('glasses', '#c9a227')],

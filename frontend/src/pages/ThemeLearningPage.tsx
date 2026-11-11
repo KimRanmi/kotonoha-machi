@@ -1,12 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
-import {
-  cancelSpeechRecognition,
-  isSpeechRecognitionSupported,
-  recognizeJapaneseSpeech,
-  SpeechCancelledError,
-} from '../lib/speechRecognition';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { cancelSpeechRecognition } from '../lib/speechRecognition';
 import { speakJapanese, stopSpeaking } from '../lib/speechSynthesis';
 import { calculateTextSimilarity, toHiragana, toKatakana } from '../lib/textSimilarity';
 import {
@@ -95,8 +91,13 @@ function ThemeLearningPage() {
   const [wrongCount, setWrongCount] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
   const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
-  const [isListening, setIsListening] = useState(false);
-  const [speechErrorMessage, setSpeechErrorMessage] = useState<string | null>(null);
+  const {
+    isSupported: speechSupported,
+    isListening,
+    errorMessage: speechErrorMessage,
+    start: startListening,
+    clearError: clearSpeechError,
+  } = useSpeechRecognition();
   const [speechAccuracy, setSpeechAccuracy] = useState<number | null>(null);
   const [isReadingHintShown, setIsReadingHintShown] = useState(false);
 
@@ -167,8 +168,7 @@ function ThemeLearningPage() {
           setWrongCount(0);
           setIsRevealed(false);
           setFeedback(null);
-          setIsListening(false);
-          setSpeechErrorMessage(null);
+          clearSpeechError();
           setSpeechAccuracy(null);
           setIsReadingHintShown(false);
         }
@@ -189,15 +189,10 @@ function ThemeLearningPage() {
     return () => {
       cancelled = true;
     };
-  }, [theme, activeStage, isNotTodayTheme]);
+  }, [theme, activeStage, isNotTodayTheme, clearSpeechError]);
 
-  // 페이지를 떠날 때 재생 중인 소리와 켜져 있는 마이크 인식을 멈춘다.
-  useEffect(() => {
-    return () => {
-      stopSpeaking();
-      cancelSpeechRecognition();
-    };
-  }, []);
+  // 페이지를 떠날 때 재생 중인 소리를 멈춘다(마이크 인식은 useSpeechRecognition이 멈춘다).
+  useEffect(() => stopSpeaking, []);
 
   const currentQuizItem =
     quizItems && currentIndex < quizItems.length ? quizItems[currentIndex] : null;
@@ -228,11 +223,13 @@ function ThemeLearningPage() {
 
   function handleNextQuizItem() {
     stopSpeaking();
+    // 듣는 도중 다음 문제로 넘어가면, 늦게 도착한 인식 결과가 새 문제에 반영되지 않게 멈춘다.
+    cancelSpeechRecognition();
     setCurrentIndex((index) => index + 1);
     setWrongCount(0);
     setIsRevealed(false);
     setFeedback(null);
-    setSpeechErrorMessage(null);
+    clearSpeechError();
     setSpeechAccuracy(null);
     setIsReadingHintShown(false);
   }
@@ -253,23 +250,11 @@ function ThemeLearningPage() {
       return;
     }
 
-    setSpeechErrorMessage(null);
-    setIsListening(true);
-
-    recognizeJapaneseSpeech()
-      .then((transcript) => {
-        setIsListening(false);
-        const accuracy = calculateSpeechAccuracy(transcript, currentQuizItem);
-        setSpeechAccuracy(accuracy);
-        setFeedback(accuracy >= SPEECH_PASS_THRESHOLD ? 'correct' : 'incorrect');
-      })
-      .catch((error: unknown) => {
-        setIsListening(false);
-        if (error instanceof SpeechCancelledError) {
-          return;
-        }
-        setSpeechErrorMessage(error instanceof Error ? error.message : '음성 인식에 실패했습니다.');
-      });
+    startListening((transcript) => {
+      const accuracy = calculateSpeechAccuracy(transcript, currentQuizItem);
+      setSpeechAccuracy(accuracy);
+      setFeedback(accuracy >= SPEECH_PASS_THRESHOLD ? 'correct' : 'incorrect');
+    });
   }
 
   async function handleAdvance() {
@@ -346,7 +331,6 @@ function ThemeLearningPage() {
 
   const currentStageIndex = STAGE_ORDER.indexOf(theme.currentStage);
   const isReviewStage = activeStage === 'REVIEW';
-  const speechSupported = isSpeechRecognitionSupported();
 
   return (
     <main className={styles.page}>

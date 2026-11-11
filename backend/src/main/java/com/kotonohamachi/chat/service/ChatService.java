@@ -1,12 +1,18 @@
 package com.kotonohamachi.chat.service;
 
 import com.kotonohamachi.chat.ChatErrorCode;
+import com.kotonohamachi.chat.ChatMessage;
+import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatResponse;
+import com.kotonohamachi.chat.repository.ChatMessageRepository;
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.resident.Resident;
 import com.kotonohamachi.resident.ResidentFriendship;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,6 +46,7 @@ public class ChatService {
 
   private final ResidentRepository residentRepository;
   private final ResidentFriendshipRepository friendshipRepository;
+  private final ChatMessageRepository chatMessageRepository;
   private final GeminiClient geminiClient;
 
   /**
@@ -47,14 +54,17 @@ public class ChatService {
    *
    * @param residentRepository 주민 저장소
    * @param friendshipRepository 친밀도 저장소
+   * @param chatMessageRepository 대화 기록 저장소
    * @param geminiClient Gemini 클라이언트
    */
   public ChatService(
       ResidentRepository residentRepository,
       ResidentFriendshipRepository friendshipRepository,
+      ChatMessageRepository chatMessageRepository,
       GeminiClient geminiClient) {
     this.residentRepository = residentRepository;
     this.friendshipRepository = friendshipRepository;
+    this.chatMessageRepository = chatMessageRepository;
     this.geminiClient = geminiClient;
   }
 
@@ -86,7 +96,34 @@ public class ChatService {
         "friendshipLevel", String.valueOf(friendshipLevel),
         "currentContext", resident.getCurrentContext(),
         "extraStatus", extraStatus(resident)));
-    return geminiClient.generate(systemPrompt, normalizedMessage);
+    ChatResponse response = geminiClient.generate(systemPrompt, normalizedMessage);
+    // 대답을 받은 뒤에 두 줄을 함께 저장한다. 대답을 못 받은 말은 기록에 남기지 않는다.
+    chatMessageRepository.saveAll(List.of(
+        ChatMessage.fromPlayer(userId, resident.getId(), normalizedMessage),
+        ChatMessage.fromResident(
+            userId, resident.getId(), response.reply(), response.translation())));
+    return response;
+  }
+
+  /**
+   * 사용자와 주민이 나눈 최근 대화를 오래된 순으로 돌려준다.
+   *
+   * @param userId 사용자 ID
+   * @param residentSlug 주민의 고유 키(예: r01)
+   * @return 최근 50줄까지의 대화(오래된 것이 먼저)
+   * @throws ApiException 주민이 없으면(404)
+   */
+  public List<ChatHistoryItem> history(Long userId, String residentSlug) {
+    Resident resident = residentRepository
+        .findBySlug(residentSlug)
+        .orElseThrow(() -> new ApiException(ChatErrorCode.RESIDENT_NOT_FOUND));
+    List<ChatMessage> latestFirst =
+        chatMessageRepository.findTop50ByUserIdAndResidentIdOrderByIdDesc(userId, resident.getId());
+    List<ChatMessage> oldestFirst = new ArrayList<>(latestFirst);
+    Collections.reverse(oldestFirst);
+    return oldestFirst.stream()
+        .map(m -> new ChatHistoryItem(m.getSpeaker(), m.getText(), m.getTranslation()))
+        .toList();
   }
 
   /** 템플릿의 {…}를 한 번에 치환한다. 치환된 값 안의 {…}는 다시 치환되지 않는다. */

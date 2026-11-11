@@ -66,7 +66,14 @@ export function recognizeJapaneseSpeech(): Promise<string> {
       const transcript = event.results[0]?.[0]?.transcript ?? '';
       resolve(transcript);
     };
+    // 이전 인식의 늦은 종료 신호가 새로 시작한 인식의 취소 핸들을 지우지 않게, 자기 자신일 때만 비운다.
+    const clearIfActive = () => {
+      if (activeRecognition === recognition) {
+        activeRecognition = null;
+      }
+    };
     recognition.onerror = (event) => {
+      clearIfActive();
       reject(
         event.error === 'aborted'
           ? new SpeechCancelledError()
@@ -75,10 +82,15 @@ export function recognizeJapaneseSpeech(): Promise<string> {
     };
     // 결과 없이 끝난 경우에도 대기 중인 Promise가 영원히 남지 않게 한다(이미 처리됐으면 무시된다).
     recognition.onend = () => {
-      activeRecognition = null;
+      clearIfActive();
       reject(new SpeechCancelledError());
     };
     activeRecognition = recognition;
-    recognition.start();
+    try {
+      recognition.start();
+    } catch {
+      clearIfActive();
+      reject(new Error('음성 인식을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.'));
+    }
   });
 }

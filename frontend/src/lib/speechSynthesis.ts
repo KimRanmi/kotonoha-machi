@@ -5,6 +5,12 @@ function isBrowserVoiceSupported(): boolean {
   return 'speechSynthesis' in window;
 }
 
+/** 브라우저 내장 음성의 높낮이(pitch, 0~2)와 속도(rate)로 만드는 목소리. 주민마다 다르게 준다. */
+export interface VoiceProfile {
+  pitch: number;
+  rate: number;
+}
+
 /** 브라우저 내장 음성의 속도. 학습용이라 기본(1.0)보다 천천히 읽는다. */
 const BROWSER_VOICE_RATE = 0.75;
 
@@ -47,7 +53,7 @@ export function stopSpeaking(): void {
 }
 
 /** 브라우저에 내장된 음성으로 읽어 준다. 서버 음성을 쓸 수 없을 때 대신 쓴다. */
-function speakWithBrowserVoice(text: string): void {
+function speakWithBrowserVoice(text: string, voice?: VoiceProfile): void {
   if (!isBrowserVoiceSupported()) {
     return;
   }
@@ -55,7 +61,8 @@ function speakWithBrowserVoice(text: string): void {
   const synthesis = window.speechSynthesis;
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'ja-JP';
-  utterance.rate = BROWSER_VOICE_RATE;
+  utterance.rate = voice?.rate ?? BROWSER_VOICE_RATE;
+  utterance.pitch = voice?.pitch ?? 1;
   const clearCurrent = () => {
     if (currentUtterance === utterance) {
       currentUtterance = null;
@@ -95,10 +102,18 @@ function loadAudioUrl(text: string): Promise<string> {
  * 텍스트를 일본어 음성으로 읽어 준다. 백엔드의 Google 음성을 우선 쓰고, 받아오지 못하면(키 없음, 횟수
  * 초과, 로그인 만료, 네트워크 오류 등) 브라우저 내장 음성으로 대신 읽는다. 새로 읽기 시작하면 재생 중인
  * 음성은 끊긴다.
+ *
+ * `voice`를 주면 목소리를 직접 정해야 하므로 서버 음성(높낮이를 바꿀 수 없다)을 건너뛰고 브라우저 내장
+ * 음성에 그 높낮이·속도를 적용해 읽는다. 주민마다 다른 목소리를 낼 때 쓴다.
  */
-export function speakJapanese(text: string): void {
+export function speakJapanese(text: string, voice?: VoiceProfile): void {
   stopSpeaking();
   const requestId = latestRequestId;
+
+  if (voice) {
+    speakWithBrowserVoice(text, voice);
+    return;
+  }
 
   loadAudioUrl(text)
     .then((url) => {
