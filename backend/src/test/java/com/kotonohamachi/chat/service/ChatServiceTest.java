@@ -63,14 +63,26 @@ class ChatServiceTest {
   }
 
   @Test
-  void chat_null_공백_메시지는_400으로_거부한다() {
+  void chat_null_공백_메시지는_다시_말해_달라는_안내를_돌려주고_기록하지_않는다() {
+    Resident resident = mock(Resident.class);
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     for (String bad : new String[] {null, "", "   ", "\n\t"}) {
-      ApiException exception =
-          catchThrowableOfType(ApiException.class, () -> chatService.chat(1L, "r01", bad));
+      ChatResponse response = chatService.chat(1L, "r01", bad);
 
-      assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.translation()).isEqualTo("다시 말씀해주세요.");
     }
     verify(geminiClient, never()).generate(any(), any());
+    verify(chatMessageRepository, never()).saveAll(any());
+  }
+
+  @Test
+  void chat_빈_메시지여도_없는_주민이면_404다() {
+    when(residentRepository.findBySlug("r99")).thenReturn(Optional.empty());
+
+    ApiException exception =
+        catchThrowableOfType(ApiException.class, () -> chatService.chat(1L, "r99", null));
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
   }
 
   @Test

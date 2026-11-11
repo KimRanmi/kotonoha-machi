@@ -34,16 +34,17 @@ public class ChatController {
    *
    * @param authentication 현재 요청의 인증 정보
    * @param residentSlug 대화할 주민의 고유 키(예: r01)
-   * @param request 플레이어의 메시지
+   * @param request 플레이어의 메시지(본문이 없어도 된다)
    * @return 주민의 일본어 대사와 한국어 번역
    */
   @PostMapping("/api/residents/{residentSlug}/chat")
   public ChatResponse chat(
       Authentication authentication,
       @PathVariable String residentSlug,
-      @RequestBody ChatRequest request) {
+      @RequestBody(required = false) ChatRequest request) {
     User user = AuthPrincipal.resolve(authentication);
-    return chatService.chat(user.getId(), residentSlug, request.message());
+    String message = request == null ? null : request.message();
+    return chatService.chat(user.getId(), residentSlug, message);
   }
 
   /**
