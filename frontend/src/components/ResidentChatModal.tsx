@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError } from '../api/client';
-import { sendChatMessage } from '../api/chat';
+import { getChatHistory, sendChatMessage } from '../api/chat';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { cancelSpeechRecognition } from '../lib/speechRecognition';
 import { speakJapanese, stopSpeaking } from '../lib/speechSynthesis';
@@ -52,6 +52,31 @@ function ResidentChatModal({ residentSlug, residentName, voice, onClose }: Resid
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  // 열 때 이전에 나눈 대화를 불러온다. 불러오는 사이 새로 보낸 말은 그 뒤에 이어 붙는다.
+  useEffect(() => {
+    let cancelled = false;
+    getChatHistory(residentSlug)
+      .then((history) => {
+        if (cancelled) {
+          return;
+        }
+        const past: ChatLine[] = history.map((item) => ({
+          speaker: item.speaker === 'PLAYER' ? 'me' : 'resident',
+          text: item.text,
+          translation: item.translation ?? undefined,
+        }));
+        setLines((previous) => [...past, ...previous]);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setErrorMessage('이전 대화를 불러오지 못했습니다.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [residentSlug]);
 
   // 대화창을 닫으면 읽던 주민 음성을 멈추고, 이후 도착하는 답장은 읽지 않는다(마이크 인식은 훅이 멈춘다).
   useEffect(() => {

@@ -9,12 +9,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.kotonohamachi.chat.ChatMessage;
+import com.kotonohamachi.chat.ChatSpeaker;
+import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatResponse;
+import com.kotonohamachi.chat.repository.ChatMessageRepository;
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.resident.Resident;
 import com.kotonohamachi.resident.ResidentFriendship;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,13 +40,17 @@ class ChatServiceTest {
   private ResidentFriendshipRepository friendshipRepository;
 
   @Mock
+  private ChatMessageRepository chatMessageRepository;
+
+  @Mock
   private GeminiClient geminiClient;
 
   private ChatService chatService;
 
   @BeforeEach
   void setUp() {
-    chatService = new ChatService(residentRepository, friendshipRepository, geminiClient);
+    chatService = new ChatService(
+        residentRepository, friendshipRepository, chatMessageRepository, geminiClient);
   }
 
   private Resident resident() {
@@ -240,5 +249,64 @@ class ChatServiceTest {
 
     assertThat(prompt.getValue()).contains("예시 대사: {friendshipLevel}");
     assertThat(prompt.getValue()).doesNotContain("こんにちは");
+  }
+
+  @Test
+  void chat_대답을_받으면_플레이어의_말과_주민의_대답을_함께_저장한다() {
+    Resident resident = resident();
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
+    when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
+    when(geminiClient.generate(any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+
+    chatService.chat(1L, "r01", " こんにちは ");
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<ChatMessage>> saved = ArgumentCaptor.forClass(List.class);
+    verify(chatMessageRepository).saveAll(saved.capture());
+    assertThat(saved.getValue()).hasSize(2);
+    assertThat(saved.getValue().get(0).getSpeaker()).isEqualTo(ChatSpeaker.PLAYER);
+    assertThat(saved.getValue().get(0).getText()).isEqualTo("こんにちは");
+    assertThat(saved.getValue().get(1).getSpeaker()).isEqualTo(ChatSpeaker.RESIDENT);
+    assertThat(saved.getValue().get(1).getText()).isEqualTo("やあ");
+    assertThat(saved.getValue().get(1).getTranslation()).isEqualTo("안녕");
+  }
+
+  @Test
+  void chat_대답을_못_받으면_아무것도_저장하지_않는다() {
+    Resident resident = resident();
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
+    when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
+    when(geminiClient.generate(any(), any())).thenThrow(new IllegalStateException("fail"));
+
+    catchThrowableOfType(IllegalStateException.class, () -> chatService.chat(1L, "r01", "やあ"));
+
+    verify(chatMessageRepository, never()).saveAll(any());
+  }
+
+  @Test
+  void history_최신순으로_받은_기록을_오래된_순으로_뒤집어_돌려준다() {
+    Resident resident = mock(Resident.class);
+    when(resident.getId()).thenReturn(1L);
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
+    when(chatMessageRepository.findTop50ByUserIdAndResidentIdOrderByIdDesc(1L, 1L))
+        .thenReturn(List.of(
+            ChatMessage.fromResident(1L, 1L, "やあ", "안녕"), ChatMessage.fromPlayer(1L, 1L, "こんにちは")));
+
+    List<ChatHistoryItem> history = chatService.history(1L, "r01");
+
+    assertThat(history)
+        .containsExactly(
+            new ChatHistoryItem(ChatSpeaker.PLAYER, "こんにちは", null),
+            new ChatHistoryItem(ChatSpeaker.RESIDENT, "やあ", "안녕"));
+  }
+
+  @Test
+  void history_주민이_없으면_404로_거부한다() {
+    when(residentRepository.findBySlug("r99")).thenReturn(Optional.empty());
+
+    ApiException exception =
+        catchThrowableOfType(ApiException.class, () -> chatService.history(1L, "r99"));
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
   }
 }

@@ -14,3 +14,16 @@ export async function sendChatMessage(residentSlug: string, message: string): Pr
   });
   return response.json();
 }
+
+/** 저장된 대화 한 줄. 주민 대사에만 한국어 번역이 있다. */
+export interface ChatHistoryItem {
+  speaker: 'PLAYER' | 'RESIDENT';
+  text: string;
+  translation: string | null;
+}
+
+/** 주민(slug)과 나눈 최근 대화를 오래된 순으로 가져온다. */
+export async function getChatHistory(residentSlug: string): Promise<ChatHistoryItem[]> {
+  const response = await apiFetch(`/api/residents/${encodeURIComponent(residentSlug)}/chat`);
+  return response.json();
+}
