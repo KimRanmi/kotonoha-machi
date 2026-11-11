@@ -4,12 +4,15 @@ import com.kotonohamachi.chat.ChatErrorCode;
 import com.kotonohamachi.chat.ChatMessage;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatResponse;
+import com.kotonohamachi.chat.dto.ChatResultResponse;
 import com.kotonohamachi.chat.repository.ChatMessageRepository;
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.resident.Resident;
 import com.kotonohamachi.resident.ResidentFriendship;
+import com.kotonohamachi.resident.dto.FriendshipChange;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
+import com.kotonohamachi.resident.service.ResidentFriendshipService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -50,6 +53,7 @@ public class ChatService {
   private final ResidentRepository residentRepository;
   private final ResidentFriendshipRepository friendshipRepository;
   private final ChatMessageRepository chatMessageRepository;
+  private final ResidentFriendshipService friendshipService;
   private final GeminiClient geminiClient;
 
   /**
@@ -58,16 +62,19 @@ public class ChatService {
    * @param residentRepository 주민 저장소
    * @param friendshipRepository 친밀도 저장소
    * @param chatMessageRepository 대화 기록 저장소
+   * @param friendshipService 친밀도 서비스
    * @param geminiClient Gemini 클라이언트
    */
   public ChatService(
       ResidentRepository residentRepository,
       ResidentFriendshipRepository friendshipRepository,
       ChatMessageRepository chatMessageRepository,
+      ResidentFriendshipService friendshipService,
       GeminiClient geminiClient) {
     this.residentRepository = residentRepository;
     this.friendshipRepository = friendshipRepository;
     this.chatMessageRepository = chatMessageRepository;
+    this.friendshipService = friendshipService;
     this.geminiClient = geminiClient;
   }
 
@@ -77,10 +84,10 @@ public class ChatService {
    * @param userId 대화하는 사용자 ID
    * @param residentSlug 대화할 주민의 고유 키(예: r01)
    * @param message 플레이어의 메시지
-   * @return 주민의 일본어 대사와 한국어 번역(메시지가 비었으면 다시 말해 달라는 안내)
+   * @return 주민의 일본어 대사·한국어 번역과 대화 뒤의 친밀도(메시지가 비었으면 다시 말해 달라는 안내)
    * @throws ApiException 메시지가 너무 길면(400), 주민이 없으면(404), 대화할 수 없으면(502/503)
    */
-  public ChatResponse chat(Long userId, String residentSlug, String message) {
+  public ChatResultResponse chat(Long userId, String residentSlug, String message) {
     String normalizedMessage = message == null ? "" : message.strip();
     if (normalizedMessage.length() > MAX_MESSAGE_LENGTH) {
       throw new ApiException(ChatErrorCode.MESSAGE_INVALID);
@@ -88,14 +95,15 @@ public class ChatService {
     Resident resident = residentRepository
         .findBySlug(residentSlug)
         .orElseThrow(() -> new ApiException(ChatErrorCode.RESIDENT_NOT_FOUND));
-    // 말이 비었으면 Gemini를 부르지 않고 다시 말해 달라고 한다. 기록에도 남기지 않는다.
-    if (normalizedMessage.isEmpty()) {
-      return ASK_AGAIN;
-    }
     int friendshipLevel = friendshipRepository
         .findByUserIdAndResidentId(userId, resident.getId())
         .map(ResidentFriendship::getLevel)
         .orElse(0);
+
+    // 말이 비었으면 Gemini를 부르지 않고 다시 말해 달라고 한다. 기록·친밀도 상승도 없다.
+    if (normalizedMessage.isEmpty()) {
+      return new ChatResultResponse(ASK_AGAIN.reply(), ASK_AGAIN.translation(), friendshipLevel, 0);
+    }
 
     String systemPrompt = fillTemplate(Map.of(
         "villagerName", resident.getName(),
@@ -109,7 +117,10 @@ public class ChatService {
         ChatMessage.fromPlayer(userId, resident.getId(), normalizedMessage),
         ChatMessage.fromResident(
             userId, resident.getId(), response.reply(), response.translation())));
-    return response;
+    // 대답까지 받은 대화만 친밀도에 반영한다.
+    FriendshipChange friendship = friendshipService.recordChat(userId, resident);
+    return new ChatResultResponse(
+        response.reply(), response.translation(), friendship.level(), friendship.gain());
   }
 
   /**

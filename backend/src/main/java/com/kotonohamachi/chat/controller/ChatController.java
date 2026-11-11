@@ -3,7 +3,7 @@ package com.kotonohamachi.chat.controller;
 import com.kotonohamachi.auth.service.AuthPrincipal;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatRequest;
-import com.kotonohamachi.chat.dto.ChatResponse;
+import com.kotonohamachi.chat.dto.ChatResultResponse;
 import com.kotonohamachi.chat.service.ChatService;
 import com.kotonohamachi.user.User;
 import java.util.List;
@@ -35,10 +35,10 @@ public class ChatController {
    * @param authentication 현재 요청의 인증 정보
    * @param residentSlug 대화할 주민의 고유 키(예: r01)
    * @param request 플레이어의 메시지(본문이 없어도 된다)
-   * @return 주민의 일본어 대사와 한국어 번역
+   * @return 주민의 일본어 대사·한국어 번역과 대화 뒤의 친밀도
    */
   @PostMapping("/api/residents/{residentSlug}/chat")
-  public ChatResponse chat(
+  public ChatResultResponse chat(
       Authentication authentication,
       @PathVariable String residentSlug,
       @RequestBody(required = false) ChatRequest request) {

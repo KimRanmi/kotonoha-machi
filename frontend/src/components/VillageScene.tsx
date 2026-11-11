@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { VillageBuilding, VillageMap, VillagePosition } from '../api/village';
+import type { Friendships } from '../api/resident';
 import type { Avatar } from '../api/user';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
@@ -13,6 +14,7 @@ import {
   WALK_SPEED,
   createResidentModel,
   disposeResidentModel,
+  type ResidentModel,
 } from '../lib/sceneCommon';
 import { collidesWithBuildings, findDoorAt } from '../lib/villageBuildings';
 import { collidesWithResidents, placeResidents } from '../lib/villageResidents';
@@ -37,6 +39,8 @@ interface VillageSceneProps {
   initialPosition: VillagePosition | null;
   /** 캐릭터가 서 있는 자리가 바뀔 때마다(시작할 때 포함) 호출된다. 저장은 호출하는 쪽이 맡는다. */
   onPositionChange: (position: VillagePosition) => void;
+  /** 주민(slug)별 친밀도. 이름표 하트에 반영되며, 바뀌어도 장면을 다시 만들지 않고 하트만 다시 그린다. */
+  friendships: Friendships;
 }
 
 const GROUND_SCALE = 2.5; // 눈에 보이는 풀밭의 절반 크기 = 이동 가능한 땅의 절반 크기 × 이 값. 화면 어디를 봐도 땅이 보이게 훨씬 크게 잡는다
@@ -74,6 +78,7 @@ function VillageScene({
   onNearBuildingChange,
   initialPosition,
   onPositionChange,
+  friendships,
 }: VillageSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // 장면은 avatar/palette/buildings/map이 바뀔 때만 다시 만들고, 입장 콜백은 최신 값을 ref로 읽는다.
@@ -96,6 +101,15 @@ function VillageScene({
   }, [onPositionChange]);
   // 시작 위치는 장면을 만들 때 한 번만 쓰므로 ref에 담아 두고, 값이 바뀌어도 장면을 다시 만들지 않는다.
   const initialPositionRef = useRef(initialPosition);
+  // 하트는 장면 안의 주민 이름표에 그려진다. 장면을 만들 때 최신 친밀도를 읽고, 이후 변화는 아래 효과가 반영한다.
+  const friendshipsRef = useRef(friendships);
+  const residentModelsRef = useRef(new Map<string, ResidentModel>());
+  useEffect(() => {
+    friendshipsRef.current = friendships;
+    residentModelsRef.current.forEach((residentModel, slug) =>
+      residentModel.setFriendship(friendships[slug] ?? 0),
+    );
+  }, [friendships]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -147,9 +161,14 @@ function VillageScene({
     // 건물에 속하지 않은 주민만 마을 길 위에 서서 남쪽(화면 아래)을 바라본다. 건물 소속 주민은 건물 안에 있다.
     // 장면이 사라질 때 정리할 수 있게 목록으로 들고 있는다.
     const residentModels = residents.map((resident) => {
-      const residentModel = createResidentModel(resident, palette);
+      const residentModel = createResidentModel(
+        resident,
+        palette,
+        friendshipsRef.current[resident.slug] ?? 0,
+      );
       residentModel.model.position.set(resident.x, 0, resident.z);
       scene.add(residentModel.model);
+      residentModelsRef.current.set(resident.slug, residentModel);
       return residentModel;
     });
 
@@ -315,6 +334,7 @@ function VillageScene({
       window.removeEventListener('blur', handleBlur);
       disposeAvatarModel(player);
       residentModels.forEach(disposeResidentModel);
+      residentModelsRef.current.clear();
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();
       groundTexture.dispose();

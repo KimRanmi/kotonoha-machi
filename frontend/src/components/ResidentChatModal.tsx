@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { CSSProperties, FormEvent } from 'react';
 import { ApiError } from '../api/client';
 import { getChatHistory, sendChatMessage } from '../api/chat';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -23,15 +23,28 @@ interface ResidentChatModalProps {
   residentName: string;
   /** 주민 답장을 읽을 때의 목소리. */
   voice: VoiceProfile;
+  /** 지금 친밀도(0~100). 헤더의 하트에 보인다. */
+  friendshipLevel: number;
+  /** 대화로 친밀도가 바뀌면 새 값을 알린다. */
+  onFriendshipChange: (residentSlug: string, level: number) => void;
   onClose: () => void;
 }
 
 /** 마을 화면 위에 겹쳐 뜨는 주민 대화창. */
-function ResidentChatModal({ residentSlug, residentName, voice, onClose }: ResidentChatModalProps) {
+function ResidentChatModal({
+  residentSlug,
+  residentName,
+  voice,
+  friendshipLevel,
+  onFriendshipChange,
+  onClose,
+}: ResidentChatModalProps) {
   const [text, setText] = useState('');
   const [lines, setLines] = useState<ChatLine[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // 마지막 대답으로 오른 친밀도. 0이면 보여 주지 않는다.
+  const [friendshipGain, setFriendshipGain] = useState(0);
   // 기록 불러오기 상태는 전송 오류와 따로 둔다(서로 덮어쓰지 않게).
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
@@ -105,6 +118,7 @@ function ResidentChatModal({ residentSlug, residentName, voice, onClose }: Resid
     isSendingRef.current = true;
     setIsSending(true);
     setErrorMessage(null);
+    setFriendshipGain(0);
     clearSpeechError();
     // 듣는 중에 직접 보냈다면 마이크를 끄고, 답장 음성이 마이크로 들어가지 않게 한다.
     cancelSpeechRecognition();
@@ -119,6 +133,8 @@ function ResidentChatModal({ residentSlug, residentName, voice, onClose }: Resid
         ...previous,
         { speaker: 'resident', text: answer.reply, translation: answer.translation },
       ]);
+      onFriendshipChange(residentSlug, answer.friendshipLevel);
+      setFriendshipGain(answer.friendshipGain);
       speakJapanese(answer.reply, voice);
     } catch (error) {
       setErrorMessage(
@@ -161,6 +177,22 @@ function ResidentChatModal({ residentSlug, residentName, voice, onClose }: Resid
       >
         <header className={styles.header}>
           <h2 className={styles.title}>{residentName}</h2>
+          <span
+            className={styles.friendship}
+            role="img"
+            aria-label={`친밀도 ${friendshipLevel} / 100`}
+            title={`친밀도 ${friendshipLevel} / 100`}
+          >
+            <span
+              className={styles.heart}
+              style={{ '--fill': `${friendshipLevel}%` } as CSSProperties}
+              aria-hidden="true"
+            >
+              ♥
+            </span>
+            <span className={styles.friendshipLevel}>{friendshipLevel}</span>
+            {friendshipGain > 0 && <span className={styles.friendshipGain}>+{friendshipGain}</span>}
+          </span>
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="닫기">
             ✕
           </button>

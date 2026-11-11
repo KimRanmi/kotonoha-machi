@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { Avatar } from '../api/user';
+import type { Friendships } from '../api/resident';
 import { createAvatarModel, disposeAvatarModel } from '../lib/avatarModel';
 import type { AvatarPalette } from '../lib/avatarPreview';
 import { createInteriorRoom } from '../lib/buildingInterior3d';
@@ -22,6 +23,7 @@ import {
   WALK_SPEED,
   createResidentModel,
   disposeResidentModel,
+  type ResidentModel,
 } from '../lib/sceneCommon';
 import { PLAYER_RADIUS } from '../lib/villageBuildings';
 import { RESIDENT_RADIUS, type VillageResident } from '../lib/villageResidents';
@@ -38,6 +40,8 @@ interface InteriorSceneProps {
   onNearResidentChange: (residentSlug: string | null) => void;
   /** 현관 매트 위에 서 있는지. 바뀔 때만 호출된다. */
   onNearExitChange: (near: boolean) => void;
+  /** 주민(slug)별 친밀도. 이름표 하트에 반영되며, 바뀌어도 장면을 다시 만들지 않고 하트만 다시 그린다. */
+  friendships: Friendships;
 }
 
 const VIEW_HEIGHT = 9; // 화면에 세로로 보이는 월드 길이(직교 카메라). 마을(18)보다 가까이서 봐 방이 화면을 채운다
@@ -58,6 +62,7 @@ function InteriorScene({
   residents,
   onNearResidentChange,
   onNearExitChange,
+  friendships,
 }: InteriorSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // 장면은 avatar/palette/interior/residents가 바뀔 때만 다시 만들고, 콜백은 최신 값을 ref로 읽는다.
@@ -65,6 +70,15 @@ function InteriorScene({
   useEffect(() => {
     onNearResidentRef.current = onNearResidentChange;
   }, [onNearResidentChange]);
+  // 하트는 장면 안의 주민 이름표에 그려진다. 장면을 만들 때 최신 친밀도를 읽고, 이후 변화는 아래 효과가 반영한다.
+  const friendshipsRef = useRef(friendships);
+  const residentModelsRef = useRef(new Map<string, ResidentModel>());
+  useEffect(() => {
+    friendshipsRef.current = friendships;
+    residentModelsRef.current.forEach((residentModel, slug) =>
+      residentModel.setFriendship(friendships[slug] ?? 0),
+    );
+  }, [friendships]);
   const onNearExitRef = useRef(onNearExitChange);
   useEffect(() => {
     onNearExitRef.current = onNearExitChange;
@@ -106,7 +120,12 @@ function InteriorScene({
 
     // 주민은 정해진 자리에 서서 현관 쪽을 바라본다. 체형·소품은 마을과 같이 입힌다.
     const residentModels = standing.map(({ resident, spot }) => {
-      const residentModel = createResidentModel(resident, palette);
+      const residentModel = createResidentModel(
+        resident,
+        palette,
+        friendshipsRef.current[resident.slug] ?? 0,
+      );
+      residentModelsRef.current.set(resident.slug, residentModel);
       residentModel.model.position.set(spot.x, 0, spot.z);
       residentModel.model.rotation.y = Math.atan2(
         ROOM_ENTRANCE.x - spot.x,
@@ -250,6 +269,7 @@ function InteriorScene({
       window.removeEventListener('blur', handleBlur);
       disposeAvatarModel(player);
       residentModels.forEach(disposeResidentModel);
+      residentModelsRef.current.clear();
       room.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
