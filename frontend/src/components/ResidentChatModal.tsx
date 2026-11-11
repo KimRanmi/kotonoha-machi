@@ -4,6 +4,7 @@ import { ApiError } from '../api/client';
 import { sendChatMessage } from '../api/chat';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { speakJapanese, stopSpeaking } from '../lib/speechSynthesis';
+import { VILLAGE_RESIDENTS } from '../lib/villageResidents';
 import JapaneseInput from './JapaneseInput';
 import styles from './ResidentChatModal.module.css';
 
@@ -64,7 +65,8 @@ function ResidentChatModal({ residentSlug, residentName, onClose }: ResidentChat
         ...previous,
         { speaker: 'resident', text: answer.reply, translation: answer.translation },
       ]);
-      speakJapanese(answer.reply);
+      const voice = VILLAGE_RESIDENTS.find((resident) => resident.slug === residentSlug)?.voice;
+      speakJapanese(answer.reply, voice);
     } catch (error) {
       setErrorMessage(
         error instanceof ApiError
