@@ -8,7 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /** 사용자와 주민이 나눈 대화 한 줄. */
 @Entity
@@ -36,7 +36,7 @@ public class ChatMessage {
   private String translation;
 
   @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-  private LocalDateTime createdAt;
+  private OffsetDateTime createdAt;
 
   /** JPA가 엔티티를 만들 때 사용하는 기본 생성자. */
   protected ChatMessage() {}

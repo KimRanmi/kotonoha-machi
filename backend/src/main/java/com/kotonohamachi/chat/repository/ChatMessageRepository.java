@@ -12,7 +12,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
    *
    * @param userId 사용자 ID
    * @param residentId 주민 ID
-   * @return 최신 순 대화(오래된 것이 뒤에 온다)
+   * @return 최신 순으로 정렬된 대화(첫 원소가 가장 최근 줄)
    */
   List<ChatMessage> findTop50ByUserIdAndResidentIdOrderByIdDesc(Long userId, Long residentId);
 }

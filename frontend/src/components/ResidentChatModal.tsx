@@ -32,6 +32,9 @@ function ResidentChatModal({ residentSlug, residentName, voice, onClose }: Resid
   const [lines, setLines] = useState<ChatLine[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // 기록 불러오기 상태는 전송 오류와 따로 둔다(서로 덮어쓰지 않게).
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
   const {
     isSupported: speechSupported,
     isListening,
@@ -56,6 +59,8 @@ function ResidentChatModal({ residentSlug, residentName, voice, onClose }: Resid
   // 열 때 이전에 나눈 대화를 불러온다. 불러오는 사이 새로 보낸 말은 그 뒤에 이어 붙는다.
   useEffect(() => {
     let cancelled = false;
+    setIsHistoryLoading(true);
+    setHistoryErrorMessage(null);
     getChatHistory(residentSlug)
       .then((history) => {
         if (cancelled) {
@@ -70,7 +75,12 @@ function ResidentChatModal({ residentSlug, residentName, voice, onClose }: Resid
       })
       .catch(() => {
         if (!cancelled) {
-          setErrorMessage('이전 대화를 불러오지 못했습니다.');
+          setHistoryErrorMessage('이전 대화를 불러오지 못했습니다.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsHistoryLoading(false);
         }
       });
     return () => {
@@ -163,6 +173,8 @@ function ResidentChatModal({ residentSlug, residentName, voice, onClose }: Resid
             </li>
           ))}
         </ul>
+        {isHistoryLoading && <p>이전 대화를 불러오는 중…</p>}
+        {historyErrorMessage && <p role="alert">{historyErrorMessage}</p>}
         {errorMessage && <p role="alert">{errorMessage}</p>}
         {speechErrorMessage && <p role="alert">{speechErrorMessage}</p>}
         {!speechSupported && (

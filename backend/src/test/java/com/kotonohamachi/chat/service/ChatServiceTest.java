@@ -286,13 +286,13 @@ class ChatServiceTest {
   @Test
   void history_최신순으로_받은_기록을_오래된_순으로_뒤집어_돌려준다() {
     Resident resident = mock(Resident.class);
-    when(resident.getId()).thenReturn(1L);
+    when(resident.getId()).thenReturn(2L);
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
-    when(chatMessageRepository.findTop50ByUserIdAndResidentIdOrderByIdDesc(1L, 1L))
+    when(chatMessageRepository.findTop50ByUserIdAndResidentIdOrderByIdDesc(7L, 2L))
         .thenReturn(List.of(
             ChatMessage.fromResident(1L, 1L, "やあ", "안녕"), ChatMessage.fromPlayer(1L, 1L, "こんにちは")));
 
-    List<ChatHistoryItem> history = chatService.history(1L, "r01");
+    List<ChatHistoryItem> history = chatService.history(7L, "r01");
 
     assertThat(history)
         .containsExactly(

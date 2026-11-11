@@ -955,3 +955,7 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   `GET /api/residents/{slug}/chat`이 최근 50줄을 오래된 순으로 주고, 대화창을 열 때 불러와 보여 준다.
   - 검증: 백엔드 `spotlessApply`·`test` 통과(서비스 단위 테스트 4개 추가: 저장, 실패 시 미저장, 순서 뒤집기, 주민 없음 404), 프런트 `prettier`·`lint`·`build` 통과.
   - 확인 못 한 것: 실제 화면과 새 GET 엔드포인트의 컨트롤러 통합 테스트(없음). 마이그레이션은 Testcontainers 통합 테스트로 적용됨.
+- 대화 기록 코드 리뷰를 반영했다. `created_at`을 다른 테이블처럼 `TIMESTAMPTZ`·`OffsetDateTime`으로 맞췄다(이미 적용했을 수 있는 `V30`은 건드리지 않고 `V31`로 바꿈). `ChatControllerIntegrationTest`를 추가해 비로그인 401, 없는 주민 404, 오래된 순 저장·조회, 사용자 간 기록 격리를 실제 Postgres로 확인한다.
+  모달은 기록 불러오기 오류를 전송 오류와 따로 보이고 불러오는 동안 안내를 보인다.
+  - 검증: 백엔드 `spotlessApply`·`test`, 프런트 `prettier`·`lint`·`build` 통과.
+  - 확인 못 한 것: 실제 화면.
