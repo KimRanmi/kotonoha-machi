@@ -109,7 +109,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r08',
     name: 'ゲンゾウ',
-    voice: { pitch: 0.5, rate: 0.6 },
+    voice: { pitch: 0.5, rate: 0.85 },
     avatar: look('TAN', 'GRAY', 'SHORT', 'OVERALLS', 'MINT'),
     build: { height: 0.82, width: 1.0 },
     accessories: [accessory('strawHat'), accessory('beard')],
@@ -184,7 +184,7 @@ export const VILLAGE_RESIDENTS: VillageResident[] = [
   {
     slug: 'r17',
     name: 'カツラ',
-    voice: { pitch: 0.7, rate: 0.6 },
+    voice: { pitch: 0.7, rate: 0.85 },
     avatar: look('FAIR', 'GRAY', 'BUNS', 'CARDIGAN', 'LAVENDER'),
     build: { height: 0.78, width: 0.95 },
     accessories: [accessory('shawl')],
