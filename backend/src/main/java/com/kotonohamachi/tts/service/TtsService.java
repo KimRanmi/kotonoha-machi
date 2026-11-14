@@ -26,6 +26,7 @@ public class TtsService {
   private static final Logger log = LoggerFactory.getLogger(TtsService.class);
   static final int MAX_TEXT_LENGTH = 300;
   static final int DAILY_SYNTHESIS_LIMIT = 200;
+  static final double MAX_SEMITONES = 3.0;
   private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
   private final TtsAudioRepository ttsAudioRepository;
@@ -119,10 +120,15 @@ public class TtsService {
         .orElse(voice);
   }
 
-  /** 높낮이 배율(0.5~2.0)을 반음 단위로 바꾼다. 같은 소리가 여러 번 저장되지 않게 0.5 단위로 맞춘다. */
+  /**
+   * 높낮이 배율(0.5~2.0)을 반음 단위로 바꾸고 ±{@value #MAX_SEMITONES}반음 안으로 제한한다. Google 음성은 높낮이를 크게
+   * 바꾸면 소리가 갈라지거나 끊겨서, 주민별 차이는 속도와 남녀 음성으로 내고 높낮이는 조금만 준다. 같은 소리가 여러 번
+   * 저장되지 않게 0.5 단위로 맞춘다.
+   */
   static double toSemitones(double pitch) {
     double clamped = Math.max(0.5, Math.min(2.0, pitch));
-    return Math.round(12 * Math.log(clamped) / Math.log(2) * 2) / 2.0;
+    double semitones = Math.round(12 * Math.log(clamped) / Math.log(2) * 2) / 2.0;
+    return Math.max(-MAX_SEMITONES, Math.min(MAX_SEMITONES, semitones));
   }
 
   /** 속도 배율을 0.5~2.0으로 제한하고 0.05 단위로 맞춘다. */

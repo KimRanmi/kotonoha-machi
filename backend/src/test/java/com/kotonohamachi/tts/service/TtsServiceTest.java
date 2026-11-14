@@ -215,9 +215,9 @@ class TtsServiceTest {
 
     ttsService.getAudio(1L, "やあ", null, 2.0, 1.01);
 
-    verify(googleTtsClient).synthesize("やあ", VOICE, 1.0, 12.0);
+    verify(googleTtsClient).synthesize("やあ", VOICE, 1.0, 3.0);
     // 조회에 쓴 키가 저장 키와 같다.
-    verify(ttsAudioRepository).findByVoiceAndText(VOICE + "|p12.0|r1.0", "やあ");
+    verify(ttsAudioRepository).findByVoiceAndText(VOICE + "|p3.0|r1.0", "やあ");
   }
 
   @Test
@@ -230,12 +230,18 @@ class TtsServiceTest {
   }
 
   @Test
-  void toSemitones_배율을_반음으로_바꾸고_범위를_제한한다() {
-    assertThat(TtsService.toSemitones(2.0)).isEqualTo(12.0);
-    assertThat(TtsService.toSemitones(0.5)).isEqualTo(-12.0);
+  void toSemitones_큰_배율은_3반음으로_잘린다() {
+    assertThat(TtsService.toSemitones(2.0)).isEqualTo(TtsService.MAX_SEMITONES).isEqualTo(3.0);
+    assertThat(TtsService.toSemitones(0.5)).isEqualTo(-3.0);
+    assertThat(TtsService.toSemitones(10.0)).isEqualTo(3.0);
+    assertThat(TtsService.toSemitones(0.01)).isEqualTo(-3.0);
+  }
+
+  @Test
+  void toSemitones_작은_배율_차이는_0점5_단위로_그대로_바뀐다() {
     assertThat(TtsService.toSemitones(1.0)).isEqualTo(0.0);
-    assertThat(TtsService.toSemitones(10.0)).isEqualTo(12.0);
-    assertThat(TtsService.toSemitones(0.01)).isEqualTo(-12.0);
+    assertThat(TtsService.toSemitones(1.1)).isEqualTo(1.5);
+    assertThat(TtsService.toSemitones(0.9)).isEqualTo(-2.0);
   }
 
   @Test
