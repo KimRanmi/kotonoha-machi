@@ -3,12 +3,15 @@ package com.kotonohamachi.tts.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.kotonohamachi.common.ApiException;
+import com.kotonohamachi.resident.Resident;
+import com.kotonohamachi.resident.repository.ResidentRepository;
 import com.kotonohamachi.tts.TtsAudio;
 import com.kotonohamachi.tts.TtsErrorCode;
 import com.kotonohamachi.tts.repository.TtsAudioRepository;
@@ -30,6 +33,8 @@ import org.springframework.http.HttpStatus;
 class TtsServiceTest {
 
   private static final String VOICE = "ja-JP-Neural2-B";
+  private static final String FEMALE = "ja-JP-Neural2-B-female";
+  private static final String MALE = "ja-JP-Neural2-C-male";
 
   @Mock
   private TtsAudioRepository ttsAudioRepository;
@@ -37,11 +42,15 @@ class TtsServiceTest {
   @Mock
   private GoogleTtsClient googleTtsClient;
 
+  @Mock
+  private ResidentRepository residentRepository;
+
   private TtsService ttsService;
 
   @BeforeEach
   void setUp() {
-    ttsService = new TtsService(ttsAudioRepository, googleTtsClient, VOICE);
+    ttsService = new TtsService(
+        ttsAudioRepository, googleTtsClient, residentRepository, VOICE, FEMALE, MALE);
   }
 
   @Test
@@ -53,14 +62,14 @@ class TtsServiceTest {
     byte[] result = ttsService.getAudio(1L, "こんにちは");
 
     assertThat(result).isEqualTo(saved);
-    verify(googleTtsClient, never()).synthesize(any(), any());
+    verify(googleTtsClient, never()).synthesize(any(), any(), anyDouble(), anyDouble());
   }
 
   @Test
   void getAudio_저장된_음성이_없으면_합성해서_저장한다() {
     byte[] synthesized = {4, 5, 6};
     when(ttsAudioRepository.findByVoiceAndText(VOICE, "ありがとう")).thenReturn(Optional.empty());
-    when(googleTtsClient.synthesize("ありがとう", VOICE)).thenReturn(synthesized);
+    when(googleTtsClient.synthesize("ありがとう", VOICE, 1.0, 0.0)).thenReturn(synthesized);
 
     byte[] result = ttsService.getAudio(1L, "ありがとう");
 
@@ -88,13 +97,13 @@ class TtsServiceTest {
 
     assertThat(blank.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(tooLong.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-    verify(googleTtsClient, never()).synthesize(any(), any());
+    verify(googleTtsClient, never()).synthesize(any(), any(), anyDouble(), anyDouble());
   }
 
   @Test
   void getAudio_합성에_실패하면_하루_횟수를_차감하지_않는다() {
     when(ttsAudioRepository.findByVoiceAndText(any(), any())).thenReturn(Optional.empty());
-    when(googleTtsClient.synthesize(any(), any()))
+    when(googleTtsClient.synthesize(any(), any(), anyDouble(), anyDouble()))
         .thenThrow(new ApiException(TtsErrorCode.UNAVAILABLE));
 
     for (int i = 0; i < TtsService.DAILY_SYNTHESIS_LIMIT + 5; i++) {
@@ -107,7 +116,8 @@ class TtsServiceTest {
   @Test
   void getAudio_같은_사용자가_동시에_요청해도_하루_한도를_넘지_못한다() throws Exception {
     when(ttsAudioRepository.findByVoiceAndText(any(), any())).thenReturn(Optional.empty());
-    when(googleTtsClient.synthesize(any(), any())).thenReturn(new byte[] {1});
+    when(googleTtsClient.synthesize(any(), any(), anyDouble(), anyDouble()))
+        .thenReturn(new byte[] {1});
     int requestCount = TtsService.DAILY_SYNTHESIS_LIMIT + 50;
     ExecutorService executor = Executors.newFixedThreadPool(16);
 
@@ -132,13 +142,15 @@ class TtsServiceTest {
     executor.shutdown();
 
     assertThat(succeeded).isEqualTo(TtsService.DAILY_SYNTHESIS_LIMIT);
-    verify(googleTtsClient, times(TtsService.DAILY_SYNTHESIS_LIMIT)).synthesize(any(), any());
+    verify(googleTtsClient, times(TtsService.DAILY_SYNTHESIS_LIMIT))
+        .synthesize(any(), any(), anyDouble(), anyDouble());
   }
 
   @Test
   void getAudio_하루_합성_횟수를_넘으면_거부한다() {
     when(ttsAudioRepository.findByVoiceAndText(any(), any())).thenReturn(Optional.empty());
-    when(googleTtsClient.synthesize(any(), any())).thenReturn(new byte[] {1});
+    when(googleTtsClient.synthesize(any(), any(), anyDouble(), anyDouble()))
+        .thenReturn(new byte[] {1});
 
     for (int i = 0; i < TtsService.DAILY_SYNTHESIS_LIMIT; i++) {
       ttsService.getAudio(1L, "文" + i);
@@ -147,6 +159,90 @@ class TtsServiceTest {
         catchThrowableOfType(ApiException.class, () -> ttsService.getAudio(1L, "もう一つ"));
 
     assertThat(exceeded.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-    verify(googleTtsClient, times(TtsService.DAILY_SYNTHESIS_LIMIT)).synthesize(any(), any());
+    verify(googleTtsClient, times(TtsService.DAILY_SYNTHESIS_LIMIT))
+        .synthesize(any(), any(), anyDouble(), anyDouble());
+  }
+
+  private void stubResident(String slug, String gender) {
+    Resident resident = org.mockito.Mockito.mock(Resident.class);
+    when(resident.getGender()).thenReturn(gender);
+    when(residentRepository.findBySlug(slug)).thenReturn(Optional.of(resident));
+  }
+
+  private void stubSynthesis() {
+    when(ttsAudioRepository.findByVoiceAndText(any(), any())).thenReturn(Optional.empty());
+    when(googleTtsClient.synthesize(any(), any(), anyDouble(), anyDouble()))
+        .thenReturn(new byte[] {1});
+  }
+
+  @Test
+  void getAudio_여성_주민은_여성_음성으로_합성한다() {
+    stubResident("r01", "F");
+    stubSynthesis();
+
+    ttsService.getAudio(1L, "やあ", "r01", null, null);
+
+    verify(googleTtsClient).synthesize("やあ", FEMALE, 1.0, 0.0);
+    verify(ttsAudioRepository).findByVoiceAndText(FEMALE, "やあ");
+  }
+
+  @Test
+  void getAudio_남성_주민은_남성_음성으로_합성한다() {
+    stubResident("r02", "M");
+    stubSynthesis();
+
+    ttsService.getAudio(1L, "やあ", "r02", null, null);
+
+    verify(googleTtsClient).synthesize("やあ", MALE, 1.0, 0.0);
+  }
+
+  @Test
+  void getAudio_성별이_없거나_모르는_주민이면_기본_음성이다() {
+    stubResident("r03", null);
+    when(residentRepository.findBySlug("nope")).thenReturn(Optional.empty());
+    stubSynthesis();
+
+    ttsService.getAudio(1L, "一", "r03", null, null);
+    ttsService.getAudio(1L, "二", "nope", null, null);
+
+    verify(googleTtsClient).synthesize("一", VOICE, 1.0, 0.0);
+    verify(googleTtsClient).synthesize("二", VOICE, 1.0, 0.0);
+  }
+
+  @Test
+  void getAudio_높낮이와_속도를_변환해_합성하고_저장_키에_접미를_붙인다() {
+    stubSynthesis();
+
+    ttsService.getAudio(1L, "やあ", null, 2.0, 1.01);
+
+    verify(googleTtsClient).synthesize("やあ", VOICE, 1.0, 12.0);
+    // 조회에 쓴 키가 저장 키와 같다.
+    verify(ttsAudioRepository).findByVoiceAndText(VOICE + "|p12.0|r1.0", "やあ");
+  }
+
+  @Test
+  void getAudio_조절이_없으면_저장_키는_음성_이름_그대로다() {
+    stubSynthesis();
+
+    ttsService.getAudio(1L, "やあ", null, 1.0, 1.0);
+
+    verify(ttsAudioRepository).findByVoiceAndText(VOICE, "やあ");
+  }
+
+  @Test
+  void toSemitones_배율을_반음으로_바꾸고_범위를_제한한다() {
+    assertThat(TtsService.toSemitones(2.0)).isEqualTo(12.0);
+    assertThat(TtsService.toSemitones(0.5)).isEqualTo(-12.0);
+    assertThat(TtsService.toSemitones(1.0)).isEqualTo(0.0);
+    assertThat(TtsService.toSemitones(10.0)).isEqualTo(12.0);
+    assertThat(TtsService.toSemitones(0.01)).isEqualTo(-12.0);
+  }
+
+  @Test
+  void roundRate_속도를_0점05_단위로_맞추고_범위를_제한한다() {
+    assertThat(TtsService.roundRate(1.02)).isEqualTo(1.0);
+    assertThat(TtsService.roundRate(1.23)).isEqualTo(1.25);
+    assertThat(TtsService.roundRate(9)).isEqualTo(2.0);
+    assertThat(TtsService.roundRate(0.1)).isEqualTo(0.5);
   }
 }

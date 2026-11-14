@@ -964,3 +964,8 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 검증: 백엔드 `spotlessApply`·`test`, 프런트 `prettier`·`lint`·`build` (결과는 아래 확인).
   - 확인 못 한 것: 실제 화면에서 하트가 차오르는 모습과 이름표 위치.
   - 다음 할 일: 친밀도별 말투·비밀 공개, 주민 방문 보상 여부.
+- 주민 대화의 장소·성별·말투 불일치를 고쳤다(검토 중, 테스트·실제 소리는 아직 확인 전). 프롬프트에 주민의 `location`을 넣어(편의점이면 점원으로 손님 응대) "내 집"으로 답하던 문제를 막고, 장소 유지·어색한 말 해석·성별 말투 규칙을 더했다.
+  시트의 `personality`를 MBTI로 바꾸고 1인칭·말투는 `core_features` 끝의 "말투:" 한 줄로 옮겼다. 시트에 `gender`(남/여) 열을 더해 `resident.gender`(`V34`, `M`/`F`)에 저장하고(`V35`는 import 결과), 프롬프트에 "성별"로 넣는다.
+  주민 대화 음성은 서버 Google 음성을 성별로 고르고(여 `ja-JP-Neural2-B`, 남 `C`) 주민별 높낮이·속도를 `pitch`/`speakingRate`로 연결했다(`GET /api/tts?resident&pitch&rate`). 서버 음성을 못 쓰면 브라우저 음성에 같은 값을 쓴다.
+  - 검증: 백엔드 `spotlessApply`·`compileJava`, 프런트 `prettier`·`lint`·`build` 통과. 백엔드 테스트는 `TtsService` 생성자가 바뀌어 기존 `TtsServiceTest`가 고쳐져야 한다(qa-tester).
+  - 확인 못 한 것: 실제 소리(Neural2에서 높낮이 값이 자연스러운지), 실제 대화 응답.

@@ -19,7 +19,9 @@ const MIGRATION_DIR = path.join(
 
 const FETCH_TIMEOUT_MS = 15000;
 const REQUIRED = ['id', 'name', 'personality', 'appearance_job', 'core_features'];
-const OPTIONAL = ['hobby', 'location'];
+const OPTIONAL = ['hobby', 'location', 'gender'];
+// 시트의 성별 값 -> DB 값. 목소리와 대화 말투를 정하는 데 쓴다.
+const GENDER_CODES = { 남: 'M', 여: 'F' };
 const MAX_LENGTH = { name: 50, personality: 30, background: 500, location: 30 };
 // 시트에 없는 값의 공통 기본 문장. 나중에 대화 시작 시 실제 위치로 덮어쓸 예정이다.
 const DEFAULT_CONTEXT = '마을에서 평소처럼 하루를 보내고 있다.';
@@ -110,7 +112,14 @@ function toResident(values, rowErrors) {
     background: '',
     sample_lines: '',
     location: values.location === '' ? null : values.location,
+    gender: null,
   };
+  if (values.gender !== '') {
+    resident.gender = GENDER_CODES[values.gender] ?? null;
+    if (resident.gender === null) {
+      rowErrors.push(`gender '${values.gender}'는 '남' 또는 '여'여야 한다`);
+    }
+  }
   for (const key of REQUIRED) {
     if (values[key] === '') {
       rowErrors.push(`${key}가 비어 있다`);
@@ -142,7 +151,7 @@ function toResident(values, rowErrors) {
 function validate(rows) {
   const errors = [];
   if (rows.length === 0) {
-    return { errors: ['CSV가 비어 있다.'], residents: [], includeLocation: false };
+    return { errors: ['CSV가 비어 있다.'], residents: [], includeLocation: false, includeGender: false };
   }
   const header = rows[0].map((h) => h.trim());
   const allowed = [...REQUIRED, ...OPTIONAL];
@@ -160,7 +169,7 @@ function validate(rows) {
     errors.push('헤더: 중복된 열 이름이 있다');
   }
   if (errors.length > 0) {
-    return { errors, residents: [], includeLocation: false };
+    return { errors, residents: [], includeLocation: false, includeGender: false };
   }
 
   const residents = [];
@@ -201,7 +210,12 @@ function validate(rows) {
   if (residents.length === 0) {
     errors.push('데이터 행이 0개다.');
   }
-  return { errors, residents, includeLocation: header.includes('location') };
+  return {
+    errors,
+    residents,
+    includeLocation: header.includes('location'),
+    includeGender: header.includes('gender'),
+  };
 }
 
 function nextMigrationVersion() {
@@ -216,7 +230,7 @@ function sqlEscape(value) {
   return value.replaceAll("'", "''");
 }
 
-function buildSql(residents, includeLocation) {
+function buildSql(residents, includeLocation, includeGender) {
   const columns = [
     'slug',
     'name',
@@ -229,6 +243,10 @@ function buildSql(residents, includeLocation) {
   // 시트에 location 열이 없으면 resident.location을 건드리지 않는다(있던 장소가 지워지지 않게).
   if (includeLocation) {
     columns.push('location');
+  }
+  // 성별 열도 마찬가지다.
+  if (includeGender) {
+    columns.push('gender');
   }
   const updatable = columns.filter((c) => c !== 'slug');
   const header =
@@ -251,7 +269,7 @@ function buildSql(residents, includeLocation) {
 async function main() {
   const options = parseArgs();
   const rows = parseCsv(await loadCsvText(options));
-  const { errors, residents, includeLocation } = validate(rows);
+  const { errors, residents, includeLocation, includeGender } = validate(rows);
   if (errors.length > 0) {
     console.error('검증 실패 (파일을 만들지 않았다):');
     errors.forEach((e) => console.error(`  - ${e}`));
@@ -259,7 +277,7 @@ async function main() {
   }
   const filename = `V${nextMigrationVersion()}__upsert_residents.sql`;
   const outputPath = path.join(MIGRATION_DIR, filename);
-  writeFileSync(outputPath, buildSql(residents, includeLocation), 'utf8');
+  writeFileSync(outputPath, buildSql(residents, includeLocation, includeGender), 'utf8');
   console.log(`생성: ${outputPath}`);
   console.log(`대상 slug ${residents.length}개 (이미 있으면 갱신, 없으면 추가):`);
   residents.forEach((r) => console.log(`  - ${r.slug} (${r.name})`));

@@ -32,12 +32,20 @@ public class TtsController {
    *
    * @param authentication 현재 요청의 인증 정보
    * @param text 읽어줄 일본어 문장
+   * @param resident 읽어줄 주민의 고유 키(선택). 주민 성별에 맞는 목소리를 쓴다
+   * @param pitch 높낮이 배율(선택)
+   * @param rate 속도 배율(선택)
    * @return MP3 음성
    */
   @GetMapping("/api/tts")
-  public ResponseEntity<byte[]> speak(Authentication authentication, @RequestParam String text) {
+  public ResponseEntity<byte[]> speak(
+      Authentication authentication,
+      @RequestParam String text,
+      @RequestParam(required = false) String resident,
+      @RequestParam(required = false) Double pitch,
+      @RequestParam(required = false) Double rate) {
     User user = AuthPrincipal.resolve(authentication);
-    byte[] audio = ttsService.getAudio(user.getId(), text);
+    byte[] audio = ttsService.getAudio(user.getId(), text, resident, pitch, rate);
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType("audio/mpeg"))
         .cacheControl(CacheControl.maxAge(Duration.ofDays(1)).cachePrivate())

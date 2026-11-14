@@ -47,14 +47,32 @@ public class GoogleTtsClient {
    * @throws ApiException 키가 설정되지 않았거나(503) 합성에 실패한 경우(502)
    */
   public byte[] synthesize(String text, String voiceName) {
+    return synthesize(text, voiceName, 1.0, 0.0);
+  }
+
+  /**
+   * 일본어 문장을 높낮이와 속도를 조절해 MP3로 합성한다.
+   *
+   * @param text 읽어줄 일본어 문장
+   * @param voiceName 음성 이름(예: ja-JP-Neural2-B)
+   * @param speakingRate 말하는 속도(1.0이 기본, 0.25~4.0)
+   * @param pitchSemitones 음높이 변화량(반음 단위, 0이 기본, -20~20)
+   * @return MP3 바이트
+   * @throws ApiException 키가 설정되지 않았거나(503) 합성에 실패한 경우(502)
+   */
+  public byte[] synthesize(
+      String text, String voiceName, double speakingRate, double pitchSemitones) {
     if (apiKey.isBlank()) {
       throw new ApiException(TtsErrorCode.UNAVAILABLE);
     }
 
     Map<String, Object> body = Map.of(
-        "input", Map.of("text", text),
-        "voice", Map.of("languageCode", "ja-JP", "name", voiceName),
-        "audioConfig", Map.of("audioEncoding", "MP3"));
+        "input",
+        Map.of("text", text),
+        "voice",
+        Map.of("languageCode", "ja-JP", "name", voiceName),
+        "audioConfig",
+        Map.of("audioEncoding", "MP3", "speakingRate", speakingRate, "pitch", pitchSemitones));
 
     try {
       SynthesizeResponse response = restClient

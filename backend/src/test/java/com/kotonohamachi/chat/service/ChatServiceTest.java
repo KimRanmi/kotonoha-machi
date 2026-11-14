@@ -208,6 +208,64 @@ class ChatServiceTest {
   }
 
   @Test
+  void chat_장소가_편의점이면_그_안에서_맞이하는_문장이_들어간다() {
+    // 장소가 있으면 현재 상황(currentContext)은 쓰이지 않으므로 공용 헬퍼 대신 따로 만든다.
+    Resident resident = mock(Resident.class);
+    when(resident.getId()).thenReturn(1L);
+    when(resident.getName()).thenReturn("ミミ");
+    when(resident.getPersonality()).thenReturn("ぶっきらぼう");
+    when(resident.getLocation()).thenReturn("편의점");
+
+    String prompt = chatAndCapturePrompt(resident).getValue();
+
+    assertThat(prompt).contains("'편의점' 안에서 플레이어를 맞이하고 있다.").doesNotContain("{currentContext}");
+  }
+
+  @Test
+  void chat_장소가_거리이면_거리에서_마주쳤다는_문장과_현재_상황이_들어간다() {
+    Resident resident = resident();
+    when(resident.getLocation()).thenReturn("거리");
+
+    String prompt = chatAndCapturePrompt(resident).getValue();
+
+    assertThat(prompt).contains("마을 거리에서 플레이어와 마주쳤다. (広場で散歩中)");
+  }
+
+  @Test
+  void chat_장소가_null이면_현재_상황을_그대로_쓴다() {
+    Resident resident = resident();
+    when(resident.getLocation()).thenReturn(null);
+
+    String prompt = chatAndCapturePrompt(resident).getValue();
+
+    assertThat(prompt).contains("현재 장소/상황: 広場で散歩中\n").doesNotContain("안에서 플레이어를");
+  }
+
+  @Test
+  void chat_성별이_F이면_여성_M이면_남성이_프롬프트에_들어간다() {
+    Resident female = resident();
+    when(female.getGender()).thenReturn("F");
+    assertThat(chatAndCapturePrompt(female).getValue()).contains("\n성별: 여성");
+  }
+
+  @Test
+  void chat_성별이_M이면_남성이_프롬프트에_들어간다() {
+    Resident male = resident();
+    when(male.getGender()).thenReturn("M");
+    assertThat(chatAndCapturePrompt(male).getValue()).contains("\n성별: 남성");
+  }
+
+  @Test
+  void chat_성별이_null이면_성별_항목이_빠진다() {
+    Resident resident = resident();
+    when(resident.getGender()).thenReturn(null);
+
+    String prompt = chatAndCapturePrompt(resident).getValue();
+
+    assertThat(prompt).doesNotContain("\n성별:");
+  }
+
+  @Test
   void chat_말투_배경_예시대사가_있으면_라벨과_함께_프롬프트에_들어간다() {
     Resident resident = resident();
     when(resident.getSpeechStyle()).thenReturn("부드러운 존댓말");
