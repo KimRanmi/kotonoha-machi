@@ -61,6 +61,10 @@ public class ChatMessage {
     return new ChatMessage(userId, residentId, ChatSpeaker.RESIDENT, text, translation);
   }
 
+  public Long getId() {
+    return id;
+  }
+
   public ChatSpeaker getSpeaker() {
     return speaker;
   }

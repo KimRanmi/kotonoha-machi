@@ -1,12 +1,15 @@
 package com.kotonohamachi.chat.controller;
 
 import com.kotonohamachi.auth.service.AuthPrincipal;
+import com.kotonohamachi.chat.dto.ChatDaySummary;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatRequest;
 import com.kotonohamachi.chat.dto.ChatResultResponse;
 import com.kotonohamachi.chat.service.ChatService;
 import com.kotonohamachi.user.User;
+import java.time.LocalDate;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,16 +51,47 @@ public class ChatController {
   }
 
   /**
-   * 주민과 나눈 최근 대화를 오래된 순으로 돌려준다.
+   * 주민과 오늘(한국 시간) 나눈 대화를 오래된 순으로 돌려준다.
    *
    * @param authentication 현재 요청의 인증 정보
    * @param residentSlug 주민의 고유 키(예: r01)
-   * @return 최근 대화(플레이어의 말과 주민의 대답)
+   * @return 오늘의 대화(플레이어의 말과 주민의 대답)
    */
   @GetMapping("/api/residents/{residentSlug}/chat")
   public List<ChatHistoryItem> history(
       Authentication authentication, @PathVariable String residentSlug) {
     User user = AuthPrincipal.resolve(authentication);
     return chatService.history(user.getId(), residentSlug);
+  }
+
+  /**
+   * 오늘 이전에 주민과 대화한 날들의 목록을 돌려준다.
+   *
+   * @param authentication 현재 요청의 인증 정보
+   * @param residentSlug 주민의 고유 키(예: r01)
+   * @return 날짜별 줄 수와 미리보기(최신 날짜부터, 최대 60일)
+   */
+  @GetMapping("/api/residents/{residentSlug}/chat/days")
+  public List<ChatDaySummary> historyDays(
+      Authentication authentication, @PathVariable String residentSlug) {
+    User user = AuthPrincipal.resolve(authentication);
+    return chatService.historyDays(user.getId(), residentSlug);
+  }
+
+  /**
+   * 특정 날(한국 시간)에 주민과 나눈 대화를 오래된 순으로 돌려준다.
+   *
+   * @param authentication 현재 요청의 인증 정보
+   * @param residentSlug 주민의 고유 키(예: r01)
+   * @param date 조회할 날짜(yyyy-MM-dd)
+   * @return 그날의 대화
+   */
+  @GetMapping("/api/residents/{residentSlug}/chat/days/{date}")
+  public List<ChatHistoryItem> historyOfDay(
+      Authentication authentication,
+      @PathVariable String residentSlug,
+      @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    User user = AuthPrincipal.resolve(authentication);
+    return chatService.historyOfDay(user.getId(), residentSlug, date);
   }
 }

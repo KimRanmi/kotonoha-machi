@@ -87,3 +87,38 @@
   color: var(--color-text-muted);
   font-size: 0.9rem;
 }
+
+.pastButton {
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.85rem;
+}
+
+.dayList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.dayItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  text-align: left;
+}
+
+.dayDate {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.dayPreview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
