@@ -23,11 +23,16 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const options = {};
   for (let i = 0; i < args.length; i += 2) {
+    if (args[i] === '--to-sheet') {
+      options.toSheet = true;
+      i -= 1; // 값이 없는 옵션이라 한 칸만 넘긴다
+      continue;
+    }
     options[args[i].replace(/^--/, '')] = args[i + 1];
   }
   if (!options.title || (!options.topic && !options.candidates)) {
     throw new Error(
-      '사용법: npm run propose -- --title "<테마 제목>" (--topic "<주제 설명>" | --candidates <후보.json>)',
+      '사용법: npm run propose -- --title "<테마 제목>" (--topic "<주제 설명>" | --candidates <후보.json>) [--to-sheet]',
     );
   }
   return options;
@@ -114,8 +119,36 @@ async function translateEntries(apiKey, kanjiEntries, vocabularyEntries) {
   });
 }
 
+/** 초안을 구글 시트(Apps Script 웹훅)에 review=draft 행으로 보낸다. */
+async function sendToSheet(draft, topic) {
+  const { THEME_SHEET_WEBHOOK_URL: url, THEME_SHEET_WEBHOOK_TOKEN: auth } = process.env;
+  if (!url || !auth) {
+    throw new Error('THEME_SHEET_WEBHOOK_URL / THEME_SHEET_WEBHOOK_TOKEN이 .env에 없습니다.');
+  }
+  const t = draft.title;
+  const rows = {
+    themes: [[t, topic]],
+    kanji: draft.kanji.map((k) => [t, k.kanji, k.onReading, k.kunReading, k.meaning, k.jlptLevel, k.displayOrder, 'draft']),
+    vocabulary: Object.entries(draft.vocabulary).flatMap(([stage, entries]) =>
+      entries.map((w) => [t, stage, w.surfaceForm, w.reading, w.meaning, w.jlptLevel, w.displayOrder, 'draft']),
+    ),
+    examples: draft.examples.map((e) => [t, e.japaneseSentence, e.reading, e.translation, e.displayOrder, 'draft']),
+  };
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ token: auth, theme: t, rows }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const result = await response.json().catch(() => null);
+  if (!result?.ok) {
+    throw new Error(`시트에 쓰지 못했습니다: ${result?.error ?? `HTTP ${response.status}`}`);
+  }
+  console.log(`시트에 review=draft로 추가했습니다: ${JSON.stringify(result.counts)}`);
+}
+
 async function main() {
-  const { title, topic, candidates: candidatesPath } = parseArgs();
+  const { title, topic, candidates: candidatesPath, toSheet } = parseArgs();
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY가 없습니다. .env.example을 복사해 .env를 만들고 채워주세요.');
@@ -169,6 +202,9 @@ async function main() {
   );
   if (draft.rejected.length > 0) {
     console.log(`거부된 후보 ${draft.rejected.length}개(이유는 draft 파일의 "rejected" 참고).`);
+  }
+  if (toSheet) {
+    await sendToSheet(draft, topic ?? '');
   }
   console.log('초안 파일을 열어 직접 검토·수정한 뒤, 아래 명령으로 마이그레이션을 생성하세요:');
   console.log(`  npm run finalize -- --draft drafts/${slug}.json`);

@@ -336,7 +336,7 @@ async function main() {
   const outputPath = path.join(MIGRATION_DIR, `V${version}__upsert_theme_${slug}.sql`);
   writeFileSync(outputPath, [...header, '', body.join('\n\n')].join('\n') + '\n', 'utf8');
 
-  console.log(`\n테마 ${picked.length}개 반영, review가 draft인 ${skipped}행은 건너뜀.`);
+  console.log(`\n테마 ${picked.length}개 반영, review가 ok가 아닌 ${skipped}행(draft·applied)은 건너뜀.`);
   console.log(`생성됨: ${outputPath}`);
   console.log('SQL을 직접 읽어보고 cd backend && ./gradlew spotlessApply test 로 검증한 뒤 커밋하세요.');
 }

@@ -22,6 +22,19 @@ npm run import -- [--themes "테마1,테마2"] [--csv-dir <폴더>] [--accept-mi
   `propose`로 후보를 뽑을 때는 `--candidates <후보.json>`으로 후보를 직접 넘길 수 있다
   (Gemini는 영어 뜻을 한국어로 옮기는 번역에만 쓴다).
 
+### `propose --to-sheet`로 시트 자동 채우기 (1회 설정)
+
+`npm run propose -- --title "<제목>" --topic "<주제>" --to-sheet`를 실행하면 후보 추천 → 사전·Tatoeba
+조회 → 한국어 번역 결과가 시트에 `review=draft` 행으로 들어간다(같은 테마를 다시 실행하면 그 테마의
+draft 행만 교체되고 검수한 행은 그대로). 설정은 처음 한 번만 한다.
+
+1. 시트에서 확장 프로그램 → Apps Script를 열고 `apps-script/Code.gs` 내용을 붙여 넣는다.
+2. Apps Script 왼쪽 프로젝트 설정 → 스크립트 속성에 `SHEET_TOKEN`을 추가하고 임의의 긴 비밀 문자열을 넣는다.
+3. 배포 → 새 배포 → 유형 "웹 앱", 실행 계정 "나", 액세스 권한 "모든 사용자"로 배포하고 나온 `/exec` 주소를 복사한다.
+4. `.env`에 `THEME_SHEET_WEBHOOK_URL`(그 주소)과 `THEME_SHEET_WEBHOOK_TOKEN`(2번의 문자열)을 넣는다.
+
+주소를 아는 사람이 호출할 수 있으므로 토큰이 맞을 때만 쓰도록 했다. 토큰은 공개하지 않는다.
+
 아래는 시트 없이 초안 JSON으로 바로 SQL을 만들던 이전 방식이다.
 
 ## 역할 분리
