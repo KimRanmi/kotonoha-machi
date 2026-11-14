@@ -45,7 +45,7 @@ export class SpeechCancelledError extends Error {}
  * 마지막 말 이후 이만큼(밀리초) 조용하면 말이 끝난 것으로 보고 인식을 마친다. 브라우저 기본 동작은 말 사이의
  * 짧은 쉼에도 바로 끝나서 문장 중간에 잘리므로, 연속 인식을 켜고 침묵 시간을 직접 잰다.
  */
-const SILENCE_TIMEOUT_MS = 2000;
+const SILENCE_TIMEOUT_MS = 5000;
 
 let activeRecognition: SpeechRecognitionLike | null = null;
 // 사용자가 취소한 인식. 취소 뒤 늦게 도착하는 종료 신호로 중간 결과가 전송되지 않게 가려낸다.
