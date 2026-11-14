@@ -58,7 +58,18 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
   }
 
   /**
-   * 사용자와 주민의 대화 중 가장 최근 10줄을 최신 순으로 조회한다(AI에게 보낼 최근 맥락).
+   * 주어진 id보다 뒤의 대화 중 가장 최근 30줄을 최신 순으로 조회한다(요약에 아직 담기지 않은 줄).
+   *
+   * @param userId 사용자 ID
+   * @param residentId 주민 ID
+   * @param afterId 이 id보다 큰 줄만
+   * @return 최신 순으로 정렬된 대화(첫 원소가 가장 최근 줄)
+   */
+  List<ChatMessage> findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(
+      Long userId, Long residentId, Long afterId);
+
+  /**
+   * 사용자와 주민의 대화 중 가장 최근 10줄을 최신 순으로 조회한다(요약 대상과 최근 줄을 가르는 기준).
    *
    * @param userId 사용자 ID
    * @param residentId 주민 ID

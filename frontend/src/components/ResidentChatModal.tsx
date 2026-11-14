@@ -78,6 +78,8 @@ function ResidentChatModal({
   // 전송 중복은 state가 아니라 ref로 막는다(음성 인식 콜백이 오래된 state를 들고 있을 수 있다).
   const isSendingRef = useRef(false);
   const isMountedRef = useRef(true);
+  // 지난 대화 화면의 요청 번호. 응답이 뒤바뀌어 도착해도 가장 최근 요청의 응답만 반영한다.
+  const pastRequestRef = useRef(0);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -164,22 +166,29 @@ function ResidentChatModal({
     }
   };
 
+  /** 창이 열려 있고 가장 최근에 보낸 지난 대화 요청일 때만 true. */
+  const isCurrentPastRequest = (requestId: number) =>
+    isMountedRef.current && requestId === pastRequestRef.current;
+
   /** 지난 대화 날짜 목록을 불러와 목록 화면으로 간다. */
   const openDays = async () => {
+    // 지난 대화를 보는 동안 마이크가 켜진 채 남지 않게 한다.
+    cancelSpeechRecognition();
+    const requestId = ++pastRequestRef.current;
     setView('days');
     setIsPastLoading(true);
     setPastErrorMessage(null);
     try {
       const loaded = await getChatDays(residentSlug);
-      if (isMountedRef.current) {
+      if (isCurrentPastRequest(requestId)) {
         setDays(loaded);
       }
     } catch {
-      if (isMountedRef.current) {
+      if (isCurrentPastRequest(requestId)) {
         setPastErrorMessage('지난 대화를 불러오지 못했습니다.');
       }
     } finally {
-      if (isMountedRef.current) {
+      if (isCurrentPastRequest(requestId)) {
         setIsPastLoading(false);
       }
     }
@@ -187,6 +196,7 @@ function ResidentChatModal({
 
   /** 고른 날의 대화를 불러와 읽기 화면으로 간다. */
   const openDay = async (date: string) => {
+    const requestId = ++pastRequestRef.current;
     setView('day');
     setSelectedDate(date);
     setDayLines([]);
@@ -194,15 +204,15 @@ function ResidentChatModal({
     setPastErrorMessage(null);
     try {
       const loaded = await getChatDay(residentSlug, date);
-      if (isMountedRef.current) {
+      if (isCurrentPastRequest(requestId)) {
         setDayLines(loaded.map(toChatLine));
       }
     } catch {
-      if (isMountedRef.current) {
+      if (isCurrentPastRequest(requestId)) {
         setPastErrorMessage('그날의 대화를 불러오지 못했습니다.');
       }
     } finally {
-      if (isMountedRef.current) {
+      if (isCurrentPastRequest(requestId)) {
         setIsPastLoading(false);
       }
     }

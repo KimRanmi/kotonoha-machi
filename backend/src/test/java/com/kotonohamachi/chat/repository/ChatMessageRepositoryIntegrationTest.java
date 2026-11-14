@@ -134,4 +134,58 @@ class ChatMessageRepositoryIntegrationTest {
     assertThat(repository.findDaysBefore(newUser(), residentId(0), OffsetDateTime.now()))
         .isEmpty();
   }
+
+  @Test
+  void findTop30은_afterId_이후만_최신_순으로_돌려주고_afterId_자신은_제외한다() {
+    long user = newUser();
+    long resident = residentId(0);
+    OffsetDateTime at = kst("2026-03-10T12:00:00");
+    for (int i = 1; i <= 5; i++) {
+      insert(user, resident, "PLAYER", "t" + i, at.plusMinutes(i));
+    }
+    List<ChatMessage> all =
+        repository.findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(user, resident, 0L);
+    assertThat(all).extracting(ChatMessage::getText).containsExactly("t5", "t4", "t3", "t2", "t1");
+    long thirdId = all.get(2).getId();
+
+    List<ChatMessage> after =
+        repository.findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(
+            user, resident, thirdId);
+
+    assertThat(after).extracting(ChatMessage::getText).containsExactly("t5", "t4");
+  }
+
+  @Test
+  void findTop30은_최신_30줄까지만_돌려준다() {
+    long user = newUser();
+    long resident = residentId(0);
+    OffsetDateTime at = kst("2026-03-10T12:00:00");
+    for (int i = 1; i <= 35; i++) {
+      insert(user, resident, "PLAYER", "t" + i, at.plusMinutes(i));
+    }
+
+    List<ChatMessage> result =
+        repository.findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(user, resident, 0L);
+
+    assertThat(result).hasSize(30);
+    assertThat(result.get(0).getText()).isEqualTo("t35");
+    assertThat(result.get(29).getText()).isEqualTo("t6");
+  }
+
+  @Test
+  void findTop30은_다른_사용자와_다른_주민의_대화를_섞지_않는다() {
+    long alice = newUser();
+    long bob = newUser();
+    long resident = residentId(0);
+    long other = residentId(1);
+    OffsetDateTime at = kst("2026-03-10T12:00:00");
+    insert(alice, resident, "PLAYER", "앨리스", at);
+    insert(bob, resident, "PLAYER", "밥", at.plusMinutes(1));
+    insert(alice, other, "PLAYER", "다른 주민", at.plusMinutes(2));
+
+    List<ChatMessage> result =
+        repository.findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(alice, resident, 0L);
+
+    assertThat(result).extracting(ChatMessage::getText).containsExactly("앨리스");
+  }
 }

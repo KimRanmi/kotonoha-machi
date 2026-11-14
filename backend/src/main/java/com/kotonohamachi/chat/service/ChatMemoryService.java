@@ -26,11 +26,11 @@ public class ChatMemoryService {
 
   private static final Logger log = LoggerFactory.getLogger(ChatMemoryService.class);
 
-  /** AI에게 그대로 보내는 최근 대화 줄 수. 이보다 오래된 줄은 요약 대상이다. */
+  /** 요약 대상과 AI에게 그대로 보내는 줄을 가르는 최근 줄 수. 이보다 오래된 줄이 요약 대상이다. */
   static final int RECENT_LINES = 10;
 
-  /** 요약하지 않은 오래된 줄이 이만큼 쌓이면 요약을 갱신한다(매 대화마다 요약하지 않도록). */
-  static final int SUMMARIZE_THRESHOLD = 20;
+  /** 요약하지 않은 오래된 줄이 이만큼 쌓이면 요약을 갱신한다. 요약은 백그라운드라 자주 돌려도 대답이 느려지지 않는다. */
+  static final int SUMMARIZE_THRESHOLD = 10;
 
   /** 한 번에 요약기에 넘기는 줄 수 상한. 요약이 밀렸을 때 입력이 커지지 않게 한다. */
   static final int MAX_LINES_PER_SUMMARY = 100;
@@ -59,21 +59,23 @@ public class ChatMemoryService {
   }
 
   /**
-   * AI에게 보낼 요약 메모와 최근 대화를 불러온다.
+   * AI에게 보낼 요약 메모와, 요약에 아직 담기지 않은 대화를 불러온다.
+   *
+   * <p>요약은 최근 10줄보다 오래된 줄만 담고 일정량이 쌓여야 갱신되므로, 요약 이후의 줄을 모두 보내야 대화가 빠지지 않는다. 평소 20줄 안쪽이고, 요약이 밀려도 최대 30줄로 묶는다.
    *
    * @param userId 사용자 ID
    * @param residentId 주민 ID
-   * @return 요약 메모(없으면 빈 문자열)와 최근 10줄(오래된 것이 먼저)
+   * @return 요약 메모(없으면 빈 문자열)와 요약 이후의 대화(오래된 것이 먼저)
    */
   public ChatContext load(Long userId, Long residentId) {
-    String summary = summaryRepository
-        .findByUserIdAndResidentId(userId, residentId)
-        .map(ChatSummary::getSummary)
-        .orElse("");
+    ChatSummary existing =
+        summaryRepository.findByUserIdAndResidentId(userId, residentId).orElse(null);
+    long summarizedUpToId = existing == null ? 0L : existing.getSummarizedUpToId();
     List<ChatMessage> oldestFirst = new ArrayList<>(
-        messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(userId, residentId));
+        messageRepository.findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(
+            userId, residentId, summarizedUpToId));
     Collections.reverse(oldestFirst);
-    return new ChatContext(summary, toItems(oldestFirst));
+    return new ChatContext(existing == null ? "" : existing.getSummary(), toItems(oldestFirst));
   }
 
   /**
@@ -120,15 +122,17 @@ public class ChatMemoryService {
         summaryRepository.save(existing);
       }
     } catch (RuntimeException e) {
-      log.warn("대화 요약 갱신 실패(다음 대화 때 다시 시도): {}", e.getClass().getSimpleName());
+      log.warn(
+          "대화 요약 갱신 실패(다음 대화 때 다시 시도): user={}, resident={}, {}",
+          userId,
+          residentId,
+          e.getClass().getSimpleName());
     } finally {
       summarizing.remove(key);
     }
   }
 
   private static List<ChatHistoryItem> toItems(List<ChatMessage> messages) {
-    return messages.stream()
-        .map(m -> new ChatHistoryItem(m.getSpeaker(), m.getText(), m.getTranslation()))
-        .toList();
+    return messages.stream().map(ChatHistoryItem::from).toList();
   }
 }

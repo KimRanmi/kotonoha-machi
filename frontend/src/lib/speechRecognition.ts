@@ -98,11 +98,14 @@ export function recognizeJapaneseSpeech(): Promise<string> {
     recognition.onerror = (event) => {
       clearTimeout(silenceTimer);
       clearIfActive();
-      reject(
-        event.error === 'aborted'
-          ? new SpeechCancelledError()
-          : new Error('음성을 인식하지 못했습니다. 다시 시도해주세요.'),
-      );
+      if (event.error === 'aborted') {
+        reject(new SpeechCancelledError());
+      } else if (transcript.trim() && !cancelledRecognitions.has(recognition)) {
+        // 말을 하던 중 오류로 끊겨도 이미 인식한 말은 살린다.
+        resolve(transcript);
+      } else {
+        reject(new Error('음성을 인식하지 못했습니다. 다시 시도해주세요.'));
+      }
     };
     // 인식이 끝나면 모은 말을 돌려준다. 취소했거나 아무 말도 없었으면 취소로 처리해 대기 중인 Promise가 남지 않게 한다.
     recognition.onend = () => {

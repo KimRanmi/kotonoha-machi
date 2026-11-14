@@ -70,9 +70,10 @@ class ChatMemoryServiceTest {
   }
 
   @Test
-  void load_요약이_없으면_빈_문자열이고_최근_대화는_오래된_순이다() {
+  void load_요약이_없으면_afterId_0으로_조회하고_오래된_순으로_돌려준다() {
     when(summaryRepository.findByUserIdAndResidentId(USER, RESIDENT)).thenReturn(Optional.empty());
-    when(messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(USER, RESIDENT))
+    when(messageRepository.findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(
+            USER, RESIDENT, 0L))
         .thenReturn(latestFirst(1, 3));
 
     ChatContext context = service().load(USER, RESIDENT);
@@ -81,19 +82,71 @@ class ChatMemoryServiceTest {
     assertThat(context.recentLines())
         .extracting(ChatHistoryItem::text)
         .containsExactly("m1", "m2", "m3");
+    verify(messageRepository, never()).findTop10ByUserIdAndResidentIdOrderByIdDesc(any(), any());
   }
 
   @Test
-  void load_요약이_있으면_함께_돌려준다() {
+  void load_요약이_있으면_summarizedUpToId_이후만_조회해_오래된_순으로_돌려준다() {
     when(summaryRepository.findByUserIdAndResidentId(USER, RESIDENT))
         .thenReturn(Optional.of(ChatSummary.create(USER, RESIDENT, "메모", 5L)));
-    when(messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(USER, RESIDENT))
+    when(messageRepository.findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(
+            USER, RESIDENT, 5L))
+        .thenReturn(latestFirst(6, 9));
+
+    ChatContext context = service().load(USER, RESIDENT);
+
+    assertThat(context.summary()).isEqualTo("메모");
+    assertThat(context.recentLines())
+        .extracting(ChatHistoryItem::text)
+        .containsExactly("m6", "m7", "m8", "m9");
+  }
+
+  @Test
+  void load_요약_이후_줄이_없으면_빈_목록이다() {
+    when(summaryRepository.findByUserIdAndResidentId(USER, RESIDENT))
+        .thenReturn(Optional.of(ChatSummary.create(USER, RESIDENT, "메모", 5L)));
+    when(messageRepository.findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(
+            USER, RESIDENT, 5L))
         .thenReturn(List.of());
 
     ChatContext context = service().load(USER, RESIDENT);
 
     assertThat(context.summary()).isEqualTo("메모");
     assertThat(context.recentLines()).isEmpty();
+  }
+
+  @Test
+  void 요약_직후에도_최근_10줄은_load에_포함된다() {
+    // 대화 id 1..21. 최근 10줄은 12..21, 그 앞 11줄(1..11)이 요약 대상이다.
+    when(messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(USER, RESIDENT))
+        .thenReturn(latestFirst(12, 21));
+    when(summaryRepository.findByUserIdAndResidentId(USER, RESIDENT)).thenReturn(Optional.empty());
+    when(messageRepository.findByUserIdAndResidentIdAndIdGreaterThanAndIdLessThanOrderByIdAsc(
+            USER, RESIDENT, 0L, 12L))
+        .thenReturn(oldestFirst(1, 11));
+    when(geminiClient.summarize(anyString(), anyList())).thenReturn("요약");
+    ChatMemoryService service = service();
+
+    service.summarizeIfNeeded(USER, RESIDENT);
+
+    ArgumentCaptor<ChatSummary> saved = ArgumentCaptor.forClass(ChatSummary.class);
+    verify(summaryRepository).save(saved.capture());
+    long upTo = saved.getValue().getSummarizedUpToId();
+    assertThat(upTo).isEqualTo(11L); // 최근 10줄(12..) 앞까지만 요약에 담긴다.
+
+    // 요약이 저장된 뒤 load는 upTo 이후 조회 -> 최근 10줄이 그대로 들어온다.
+    when(summaryRepository.findByUserIdAndResidentId(USER, RESIDENT))
+        .thenReturn(Optional.of(saved.getValue()));
+    when(messageRepository.findTop30ByUserIdAndResidentIdAndIdGreaterThanOrderByIdDesc(
+            USER, RESIDENT, upTo))
+        .thenReturn(latestFirst(12, 21));
+
+    ChatContext context = service.load(USER, RESIDENT);
+
+    assertThat(context.summary()).isEqualTo("요약");
+    assertThat(context.recentLines()).hasSize(10);
+    assertThat(context.recentLines().get(0).text()).isEqualTo("m12");
+    assertThat(context.recentLines().get(9).text()).isEqualTo("m21");
   }
 
   @Test
@@ -108,13 +161,13 @@ class ChatMemoryServiceTest {
   }
 
   @Test
-  void summarizeIfNeeded_오래된_줄이_20_미만이면_요약하지_않는다() {
+  void summarizeIfNeeded_오래된_줄이_10_미만이면_요약하지_않는다() {
     when(messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(USER, RESIDENT))
-        .thenReturn(latestFirst(20, 29));
+        .thenReturn(latestFirst(10, 19));
     when(summaryRepository.findByUserIdAndResidentId(USER, RESIDENT)).thenReturn(Optional.empty());
     when(messageRepository.findByUserIdAndResidentIdAndIdGreaterThanAndIdLessThanOrderByIdAsc(
-            USER, RESIDENT, 0L, 20L))
-        .thenReturn(oldestFirst(1, 19));
+            USER, RESIDENT, 0L, 10L))
+        .thenReturn(oldestFirst(1, 9));
 
     service().summarizeIfNeeded(USER, RESIDENT);
 
@@ -123,13 +176,13 @@ class ChatMemoryServiceTest {
   }
 
   @Test
-  void summarizeIfNeeded_오래된_줄이_20_이상이면_요약해_새로_저장한다() {
+  void summarizeIfNeeded_오래된_줄이_10_이상이면_요약해_새로_저장한다() {
     when(messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(USER, RESIDENT))
-        .thenReturn(latestFirst(22, 31));
+        .thenReturn(latestFirst(12, 21));
     when(summaryRepository.findByUserIdAndResidentId(USER, RESIDENT)).thenReturn(Optional.empty());
     when(messageRepository.findByUserIdAndResidentIdAndIdGreaterThanAndIdLessThanOrderByIdAsc(
-            USER, RESIDENT, 0L, 22L))
-        .thenReturn(oldestFirst(2, 21));
+            USER, RESIDENT, 0L, 12L))
+        .thenReturn(oldestFirst(2, 11));
     when(geminiClient.summarize(anyString(), anyList())).thenReturn("새 요약");
 
     service().summarizeIfNeeded(USER, RESIDENT);
@@ -137,11 +190,11 @@ class ChatMemoryServiceTest {
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<ChatHistoryItem>> lines = ArgumentCaptor.forClass(List.class);
     verify(geminiClient).summarize(org.mockito.ArgumentMatchers.eq(""), lines.capture());
-    assertThat(lines.getValue()).hasSize(20);
+    assertThat(lines.getValue()).hasSize(10);
     ArgumentCaptor<ChatSummary> saved = ArgumentCaptor.forClass(ChatSummary.class);
     verify(summaryRepository).save(saved.capture());
     assertThat(saved.getValue().getSummary()).isEqualTo("새 요약");
-    assertThat(saved.getValue().getSummarizedUpToId()).isEqualTo(21L);
+    assertThat(saved.getValue().getSummarizedUpToId()).isEqualTo(11L);
   }
 
   @Test

@@ -104,9 +104,7 @@ public class ChatService {
     if (normalizedMessage.length() > MAX_MESSAGE_LENGTH) {
       throw new ApiException(ChatErrorCode.MESSAGE_INVALID);
     }
-    Resident resident = residentRepository
-        .findBySlug(residentSlug)
-        .orElseThrow(() -> new ApiException(ChatErrorCode.RESIDENT_NOT_FOUND));
+    Resident resident = findResident(residentSlug);
     int friendshipLevel = friendshipRepository
         .findByUserIdAndResidentId(userId, resident.getId())
         .map(ResidentFriendship::getLevel)
@@ -188,7 +186,7 @@ public class ChatService {
         .findByUserIdAndResidentIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByIdAsc(
             userId, resident.getId(), from, to)
         .stream()
-        .map(m -> new ChatHistoryItem(m.getSpeaker(), m.getText(), m.getTranslation()))
+        .map(ChatHistoryItem::from)
         .toList();
   }
 
