@@ -114,8 +114,8 @@ function checkCommon(row, themeTitles, errors) {
   if (row.theme !== '' && !themeTitles.has(row.theme)) {
     errors.push(`${where(row)}: theme '${row.theme}'가 themes 탭에 없다`);
   }
-  if (!['draft', 'ok'].includes(row.review)) {
-    errors.push(`${where(row)}: review는 draft 또는 ok여야 한다(현재: '${row.review}')`);
+  if (!['draft', 'ok', 'applied'].includes(row.review)) {
+    errors.push(`${where(row)}: review는 draft, ok, applied 중 하나여야 한다(applied = 이미 DB에 반영됨, import가 건너뜀)(현재: '${row.review}')`);
   }
   checkInteger(row, 'display_order', errors);
 }

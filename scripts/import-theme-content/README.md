@@ -13,7 +13,7 @@
 npm run import -- [--themes "테마1,테마2"] [--csv-dir <폴더>] [--accept-mismatch]
 ```
 
-- `review`가 `ok`인 행만 반영한다.
+- `review`가 `ok`인 행만 반영한다(`draft`=검수 전, `applied`=이미 DB에 반영된 행이라 건너뜀).
 - 한자·단어의 읽는 법/JLPT 레벨을 kanjiapi.dev와 대조해 다르면 SQL을 만들지 않고 멈춘다
   (의도한 값이면 `--accept-mismatch`). 한국어 뜻과 예문 읽는 법은 사람이 정한 값을 믿는다.
 - 테마별로 "없으면 만들고, 내용은 지우고 다시 넣는" SQL을 `V<n>__upsert_theme_….sql`로 만든다
