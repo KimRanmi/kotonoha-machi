@@ -145,7 +145,10 @@ function validate(data) {
   };
   for (const row of data.kanji) {
     checkCommon(row, themeTitles, errors);
-    requireFields(row, ['kanji', 'on_reading', 'meaning', 'jlpt_level'], errors);
+    requireFields(row, ['kanji', 'meaning', 'jlpt_level'], errors);
+    if (row.on_reading === '' && row.kun_reading === '') {
+      errors.push(`${where(row)}: on_reading과 kun_reading 중 하나는 있어야 한다`);
+    }
     checkLength(row, 'kanji', MAX_LENGTH.kanji, errors);
     checkLength(row, 'on_reading', MAX_LENGTH.reading, errors);
     checkLength(row, 'kun_reading', MAX_LENGTH.reading, errors);
