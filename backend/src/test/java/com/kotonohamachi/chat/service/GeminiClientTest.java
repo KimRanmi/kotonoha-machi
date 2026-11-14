@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.common.ApiException;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -18,8 +19,8 @@ class GeminiClientTest {
   void generate_키가_비어_있으면_503으로_거부한다() {
     GeminiClient client = new GeminiClient("", "gemini-2.0-flash");
 
-    ApiException exception =
-        catchThrowableOfType(ApiException.class, () -> client.generate("system", "こんにちは"));
+    ApiException exception = catchThrowableOfType(
+        ApiException.class, () -> client.generate("system", List.of(), "こんにちは"));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
   }
@@ -28,8 +29,8 @@ class GeminiClientTest {
   void generate_키가_공백이어도_503으로_거부한다() {
     GeminiClient client = new GeminiClient("   ", "gemini-2.0-flash");
 
-    ApiException exception =
-        catchThrowableOfType(ApiException.class, () -> client.generate("system", "こんにちは"));
+    ApiException exception = catchThrowableOfType(
+        ApiException.class, () -> client.generate("system", List.of(), "こんにちは"));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
   }
@@ -61,5 +62,15 @@ class GeminiClientTest {
 
     assertThat(exception).isNotNull();
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY);
+  }
+
+  @Test
+  void summarize_키가_비어_있으면_503으로_거부한다() {
+    GeminiClient client = new GeminiClient("", "gemini-2.0-flash");
+
+    ApiException exception =
+        catchThrowableOfType(ApiException.class, () -> client.summarize("", List.of()));
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
   }
 }
