@@ -3,6 +3,9 @@ package com.kotonohamachi.chat.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
+import com.google.genai.types.Content;
+import com.kotonohamachi.chat.ChatSpeaker;
+import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.common.ApiException;
 import java.util.List;
@@ -72,5 +75,55 @@ class GeminiClientTest {
         catchThrowableOfType(ApiException.class, () -> client.summarize("", List.of()));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+  }
+
+  private static ChatHistoryItem player(String text) {
+    return new ChatHistoryItem(ChatSpeaker.PLAYER, text, null);
+  }
+
+  private static ChatHistoryItem resident(String text) {
+    return new ChatHistoryItem(ChatSpeaker.RESIDENT, text, "번역");
+  }
+
+  @Test
+  void buildContents_주민_줄로_시작하면_앞의_주민_줄을_건너뛴다() {
+    List<Content> contents = GeminiClient.buildContents(
+        List.of(resident("r1"), resident("r2"), player("p1"), resident("r3")), "now");
+
+    assertThat(contents)
+        .extracting(Content::role)
+        .extracting(o -> o.orElse(null))
+        .containsExactly("user", "model", "user");
+    assertThat(contents.get(0).parts().get().get(0).text().get()).isEqualTo("p1");
+  }
+
+  @Test
+  void buildContents_플레이어로_시작하면_모두_유지하고_role이_번갈아_나온다() {
+    List<Content> contents = GeminiClient.buildContents(
+        List.of(player("p1"), resident("r1"), player("p2"), resident("r2")), "now");
+
+    assertThat(contents)
+        .extracting(Content::role)
+        .extracting(o -> o.orElse(null))
+        .containsExactly("user", "model", "user", "model", "user");
+  }
+
+  @Test
+  void buildContents_빈_목록이면_현재_말_하나만_있다() {
+    List<Content> contents = GeminiClient.buildContents(List.of(), "now");
+
+    assertThat(contents).hasSize(1);
+    assertThat(contents.get(0).role().get()).isEqualTo("user");
+    assertThat(contents.get(0).parts().get().get(0).text().get()).isEqualTo("now");
+  }
+
+  @Test
+  void buildContents_마지막은_user_역할의_현재_말이다() {
+    List<Content> contents =
+        GeminiClient.buildContents(List.of(player("p1"), resident("r1")), "now");
+
+    Content last = contents.get(contents.size() - 1);
+    assertThat(last.role().get()).isEqualTo("user");
+    assertThat(last.parts().get().get(0).text().get()).isEqualTo("now");
   }
 }

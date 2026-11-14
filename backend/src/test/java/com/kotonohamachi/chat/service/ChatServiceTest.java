@@ -253,6 +253,13 @@ class ChatServiceTest {
   }
 
   @Test
+  void chat_모르는_말은_짐작_가능_여부에_따라_반응하는_규칙이_프롬프트에_들어간다() {
+    String prompt = chatAndCapturePrompt(resident()).getValue();
+
+    assertThat(prompt).contains("전혀 짐작할 수 없을 때만").contains("짐작할 수 있으면");
+  }
+
+  @Test
   void chat_성별이_F이면_여성_M이면_남성이_프롬프트에_들어간다() {
     Resident female = resident();
     when(female.getGender()).thenReturn("F");

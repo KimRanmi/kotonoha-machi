@@ -106,15 +106,27 @@ public class GeminiClient {
         .httpOptions(HttpOptions.builder().timeout(TIMEOUT_MILLIS).build())
         .build();
 
+    List<Content> contents = buildContents(recentLines, userMessage);
+    return parseReply(call(contents, config));
+  }
+
+  /**
+   * 지난 대화와 현재 말을 Gemini에 보낼 대화 목록으로 만든다. 대화는 플레이어의 말로 시작해야 해서, 줄을 자르다 맨 앞이 주민의
+   * 말이 되면 그 줄들은 건너뛴다.
+   */
+  static List<Content> buildContents(List<ChatHistoryItem> recentLines, String userMessage) {
     List<Content> contents = new ArrayList<>();
     for (ChatHistoryItem line : recentLines) {
+      if (contents.isEmpty() && line.speaker() != ChatSpeaker.PLAYER) {
+        continue;
+      }
       String role = line.speaker() == ChatSpeaker.PLAYER ? "user" : "model";
       contents.add(
           Content.builder().role(role).parts(Part.fromText(line.text())).build());
     }
     contents.add(
         Content.builder().role("user").parts(Part.fromText(userMessage)).build());
-    return parseReply(call(contents, config));
+    return contents;
   }
 
   /**

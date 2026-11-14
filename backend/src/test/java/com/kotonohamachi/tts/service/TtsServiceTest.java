@@ -251,4 +251,24 @@ class TtsServiceTest {
     assertThat(TtsService.roundRate(9)).isEqualTo(2.0);
     assertThat(TtsService.roundRate(0.1)).isEqualTo(0.5);
   }
+
+  @Test
+  void toSemitones_NaN이면_0으로_방어한다() {
+    assertThat(TtsService.toSemitones(Double.NaN)).isEqualTo(0.0);
+  }
+
+  @Test
+  void roundRate_NaN이면_1로_방어한다() {
+    assertThat(TtsService.roundRate(Double.NaN)).isEqualTo(1.0);
+  }
+
+  @Test
+  void getAudio_속도가_NaN이어도_속도_1로_합성한다() {
+    stubResident("r01", "F");
+    stubSynthesis();
+
+    ttsService.getAudio(1L, "やあ", "r01", null, Double.NaN);
+
+    verify(googleTtsClient).synthesize("やあ", FEMALE, 1.0, 0.0);
+  }
 }

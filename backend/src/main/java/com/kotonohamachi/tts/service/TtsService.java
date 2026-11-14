@@ -126,13 +126,19 @@ public class TtsService {
    * 저장되지 않게 0.5 단위로 맞춘다.
    */
   static double toSemitones(double pitch) {
+    if (Double.isNaN(pitch)) {
+      return 0.0;
+    }
     double clamped = Math.max(0.5, Math.min(2.0, pitch));
     double semitones = Math.round(12 * Math.log(clamped) / Math.log(2) * 2) / 2.0;
     return Math.max(-MAX_SEMITONES, Math.min(MAX_SEMITONES, semitones));
   }
 
-  /** 속도 배율을 0.5~2.0으로 제한하고 0.05 단위로 맞춘다. */
+  /** 속도 배율을 0.5~2.0으로 제한하고 0.05 단위로 맞춘다. 숫자가 아닌 값은 기본 속도(1.0)로 본다. */
   static double roundRate(double rate) {
+    if (Double.isNaN(rate)) {
+      return 1.0;
+    }
     double clamped = Math.max(0.5, Math.min(2.0, rate));
     return Math.round(clamped * 20) / 20.0;
   }
