@@ -40,6 +40,9 @@ public class Resident {
   @Column
   private String location;
 
+  @Column
+  private String gender;
+
   /** JPA가 엔티티를 만들 때 사용하는 기본 생성자. */
   protected Resident() {}
 
@@ -82,5 +85,14 @@ public class Resident {
    */
   public String getLocation() {
     return location;
+  }
+
+  /**
+   * 주민의 성별을 반환한다. 대화 말투와 음성 목소리를 정하는 데 쓴다.
+   *
+   * @return M(남성) 또는 F(여성). 정하지 않았으면 null
+   */
+  public String getGender() {
+    return gender;
   }
 }

@@ -188,4 +188,36 @@ class ChatMessageRepositoryIntegrationTest {
 
     assertThat(result).extracting(ChatMessage::getText).containsExactly("앨리스");
   }
+
+  @Test
+  void findByAfterIdAndCreatedAtLessThan은_afterId_초과이고_시각_미만인_줄만_오래된_순으로_돌려준다() {
+    long alice = newUser();
+    long bob = newUser();
+    long resident = residentId(0);
+    long other = residentId(1);
+    insert(alice, resident, "PLAYER", "어제1", kst("2026-03-09T10:00:00"));
+    insert(alice, resident, "RESIDENT", "어제2", kst("2026-03-09T10:01:00"));
+    insert(alice, resident, "PLAYER", "어제3", kst("2026-03-09T23:59:59"));
+    insert(alice, resident, "PLAYER", "오늘 0시", kst("2026-03-10T00:00:00"));
+    insert(alice, resident, "PLAYER", "오늘 낮", kst("2026-03-10T12:00:00"));
+    insert(bob, resident, "PLAYER", "밥", kst("2026-03-09T10:00:00"));
+    insert(alice, other, "PLAYER", "다른 주민", kst("2026-03-09T10:00:00"));
+    OffsetDateTime todayStart = kst("2026-03-10T00:00:00");
+
+    List<ChatMessage> all =
+        repository.findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
+            alice, resident, 0L, todayStart);
+    assertThat(all).extracting(ChatMessage::getText).containsExactly("어제1", "어제2", "어제3");
+
+    long afterId = all.get(0).getId();
+    List<ChatMessage> after =
+        repository.findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
+            alice, resident, afterId, todayStart);
+    assertThat(after).extracting(ChatMessage::getText).containsExactly("어제2", "어제3");
+
+    long lastId = all.get(2).getId();
+    assertThat(repository.findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
+            alice, resident, lastId, todayStart))
+        .isEmpty();
+  }
 }

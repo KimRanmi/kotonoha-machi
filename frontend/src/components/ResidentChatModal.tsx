@@ -153,7 +153,7 @@ function ResidentChatModal({
       ]);
       onFriendshipChange(residentSlug, answer.friendshipLevel);
       setFriendshipGain(answer.friendshipGain);
-      speakJapanese(answer.reply, voice);
+      speakJapanese(answer.reply, { slug: residentSlug, voice });
     } catch (error) {
       setErrorMessage(
         error instanceof ApiError

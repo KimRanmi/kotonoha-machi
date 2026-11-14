@@ -48,6 +48,9 @@ app:
     google-api-key: ${GOOGLE_TTS_API_KEY:}
     # 합성에 쓸 일본어 음성. 바꾸면 이미 저장해 둔 음성은 쓰이지 않고 새로 합성한다.
     voice: ${GOOGLE_TTS_VOICE:ja-JP-Neural2-B}
+    # 주민 성별별 음성. 여성은 B, 남성은 C가 기본이다.
+    voice-female: ${GOOGLE_TTS_VOICE_FEMALE:ja-JP-Neural2-B}
+    voice-male: ${GOOGLE_TTS_VOICE_MALE:ja-JP-Neural2-C}
   gemini:
     # Gemini API 키. 비어 있으면 주민과의 대화를 쓸 수 없다(503).
     api-key: ${GEMINI_API_KEY:}

@@ -6,6 +6,9 @@ import com.kotonohamachi.chat.dto.ChatContext;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.repository.ChatMessageRepository;
 import com.kotonohamachi.chat.repository.ChatSummaryRepository;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -17,19 +20,19 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
- * AI에게 보낼 지난 대화 맥락("요약 메모 + 최근 10줄")을 만들고, 오래된 대화를 요약해 둔다.
+ * AI에게 보낼 지난 대화 맥락("요약 메모 + 요약 이후의 대화 원문")을 만들고, 지난 날의 대화를 요약해 둔다.
  *
- * <p>이렇게 하면 대화가 아무리 길어져도 AI로 가는 데이터 크기가 일정하게 유지된다.
+ * <p>요약은 오늘(한국 시간) 이전의 대화만 담는다. 그래서 같은 주민과는 하루에 한 번만 요약하고(Gemini 호출을 아낀다), 오늘
+ * 나눈 대화는 요약 없이 원문 그대로 AI에게 보내 하루 동안의 대화가 끊기지 않는다.
  */
 @Service
 public class ChatMemoryService {
 
   private static final Logger log = LoggerFactory.getLogger(ChatMemoryService.class);
 
-  /** 요약 대상과 AI에게 그대로 보내는 줄을 가르는 최근 줄 수. 이보다 오래된 줄이 요약 대상이다. */
-  static final int RECENT_LINES = 10;
+  private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
-  /** 요약하지 않은 오래된 줄이 이만큼 쌓이면 요약을 갱신한다. 요약은 백그라운드라 자주 돌려도 대답이 느려지지 않는다. */
+  /** 오늘 이전에 요약하지 않은 줄이 이만큼 쌓이면 요약을 갱신한다. 조금뿐이면 원문으로 보내고 호출을 아낀다. */
   static final int SUMMARIZE_THRESHOLD = 10;
 
   /** 한 번에 요약기에 넘기는 줄 수 상한. 요약이 밀렸을 때 입력이 커지지 않게 한다. */
@@ -61,7 +64,7 @@ public class ChatMemoryService {
   /**
    * AI에게 보낼 요약 메모와, 요약에 아직 담기지 않은 대화를 불러온다.
    *
-   * <p>요약은 최근 10줄보다 오래된 줄만 담고 일정량이 쌓여야 갱신되므로, 요약 이후의 줄을 모두 보내야 대화가 빠지지 않는다. 평소 20줄 안쪽이고, 요약이 밀려도 최대 30줄로 묶는다.
+   * <p>요약은 오늘 이전의 줄만 담고 하루에 한 번 갱신되므로, 요약 이후의 줄(오늘 나눈 대화와 아직 요약하지 않은 지난 줄)을 모두 보내야 대화가 빠지지 않는다. 최대 30줄로 묶는다.
    *
    * @param userId 사용자 ID
    * @param residentId 주민 ID
@@ -79,7 +82,8 @@ public class ChatMemoryService {
   }
 
   /**
-   * 최근 10줄보다 오래된 대화가 충분히 쌓였으면 요약 메모를 갱신한다.
+   * 오늘(한국 시간) 이전의 대화 중 아직 요약하지 않은 줄이 충분히 쌓였으면 요약 메모를 갱신한다. 오늘 이전 줄은 한 번 요약하면
+   * 모두 반영되므로 하루에 한 번만 실행된다.
    *
    * <p>별도 스레드에서 돌아 대답을 기다리게 하지 않는다. 요약은 부가 기능이라 실패해도 대화 자체는 막지 않고, 로그만 남기고 다음 대화 때 다시 시도한다.
    *
@@ -93,20 +97,17 @@ public class ChatMemoryService {
       return;
     }
     try {
-      List<ChatMessage> recentLatestFirst =
-          messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(userId, residentId);
-      if (recentLatestFirst.size() < RECENT_LINES) {
-        return;
-      }
-      // 최근 10줄 중 가장 오래된 줄 앞까지가 요약 대상이다.
-      long oldestRecentId = recentLatestFirst.get(recentLatestFirst.size() - 1).getId();
+      // 오늘 0시(한국 시간) 이전의 줄만 요약 대상이다. 오늘 나눈 대화는 원문으로 보낸다.
+      OffsetDateTime todayStart =
+          LocalDate.now(KOREA_ZONE).atStartOfDay(KOREA_ZONE).toOffsetDateTime();
       ChatSummary existing =
           summaryRepository.findByUserIdAndResidentId(userId, residentId).orElse(null);
       long summarizedUpToId = existing == null ? 0L : existing.getSummarizedUpToId();
 
       List<ChatMessage> older =
-          messageRepository.findByUserIdAndResidentIdAndIdGreaterThanAndIdLessThanOrderByIdAsc(
-              userId, residentId, summarizedUpToId, oldestRecentId);
+          messageRepository
+              .findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
+                  userId, residentId, summarizedUpToId, todayStart);
       if (older.size() < SUMMARIZE_THRESHOLD) {
         return;
       }

@@ -18,10 +18,11 @@
 | --- | --- | --- |
 | id | O | 양의 정수, 중복 불가. 한 번 정하면 바꾸지 않는다 |
 | name | O | `가이토 (カイト)` 형식. 마지막 괄호 안의 일본어가 이름이 된다 |
-| personality | O | 성격 유형. 그대로 사용 (최대 30자) |
+| personality | O | 성격 유형(MBTI 4글자 등). 그대로 사용 (최대 30자) |
 | appearance_job | O | 외모·직업 |
 | core_features | O | 핵심 특징 |
 | hobby | | 취미 |
+| gender | | `남` 또는 `여`. DB에는 `M`/`F`로 저장되어 대화 프롬프트와 목소리(여성 ja-JP-Neural2-B, 남성 ja-JP-Neural2-C)를 정한다. 빈 칸은 NULL, 다른 값은 오류. 시트에 `gender` 열이 없으면 SQL에 넣지 않는다 |
 | location | | 주민이 지내는 장소(최대 30자). 같은 이름의 건물(`scripts/import-buildings` 시트의 `location`)이 있으면 그 건물에 속하고, 건물이 없는 값(예: `거리`)이나 빈 칸은 건물 밖에서 지낸다 |
 
 ## 변환 규칙 (시트 -> resident 테이블)

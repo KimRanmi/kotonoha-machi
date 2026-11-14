@@ -52,6 +52,12 @@ export function stopSpeaking(): void {
   }
 }
 
+/** 서버 음성에서 목소리를 정할 주민. 성별은 서버가 주민의 slug로 찾는다. */
+export interface ResidentSpeaker {
+  slug: string;
+  voice: VoiceProfile;
+}
+
 /** 브라우저에 내장된 음성으로 읽어 준다. 서버 음성을 쓸 수 없을 때 대신 쓴다. */
 function speakWithBrowserVoice(text: string, voice?: VoiceProfile): void {
   if (!isBrowserVoiceSupported()) {
@@ -86,15 +92,24 @@ function speakWithBrowserVoice(text: string, voice?: VoiceProfile): void {
   }
 }
 
-function loadAudioUrl(text: string): Promise<string> {
-  const cached = audioUrlCache.get(text);
+function loadAudioUrl(text: string, speaker?: ResidentSpeaker): Promise<string> {
+  // 같은 문장도 주민마다 목소리가 달라 주민까지 넣어 기억한다.
+  const cacheKey = speaker ? `${speaker.slug}\n${text}` : text;
+  const cached = audioUrlCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  const request = getSpeechAudio(text).then((blob) => URL.createObjectURL(blob));
-  audioUrlCache.set(text, request);
-  request.catch(() => audioUrlCache.delete(text));
+  const request = getSpeechAudio(
+    text,
+    speaker && {
+      residentSlug: speaker.slug,
+      pitch: speaker.voice.pitch,
+      rate: speaker.voice.rate,
+    },
+  ).then((blob) => URL.createObjectURL(blob));
+  audioUrlCache.set(cacheKey, request);
+  request.catch(() => audioUrlCache.delete(cacheKey));
   return request;
 }
 
@@ -103,33 +118,29 @@ function loadAudioUrl(text: string): Promise<string> {
  * 초과, 로그인 만료, 네트워크 오류 등) 브라우저 내장 음성으로 대신 읽는다. 새로 읽기 시작하면 재생 중인
  * 음성은 끊긴다.
  *
- * `voice`를 주면 목소리를 직접 정해야 하므로 서버 음성(높낮이를 바꿀 수 없다)을 건너뛰고 브라우저 내장
- * 음성에 그 높낮이·속도를 적용해 읽는다. 주민마다 다른 목소리를 낼 때 쓴다.
+ * `speaker`(주민)를 주면 그 주민의 성별에 맞는 서버 음성에 주민의 높낮이·속도를 적용해 읽는다. 서버 음성을
+ * 쓰지 못하면 브라우저 내장 음성에 같은 높낮이·속도를 적용해 대신 읽는다.
  */
-export function speakJapanese(text: string, voice?: VoiceProfile): void {
+export function speakJapanese(text: string, speaker?: ResidentSpeaker): void {
   stopSpeaking();
   const requestId = latestRequestId;
 
-  if (voice) {
-    speakWithBrowserVoice(text, voice);
-    return;
-  }
-
-  loadAudioUrl(text)
+  loadAudioUrl(text, speaker)
     .then((url) => {
       // 기다리는 사이 다른 문장을 눌렀거나 멈췄다면 이 음성은 재생하지 않는다.
       if (requestId !== latestRequestId) {
         return;
       }
       const audio = new Audio(url);
-      audio.playbackRate = AUDIO_PLAYBACK_RATE;
+      // 주민 음성은 서버에서 이미 속도를 맞춰 합성했으니 다시 늦추지 않는다.
+      audio.playbackRate = speaker ? 1 : AUDIO_PLAYBACK_RATE;
       currentAudio = audio;
       return audio.play();
     })
     .catch((error: unknown) => {
       console.warn('서버 음성을 쓰지 못해 브라우저 음성으로 대신합니다.', error);
       if (requestId === latestRequestId) {
-        speakWithBrowserVoice(text);
+        speakWithBrowserVoice(text, speaker?.voice);
       }
     });
 }
