@@ -114,9 +114,27 @@ function buildSql(draft) {
   return lines.join('\n') + '\n';
 }
 
+/** 검수 표시("검수 필요")가 남은 항목이 있으면 사람이 아직 승인하지 않은 초안이라 중단한다. */
+function assertReviewed(draft) {
+  const entries = [
+    ...draft.kanji,
+    ...Object.values(draft.vocabulary).flat(),
+    ...draft.examples,
+  ];
+  const pending = entries.filter((entry) =>
+    [entry.meaningStatus, entry.readingStatus].some((status) => status?.includes('검수 필요')),
+  );
+  if (pending.length > 0) {
+    throw new Error(
+      `검수 표시가 남은 항목이 ${pending.length}개 있습니다. 뜻/읽는 법을 확인한 뒤 meaningStatus·readingStatus를 "검수 완료"로 바꿔주세요.`,
+    );
+  }
+}
+
 function main() {
   const { draft: draftPath } = parseArgs();
   const draft = JSON.parse(readFileSync(path.resolve(draftPath), 'utf-8'));
+  assertReviewed(draft);
 
   const version = nextMigrationVersion();
   const slug = draft.title.replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_|_$/g, '');
