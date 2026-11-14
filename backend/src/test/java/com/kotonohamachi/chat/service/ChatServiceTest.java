@@ -150,6 +150,25 @@ class ChatServiceTest {
   }
 
   @Test
+  void chat_프롬프트에_친밀도_단계별_규칙이_들어간다() {
+    Resident resident = resident();
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
+    when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
+    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+
+    chatService.chat(1L, "r01", "こんにちは");
+
+    ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
+    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"));
+    assertThat(prompt.getValue())
+        .contains("0~19:")
+        .contains("20~49:")
+        .contains("50~79:")
+        .contains("80~100:")
+        .contains("80 미만에서는 그런 사연을 먼저 꺼내지 않음");
+  }
+
+  @Test
   void chat_친밀도_행이_없으면_0으로_프롬프트에_넣는다() {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
