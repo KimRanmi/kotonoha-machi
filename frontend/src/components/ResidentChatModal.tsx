@@ -166,6 +166,12 @@ function ResidentChatModal({
     }
   };
 
+  /** 이미 불러온 화면으로 되돌아간다. 이전 화면의 오류 문구는 남기지 않는다. */
+  const goToView = (nextView: View) => {
+    setPastErrorMessage(null);
+    setView(nextView);
+  };
+
   /** 창이 열려 있고 가장 최근에 보낸 지난 대화 요청일 때만 true. */
   const isCurrentPastRequest = (requestId: number) =>
     isMountedRef.current && requestId === pastRequestRef.current;
@@ -269,12 +275,12 @@ function ResidentChatModal({
             </button>
           )}
           {view === 'days' && (
-            <button type="button" className={styles.pastButton} onClick={() => setView('today')}>
+            <button type="button" className={styles.pastButton} onClick={() => goToView('today')}>
               ← 오늘 대화
             </button>
           )}
           {view === 'day' && (
-            <button type="button" className={styles.pastButton} onClick={() => setView('days')}>
+            <button type="button" className={styles.pastButton} onClick={() => goToView('days')}>
               ← 목록
             </button>
           )}
