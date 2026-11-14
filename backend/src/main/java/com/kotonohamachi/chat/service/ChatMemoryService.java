@@ -9,8 +9,11 @@ import com.kotonohamachi.chat.repository.ChatSummaryRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
@@ -31,6 +34,9 @@ public class ChatMemoryService {
 
   /** 한 번에 요약기에 넘기는 줄 수 상한. 요약이 밀렸을 때 입력이 커지지 않게 한다. */
   static final int MAX_LINES_PER_SUMMARY = 100;
+
+  /** 지금 요약 중인 사용자·주민 쌍. 같은 쌍을 동시에 두 번 요약하지 않게 한다. */
+  private final Set<String> summarizing = ConcurrentHashMap.newKeySet();
 
   private final ChatMessageRepository messageRepository;
   private final ChatSummaryRepository summaryRepository;
@@ -73,12 +79,17 @@ public class ChatMemoryService {
   /**
    * 최근 10줄보다 오래된 대화가 충분히 쌓였으면 요약 메모를 갱신한다.
    *
-   * <p>요약은 부가 기능이라 실패해도 대화 자체는 막지 않는다. 실패하면 로그만 남기고 다음 대화 때 다시 시도한다.
+   * <p>별도 스레드에서 돌아 대답을 기다리게 하지 않는다. 요약은 부가 기능이라 실패해도 대화 자체는 막지 않고, 로그만 남기고 다음 대화 때 다시 시도한다.
    *
    * @param userId 사용자 ID
    * @param residentId 주민 ID
    */
+  @Async
   public void summarizeIfNeeded(Long userId, Long residentId) {
+    String key = userId + ":" + residentId;
+    if (!summarizing.add(key)) {
+      return;
+    }
     try {
       List<ChatMessage> recentLatestFirst =
           messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(userId, residentId);
@@ -110,6 +121,8 @@ public class ChatMemoryService {
       }
     } catch (RuntimeException e) {
       log.warn("대화 요약 갱신 실패(다음 대화 때 다시 시도): {}", e.getClass().getSimpleName());
+    } finally {
+      summarizing.remove(key);
     }
   }
 

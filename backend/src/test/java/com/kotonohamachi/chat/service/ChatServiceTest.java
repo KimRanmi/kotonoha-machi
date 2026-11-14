@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.kotonohamachi.chat.ChatMessage;
 import com.kotonohamachi.chat.ChatSpeaker;
 import com.kotonohamachi.chat.dto.ChatContext;
+import com.kotonohamachi.chat.dto.ChatDaySummary;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.chat.dto.ChatResultResponse;
@@ -24,6 +25,10 @@ import com.kotonohamachi.resident.dto.FriendshipChange;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
 import com.kotonohamachi.resident.service.ResidentFriendshipService;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -317,14 +322,33 @@ class ChatServiceTest {
     verify(chatMessageRepository, never()).saveAll(any());
   }
 
-  @Test
-  void history_최신순으로_받은_기록을_오래된_순으로_뒤집어_돌려준다() {
+  private Resident residentWithId(long id) {
     Resident resident = mock(Resident.class);
-    when(resident.getId()).thenReturn(2L);
+    when(resident.getId()).thenReturn(id);
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
-    when(chatMessageRepository.findTop50ByUserIdAndResidentIdOrderByIdDesc(7L, 2L))
-        .thenReturn(List.of(
-            ChatMessage.fromResident(1L, 1L, "やあ", "안녕"), ChatMessage.fromPlayer(1L, 1L, "こんにちは")));
+    return resident;
+  }
+
+  private void stubRange(
+      ArgumentCaptor<OffsetDateTime> from,
+      ArgumentCaptor<OffsetDateTime> to,
+      List<ChatMessage> result) {
+    when(chatMessageRepository
+            .findByUserIdAndResidentIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByIdAsc(
+                eq(7L), eq(2L), from.capture(), to.capture()))
+        .thenReturn(result);
+  }
+
+  @Test
+  void history_오늘_KST_0시부터_다음날_0시까지만_조회해_그대로_돌려준다() {
+    residentWithId(2L);
+    ArgumentCaptor<OffsetDateTime> from = ArgumentCaptor.forClass(OffsetDateTime.class);
+    ArgumentCaptor<OffsetDateTime> to = ArgumentCaptor.forClass(OffsetDateTime.class);
+    stubRange(
+        from,
+        to,
+        List.of(
+            ChatMessage.fromPlayer(1L, 1L, "こんにちは"), ChatMessage.fromResident(1L, 1L, "やあ", "안녕")));
 
     List<ChatHistoryItem> history = chatService.history(7L, "r01");
 
@@ -332,6 +356,34 @@ class ChatServiceTest {
         .containsExactly(
             new ChatHistoryItem(ChatSpeaker.PLAYER, "こんにちは", null),
             new ChatHistoryItem(ChatSpeaker.RESIDENT, "やあ", "안녕"));
+    ZoneId kst = ZoneId.of("Asia/Seoul");
+    OffsetDateTime todayStart = LocalDate.now(kst).atStartOfDay(kst).toOffsetDateTime();
+    assertThat(from.getValue().toInstant()).isEqualTo(todayStart.toInstant());
+    assertThat(to.getValue().toInstant()).isEqualTo(todayStart.plusDays(1).toInstant());
+  }
+
+  @Test
+  void historyOfDay_날짜_경계는_한국_시간_0시다() {
+    residentWithId(2L);
+    ArgumentCaptor<OffsetDateTime> from = ArgumentCaptor.forClass(OffsetDateTime.class);
+    ArgumentCaptor<OffsetDateTime> to = ArgumentCaptor.forClass(OffsetDateTime.class);
+    stubRange(from, to, List.of());
+
+    chatService.historyOfDay(7L, "r01", LocalDate.of(2026, 3, 10));
+
+    // KST 3/10 00:00 = UTC 3/9 15:00, 끝은 반열린 구간의 다음날 0시.
+    assertThat(from.getValue().toInstant()).isEqualTo(Instant.parse("2026-03-09T15:00:00Z"));
+    assertThat(to.getValue().toInstant()).isEqualTo(Instant.parse("2026-03-10T15:00:00Z"));
+  }
+
+  @Test
+  void historyOfDay_주민이_없으면_404다() {
+    when(residentRepository.findBySlug("r99")).thenReturn(Optional.empty());
+
+    ApiException exception = catchThrowableOfType(
+        ApiException.class, () -> chatService.historyOfDay(1L, "r99", LocalDate.of(2026, 3, 10)));
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
   }
 
   @Test
@@ -342,6 +394,59 @@ class ChatServiceTest {
         catchThrowableOfType(ApiException.class, () -> chatService.history(1L, "r99"));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  private static ChatMessageRepository.DayRow row(String date, long count, String first) {
+    ChatMessageRepository.DayRow row = mock(ChatMessageRepository.DayRow.class);
+    when(row.getChatDate()).thenReturn(date);
+    when(row.getLineCount()).thenReturn(count);
+    when(row.getFirstPlayerText()).thenReturn(first);
+    return row;
+  }
+
+  @Test
+  void historyDays_오늘_KST_0시_이전만_조회하고_미리보기를_30자로_자른다() {
+    residentWithId(2L);
+    String exactly30 = "あ".repeat(30);
+    String long31 = "い".repeat(31);
+    ArgumentCaptor<OffsetDateTime> before = ArgumentCaptor.forClass(OffsetDateTime.class);
+    List<ChatMessageRepository.DayRow> rows = List.of(
+        row("2026-03-09", 4, long31),
+        row("2026-03-08", 2, exactly30),
+        row("2026-03-07", 2, "短い"),
+        row("2026-03-06", 1, null));
+    when(chatMessageRepository.findDaysBefore(eq(7L), eq(2L), before.capture())).thenReturn(rows);
+
+    List<ChatDaySummary> days = chatService.historyDays(7L, "r01");
+
+    assertThat(days)
+        .containsExactly(
+            new ChatDaySummary("2026-03-09", 4, "い".repeat(30) + "…"),
+            new ChatDaySummary("2026-03-08", 2, exactly30),
+            new ChatDaySummary("2026-03-07", 2, "短い"),
+            new ChatDaySummary("2026-03-06", 1, ""));
+    ZoneId kst = ZoneId.of("Asia/Seoul");
+    assertThat(before.getValue().toInstant())
+        .isEqualTo(LocalDate.now(kst).atStartOfDay(kst).toInstant());
+  }
+
+  @Test
+  void historyDays_대화한_날이_없으면_빈_목록이다() {
+    residentWithId(2L);
+    when(chatMessageRepository.findDaysBefore(eq(7L), eq(2L), any())).thenReturn(List.of());
+
+    assertThat(chatService.historyDays(7L, "r01")).isEmpty();
+  }
+
+  @Test
+  void historyDays_주민이_없으면_404다() {
+    when(residentRepository.findBySlug("r99")).thenReturn(Optional.empty());
+
+    ApiException exception =
+        catchThrowableOfType(ApiException.class, () -> chatService.historyDays(1L, "r99"));
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+    verify(chatMessageRepository, never()).findDaysBefore(any(), any(), any());
   }
 
   @Test

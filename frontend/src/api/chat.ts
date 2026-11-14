@@ -26,8 +26,31 @@ export interface ChatHistoryItem {
   translation: string | null;
 }
 
-/** 주민(slug)과 나눈 최근 대화를 오래된 순으로 가져온다. */
+/** 주민(slug)과 오늘(한국 시간) 나눈 대화를 오래된 순으로 가져온다. */
 export async function getChatHistory(residentSlug: string): Promise<ChatHistoryItem[]> {
   const response = await apiFetch(`/api/residents/${encodeURIComponent(residentSlug)}/chat`);
+  return response.json();
+}
+
+/** 지난 대화 목록의 하루치 요약. */
+export interface ChatDay {
+  /** 대화한 날짜(한국 시간, yyyy-MM-dd). */
+  date: string;
+  lineCount: number;
+  /** 그날 플레이어가 처음 한 말(앞부분). */
+  preview: string;
+}
+
+/** 오늘 이전에 주민과 대화한 날들을 최신 날짜부터 가져온다. */
+export async function getChatDays(residentSlug: string): Promise<ChatDay[]> {
+  const response = await apiFetch(`/api/residents/${encodeURIComponent(residentSlug)}/chat/days`);
+  return response.json();
+}
+
+/** 특정 날(yyyy-MM-dd)에 주민과 나눈 대화를 오래된 순으로 가져온다. */
+export async function getChatDay(residentSlug: string, date: string): Promise<ChatHistoryItem[]> {
+  const response = await apiFetch(
+    `/api/residents/${encodeURIComponent(residentSlug)}/chat/days/${encodeURIComponent(date)}`,
+  );
   return response.json();
 }

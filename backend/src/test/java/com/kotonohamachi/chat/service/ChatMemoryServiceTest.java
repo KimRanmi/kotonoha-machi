@@ -200,4 +200,48 @@ class ChatMemoryServiceTest {
 
     verify(summaryRepository, never()).save(any());
   }
+
+  @Test
+  void summarizeIfNeeded_같은_쌍이_요약_중이면_중복_호출은_요약하지_않는다() throws Exception {
+    when(messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(USER, RESIDENT))
+        .thenReturn(latestFirst(31, 40));
+    when(summaryRepository.findByUserIdAndResidentId(USER, RESIDENT)).thenReturn(Optional.empty());
+    when(messageRepository.findByUserIdAndResidentIdAndIdGreaterThanAndIdLessThanOrderByIdAsc(
+            USER, RESIDENT, 0L, 31L))
+        .thenReturn(oldestFirst(1, 30));
+    java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    when(geminiClient.summarize(anyString(), anyList())).thenAnswer(invocation -> {
+      started.countDown();
+      release.await(5, java.util.concurrent.TimeUnit.SECONDS);
+      return "요약";
+    });
+    ChatMemoryService service = service();
+
+    Thread first = new Thread(() -> service.summarizeIfNeeded(USER, RESIDENT));
+    first.start();
+    assertThat(started.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+    service.summarizeIfNeeded(USER, RESIDENT); // 첫 요약이 진행 중이므로 바로 돌아와야 한다.
+    release.countDown();
+    first.join(5000);
+
+    verify(geminiClient, org.mockito.Mockito.times(1)).summarize(anyString(), anyList());
+  }
+
+  @Test
+  void summarizeIfNeeded_요약이_끝나면_같은_쌍을_다시_요약할_수_있다() {
+    when(messageRepository.findTop10ByUserIdAndResidentIdOrderByIdDesc(USER, RESIDENT))
+        .thenReturn(latestFirst(31, 40));
+    when(summaryRepository.findByUserIdAndResidentId(USER, RESIDENT)).thenReturn(Optional.empty());
+    when(messageRepository.findByUserIdAndResidentIdAndIdGreaterThanAndIdLessThanOrderByIdAsc(
+            USER, RESIDENT, 0L, 31L))
+        .thenReturn(oldestFirst(1, 30));
+    when(geminiClient.summarize(anyString(), anyList())).thenReturn("요약");
+    ChatMemoryService service = service();
+
+    service.summarizeIfNeeded(USER, RESIDENT);
+    service.summarizeIfNeeded(USER, RESIDENT);
+
+    verify(geminiClient, org.mockito.Mockito.times(2)).summarize(anyString(), anyList());
+  }
 }

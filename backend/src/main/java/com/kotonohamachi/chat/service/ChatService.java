@@ -3,6 +3,7 @@ package com.kotonohamachi.chat.service;
 import com.kotonohamachi.chat.ChatErrorCode;
 import com.kotonohamachi.chat.ChatMessage;
 import com.kotonohamachi.chat.dto.ChatContext;
+import com.kotonohamachi.chat.dto.ChatDaySummary;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.chat.dto.ChatResultResponse;
@@ -14,8 +15,9 @@ import com.kotonohamachi.resident.dto.FriendshipChange;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
 import com.kotonohamachi.resident.service.ResidentFriendshipService;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -27,6 +29,11 @@ import org.springframework.stereotype.Service;
 public class ChatService {
 
   static final int MAX_MESSAGE_LENGTH = 200;
+
+  private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+
+  /** 날짜 목록에서 미리보기로 보여 줄 글자 수. */
+  private static final int PREVIEW_LENGTH = 30;
 
   // 플레이어의 말이 비어 있을 때 돌려주는 안내.
   private static final ChatResponse ASK_AGAIN = new ChatResponse("もう一度お願いします。", "다시 말씀해주세요.");
@@ -135,24 +142,68 @@ public class ChatService {
   }
 
   /**
-   * 사용자와 주민이 나눈 최근 대화를 오래된 순으로 돌려준다.
+   * 사용자와 주민이 오늘(한국 시간) 나눈 대화를 오래된 순으로 돌려준다.
    *
    * @param userId 사용자 ID
    * @param residentSlug 주민의 고유 키(예: r01)
-   * @return 최근 50줄까지의 대화(오래된 것이 먼저)
+   * @return 오늘의 대화(오래된 것이 먼저)
    * @throws ApiException 주민이 없으면(404)
    */
   public List<ChatHistoryItem> history(Long userId, String residentSlug) {
-    Resident resident = residentRepository
-        .findBySlug(residentSlug)
-        .orElseThrow(() -> new ApiException(ChatErrorCode.RESIDENT_NOT_FOUND));
-    List<ChatMessage> latestFirst =
-        chatMessageRepository.findTop50ByUserIdAndResidentIdOrderByIdDesc(userId, resident.getId());
-    List<ChatMessage> oldestFirst = new ArrayList<>(latestFirst);
-    Collections.reverse(oldestFirst);
-    return oldestFirst.stream()
+    return historyOfDay(userId, residentSlug, LocalDate.now(KOREA_ZONE));
+  }
+
+  /**
+   * 오늘 이전에 대화한 날들의 목록을 최신 날짜부터 돌려준다.
+   *
+   * @param userId 사용자 ID
+   * @param residentSlug 주민의 고유 키(예: r01)
+   * @return 날짜별 줄 수와 미리보기(최대 60일)
+   * @throws ApiException 주민이 없으면(404)
+   */
+  public List<ChatDaySummary> historyDays(Long userId, String residentSlug) {
+    Resident resident = findResident(residentSlug);
+    OffsetDateTime todayStart =
+        LocalDate.now(KOREA_ZONE).atStartOfDay(KOREA_ZONE).toOffsetDateTime();
+    return chatMessageRepository.findDaysBefore(userId, resident.getId(), todayStart).stream()
+        .map(row -> new ChatDaySummary(
+            row.getChatDate(), row.getLineCount(), preview(row.getFirstPlayerText())))
+        .toList();
+  }
+
+  /**
+   * 사용자와 주민이 특정 날(한국 시간)에 나눈 대화를 오래된 순으로 돌려준다.
+   *
+   * @param userId 사용자 ID
+   * @param residentSlug 주민의 고유 키(예: r01)
+   * @param day 조회할 날짜
+   * @return 그날의 대화(오래된 것이 먼저)
+   * @throws ApiException 주민이 없으면(404)
+   */
+  public List<ChatHistoryItem> historyOfDay(Long userId, String residentSlug, LocalDate day) {
+    Resident resident = findResident(residentSlug);
+    OffsetDateTime from = day.atStartOfDay(KOREA_ZONE).toOffsetDateTime();
+    OffsetDateTime to = day.plusDays(1).atStartOfDay(KOREA_ZONE).toOffsetDateTime();
+    return chatMessageRepository
+        .findByUserIdAndResidentIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByIdAsc(
+            userId, resident.getId(), from, to)
+        .stream()
         .map(m -> new ChatHistoryItem(m.getSpeaker(), m.getText(), m.getTranslation()))
         .toList();
+  }
+
+  private Resident findResident(String residentSlug) {
+    return residentRepository
+        .findBySlug(residentSlug)
+        .orElseThrow(() -> new ApiException(ChatErrorCode.RESIDENT_NOT_FOUND));
+  }
+
+  /** 미리보기용으로 앞부분만 남긴다. 플레이어의 말이 없는 날은 빈 문자열. */
+  private static String preview(String text) {
+    if (text == null) {
+      return "";
+    }
+    return text.length() > PREVIEW_LENGTH ? text.substring(0, PREVIEW_LENGTH) + "…" : text;
   }
 
   /** 템플릿의 {…}를 한 번에 치환한다. 치환된 값 안의 {…}는 다시 치환되지 않는다. */

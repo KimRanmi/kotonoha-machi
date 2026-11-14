@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { ApiError } from '../api/client';
-import { getChatHistory, sendChatMessage } from '../api/chat';
+import { getChatDay, getChatDays, getChatHistory, sendChatMessage } from '../api/chat';
+import type { ChatDay, ChatHistoryItem } from '../api/chat';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { cancelSpeechRecognition } from '../lib/speechRecognition';
 import { speakJapanese, stopSpeaking } from '../lib/speechSynthesis';
@@ -17,6 +18,18 @@ interface ChatLine {
   text: string;
   translation?: string;
 }
+
+/** 서버의 기록 한 줄을 화면용 줄로 바꾼다. */
+function toChatLine(item: ChatHistoryItem): ChatLine {
+  return {
+    speaker: item.speaker === 'PLAYER' ? 'me' : 'resident',
+    text: item.text,
+    translation: item.translation ?? undefined,
+  };
+}
+
+/** 대화창이 보여 주는 화면: 오늘 대화 / 지난 대화 날짜 목록 / 고른 날의 대화. */
+type View = 'today' | 'days' | 'day';
 
 interface ResidentChatModalProps {
   residentSlug: string;
@@ -48,6 +61,13 @@ function ResidentChatModal({
   // 기록 불러오기 상태는 전송 오류와 따로 둔다(서로 덮어쓰지 않게).
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
+  const [view, setView] = useState<View>('today');
+  const [days, setDays] = useState<ChatDay[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dayLines, setDayLines] = useState<ChatLine[]>([]);
+  // 지난 대화 화면의 불러오기 상태(오늘 대화의 상태와 따로 둔다).
+  const [isPastLoading, setIsPastLoading] = useState(false);
+  const [pastErrorMessage, setPastErrorMessage] = useState<string | null>(null);
   const {
     isSupported: speechSupported,
     isListening,
@@ -79,11 +99,7 @@ function ResidentChatModal({
         if (cancelled) {
           return;
         }
-        const past: ChatLine[] = history.map((item) => ({
-          speaker: item.speaker === 'PLAYER' ? 'me' : 'resident',
-          text: item.text,
-          translation: item.translation ?? undefined,
-        }));
+        const past = history.map(toChatLine);
         setLines((previous) => [...past, ...previous]);
       })
       .catch(() => {
@@ -148,6 +164,50 @@ function ResidentChatModal({
     }
   };
 
+  /** 지난 대화 날짜 목록을 불러와 목록 화면으로 간다. */
+  const openDays = async () => {
+    setView('days');
+    setIsPastLoading(true);
+    setPastErrorMessage(null);
+    try {
+      const loaded = await getChatDays(residentSlug);
+      if (isMountedRef.current) {
+        setDays(loaded);
+      }
+    } catch {
+      if (isMountedRef.current) {
+        setPastErrorMessage('지난 대화를 불러오지 못했습니다.');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsPastLoading(false);
+      }
+    }
+  };
+
+  /** 고른 날의 대화를 불러와 읽기 화면으로 간다. */
+  const openDay = async (date: string) => {
+    setView('day');
+    setSelectedDate(date);
+    setDayLines([]);
+    setIsPastLoading(true);
+    setPastErrorMessage(null);
+    try {
+      const loaded = await getChatDay(residentSlug, date);
+      if (isMountedRef.current) {
+        setDayLines(loaded.map(toChatLine));
+      }
+    } catch {
+      if (isMountedRef.current) {
+        setPastErrorMessage('그날의 대화를 불러오지 못했습니다.');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsPastLoading(false);
+      }
+    }
+  };
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     void sendMessage(text);
@@ -193,41 +253,102 @@ function ResidentChatModal({
             <span className={styles.friendshipLevel}>{friendshipLevel}</span>
             {friendshipGain > 0 && <span className={styles.friendshipGain}>+{friendshipGain}</span>}
           </span>
+          {view === 'today' && (
+            <button type="button" className={styles.pastButton} onClick={() => void openDays()}>
+              지난 대화
+            </button>
+          )}
+          {view === 'days' && (
+            <button type="button" className={styles.pastButton} onClick={() => setView('today')}>
+              ← 오늘 대화
+            </button>
+          )}
+          {view === 'day' && (
+            <button type="button" className={styles.pastButton} onClick={() => setView('days')}>
+              ← 목록
+            </button>
+          )}
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="닫기">
             ✕
           </button>
         </header>
-        <ul className={styles.lines} aria-live="polite">
-          {lines.map((line, index) => (
-            <li key={index} className={styles.line}>
-              <strong>{line.speaker === 'me' ? '나' : residentName}</strong>: {line.text}
-              {line.translation && <div className={styles.translation}>{line.translation}</div>}
-            </li>
-          ))}
-        </ul>
-        {isHistoryLoading && <p>이전 대화를 불러오는 중…</p>}
-        {historyErrorMessage && <p role="alert">{historyErrorMessage}</p>}
-        {errorMessage && <p role="alert">{errorMessage}</p>}
-        {speechErrorMessage && <p role="alert">{speechErrorMessage}</p>}
-        {!speechSupported && (
-          <p role="alert">이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 이용해주세요.</p>
+        {view === 'days' && (
+          <>
+            {isPastLoading && <p>지난 대화를 불러오는 중…</p>}
+            {pastErrorMessage && <p role="alert">{pastErrorMessage}</p>}
+            {!isPastLoading && !pastErrorMessage && days.length === 0 && (
+              <p>지난 대화가 없습니다.</p>
+            )}
+            <ul className={styles.dayList}>
+              {days.map((day) => (
+                <li key={day.date}>
+                  <button
+                    type="button"
+                    className={styles.dayItem}
+                    onClick={() => void openDay(day.date)}
+                  >
+                    <span className={styles.dayDate}>
+                      {day.date} · {day.lineCount}줄
+                    </span>
+                    <span className={styles.dayPreview}>{day.preview}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
-        <form onSubmit={handleSubmit}>
-          <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
-          <button
-            type="button"
-            onClick={isListening ? cancelSpeechRecognition : handleVoiceInput}
-            disabled={!speechSupported || isSending}
-          >
-            {isListening ? '✕ 듣기 취소' : '🎤 말하기'}
-          </button>
-          <button
-            type="submit"
-            disabled={isSending || !text.trim() || text.length > MAX_MESSAGE_LENGTH}
-          >
-            {isSending ? '답장을 기다리는 중…' : '보내기'}
-          </button>
-        </form>
+        {view === 'day' && (
+          <>
+            <p className={styles.dayDate}>{selectedDate}</p>
+            {isPastLoading && <p>불러오는 중…</p>}
+            {pastErrorMessage && <p role="alert">{pastErrorMessage}</p>}
+            <ul className={styles.lines}>
+              {dayLines.map((line, index) => (
+                <li key={index} className={styles.line}>
+                  <strong>{line.speaker === 'me' ? '나' : residentName}</strong>: {line.text}
+                  {line.translation && <div className={styles.translation}>{line.translation}</div>}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {view === 'today' && (
+          <>
+            <ul className={styles.lines} aria-live="polite">
+              {lines.map((line, index) => (
+                <li key={index} className={styles.line}>
+                  <strong>{line.speaker === 'me' ? '나' : residentName}</strong>: {line.text}
+                  {line.translation && <div className={styles.translation}>{line.translation}</div>}
+                </li>
+              ))}
+            </ul>
+            {isHistoryLoading && <p>이전 대화를 불러오는 중…</p>}
+            {historyErrorMessage && <p role="alert">{historyErrorMessage}</p>}
+            {errorMessage && <p role="alert">{errorMessage}</p>}
+            {speechErrorMessage && <p role="alert">{speechErrorMessage}</p>}
+            {!speechSupported && (
+              <p role="alert">
+                이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 이용해주세요.
+              </p>
+            )}
+            <form onSubmit={handleSubmit}>
+              <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
+              <button
+                type="button"
+                onClick={isListening ? cancelSpeechRecognition : handleVoiceInput}
+                disabled={!speechSupported || isSending}
+              >
+                {isListening ? '✕ 듣기 취소' : '🎤 말하기'}
+              </button>
+              <button
+                type="submit"
+                disabled={isSending || !text.trim() || text.length > MAX_MESSAGE_LENGTH}
+              >
+                {isSending ? '답장을 기다리는 중…' : '보내기'}
+              </button>
+            </form>
+          </>
+        )}
       </section>
     </div>
   );
