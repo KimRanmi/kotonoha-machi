@@ -83,6 +83,15 @@
   line-height: 1.5;
 }
 
+/* 하루 대화 상한에 걸렸을 때 주민이 졸려하는 안내. 오류 줄과 달리 부드러운 색으로 보인다. */
+.sleepyNotice {
+  margin: 0;
+  padding: var(--space-2);
+  border-radius: 8px;
+  background: #fff4d6;
+  line-height: 1.5;
+}
+
 .translation {
   color: var(--color-text-muted);
   font-size: 0.9rem;

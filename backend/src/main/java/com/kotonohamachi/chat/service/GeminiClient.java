@@ -86,7 +86,7 @@ public class GeminiClient {
    * @param recentLines 최근 대화(오래된 것이 먼저, 없으면 빈 목록)
    * @param userMessage 플레이어의 새 메시지(시스템 프롬프트와 분리해 보낸다)
    * @return 일본어 대사와 한국어 번역
-   * @throws ApiException 키가 설정되지 않았거나(503) 대사 생성에 실패한 경우(502)
+   * @throws ApiException 키가 설정되지 않았거나(503), Google 한도를 넘었거나(429), 대사 생성에 실패한 경우(502)
    */
   public ChatResponse generate(
       String systemPrompt, List<ChatHistoryItem> recentLines, String userMessage) {
@@ -174,9 +174,7 @@ public class GeminiClient {
     try {
       return getClient().models.generateContent(model, contents, config).text();
     } catch (com.google.genai.errors.ApiException e) {
-      // 예외 메시지에 요청 정보가 섞일 수 있어 상태 코드만 남긴다(키가 로그에 남지 않게).
-      log.error("Gemini 호출 실패: HTTP {}", e.code());
-      throw new ApiException(ChatErrorCode.GENERATION_FAILED);
+      throw fromGoogleError(e.code());
     } catch (RuntimeException e) {
       // 원인 종류(시간 초과, DNS, SSL 등)를 알 수 있게 클래스 이름만 남긴다. 메시지는 요청 정보가 섞일 수 있어 뺀다.
       Throwable cause = e.getCause();
@@ -186,6 +184,20 @@ public class GeminiClient {
           cause == null ? "없음" : cause.getClass().getName());
       throw new ApiException(ChatErrorCode.GENERATION_FAILED);
     }
+  }
+
+  /**
+   * Google이 돌려준 HTTP 상태 코드를 우리 오류로 바꾼다. 429는 무료 티어 등 Google 쪽 한도를 넘은 경우라 우리 하루 상한과 같은
+   * "졸려요" 연출(429)로 돌려주고, 나머지는 대사 생성 실패(502)다. 예외 메시지에는 요청 정보가 섞일 수 있어 상태 코드만 남긴다(키가
+   * 로그에 남지 않게).
+   */
+  static ApiException fromGoogleError(int httpStatus) {
+    if (httpStatus == 429) {
+      log.warn("Gemini 호출 실패: Google 한도 초과(HTTP 429)");
+      return new ApiException(ChatErrorCode.DAILY_LIMIT_EXCEEDED);
+    }
+    log.error("Gemini 호출 실패: HTTP {}", httpStatus);
+    return new ApiException(ChatErrorCode.GENERATION_FAILED);
   }
 
   private Client getClient() {

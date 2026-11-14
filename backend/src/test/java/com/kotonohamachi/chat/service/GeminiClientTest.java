@@ -126,4 +126,19 @@ class GeminiClientTest {
     assertThat(last.role().get()).isEqualTo("user");
     assertThat(last.parts().get().get(0).text().get()).isEqualTo("now");
   }
+
+  @Test
+  void fromGoogleError_Google_429는_우리_429로_바꾼다() {
+    ApiException exception = GeminiClient.fromGoogleError(429);
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+    assertThat(exception.getMessage()).contains("졸려요");
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 401, 500, 503})
+  void fromGoogleError_그_밖의_오류는_502로_바꾼다(int httpStatus) {
+    assertThat(GeminiClient.fromGoogleError(httpStatus).getStatus())
+        .isEqualTo(HttpStatus.BAD_GATEWAY);
+  }
 }
