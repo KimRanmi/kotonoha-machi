@@ -3,6 +3,29 @@
 테마 학습 콘텐츠(한자·단어·표현·예문)를 새 테마용으로 추가할 때 쓰는 1회성 개발 도구다.
 백엔드/프런트엔드 앱과 완전히 분리돼 있고, 앱에는 전혀 포함되지 않는다.
 
+## 위키백과 지문 → 오늘의 학습 (1단계: 지문 후보 고르기)
+
+결정 배경은 `docs/decisions/0038-wikipedia-passage-daily-lesson.md`. 시트·Apps Script는 쓰지 않는다.
+
+```bash
+npm run collect -- --month 11            # 11월 전체 날짜 문서의 「記念日・年中行事」 링크에서 후보 수집
+npm run collect -- --date 11月16日        # 날짜 하나만
+npm run collect -- --category 良質な記事 --limit 200   # 보조: 분류에서
+npm run pick -- --pick 3,7,12            # 후보 파일의 번호로 승인 → approved/readings.json
+```
+
+- `collect`는 위키백과 공식 API로 도입 단락·리비전 번호(`oldid`)·분류를 가져와 `cache/`에 저장하고(다시 부르지 않음),
+  거름·점수를 매겨 `candidates/wiki/<이름>.md`에 상위 후보(기본 10개)와 제외 이유를 쓴다. 429가 나면 다시 실행하면 캐시부터 이어서 한다.
+- 자동 거름: 길이 150~500자, 숫자·괄호·고유명사 비율, 제목 패턴(연도 등), 금지 단어·제외 분류(`config/wiki-filter.json`).
+- 점수: N1~N3 한자의 서로 다른 개수와 비율이 높을수록 +, JLPT 목록 밖 한자·고유명사·괄호가 많으면 −(`lib/passageScore.mjs`).
+  기준이 어긋나면 항목을 고치지 말고 이 상수·설정 파일을 고친다.
+- **기계가 못 거르는 것**: 금지 단어에 안 걸리는 민감한 맥락(논란·편향된 서술), 본문 오류, 지문으로서의 재미·적합성.
+  그래서 사람이 후보 파일의 본문을 눈으로 확인하고 번호를 고른다.
+- `cache/`, `candidates/wiki/`는 git에 올리지 않는다(위키백과 본문, CC BY-SA). `approved/readings.json` 커밋 여부는 아직 미정.
+- API 규칙: 요청은 하나씩, 1.2초 간격, `maxlag`, User-Agent는 `kotonoha-import-tool/0.1`(연락처 없음).
+
+아래는 이전 방식(테마별 콘텐츠)이다.
+
 ## 새 흐름: 구글 시트가 원본 (`npm run import`)
 
 테마 콘텐츠의 원본은 구글 시트 "kotonoha-machi 테마 콘텐츠"(탭 `themes`, `kanji`, `vocabulary`,
