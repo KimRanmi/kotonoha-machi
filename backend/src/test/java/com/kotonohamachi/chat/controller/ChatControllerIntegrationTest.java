@@ -10,8 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.kotonohamachi.auth.service.EmailSender;
+import com.kotonohamachi.chat.ChatErrorCode;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.chat.service.GeminiClient;
+import com.kotonohamachi.common.ApiException;
 import jakarta.servlet.Filter;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -259,6 +261,21 @@ class ChatControllerIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[?(@.residentSlug == 'r01')].level").value(10))
         .andExpect(jsonPath("$[?(@.residentSlug == 'r02')].level").value(0));
+  }
+
+  @Test
+  void Gemini_한도로_429가_나면_졸려요_메시지로_응답한다() throws Exception {
+    when(geminiClient.generate(any(), any(), any()))
+        .thenThrow(new ApiException(ChatErrorCode.DAILY_LIMIT_EXCEEDED));
+    MockHttpSession session = signUpVerifyAndLogin();
+
+    mockMvc
+        .perform(post("/api/residents/r01/chat")
+            .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"message\":\"こんにちは\"}"))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.message").value("오늘은 이야기를 많이 해서 졸려요. 내일 또 이야기해요."));
   }
 
   @Test

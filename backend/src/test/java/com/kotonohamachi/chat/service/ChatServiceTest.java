@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,12 +26,14 @@ import com.kotonohamachi.resident.dto.FriendshipChange;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
 import com.kotonohamachi.resident.service.ResidentFriendshipService;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,6 +66,10 @@ class ChatServiceTest {
 
   private ChatService chatService;
 
+  // 날짜 경계 테스트에서 "지금"을 옮길 수 있게 바꿔 끼우는 시계.
+  private final AtomicReference<Instant> now =
+      new AtomicReference<>(Instant.parse("2026-03-10T03:00:00Z"));
+
   @BeforeEach
   void setUp() {
     chatService = new ChatService(
@@ -71,7 +78,23 @@ class ChatServiceTest {
         chatMessageRepository,
         friendshipService,
         memoryService,
-        geminiClient);
+        geminiClient,
+        new Clock() {
+          @Override
+          public ZoneId getZone() {
+            return ZoneId.of("Asia/Seoul");
+          }
+
+          @Override
+          public Clock withZone(ZoneId zone) {
+            return this;
+          }
+
+          @Override
+          public Instant instant() {
+            return now.get();
+          }
+        });
     lenient().when(memoryService.load(any(), any())).thenReturn(new ChatContext("", List.of()));
     lenient()
         .when(friendshipService.recordChat(any(), any()))
@@ -147,6 +170,25 @@ class ChatServiceTest {
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     verify(geminiClient, never()).generate(any(), any(), any());
+  }
+
+  @Test
+  void chat_프롬프트에_친밀도_단계별_규칙이_들어간다() {
+    Resident resident = resident();
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
+    when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
+    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+
+    chatService.chat(1L, "r01", "こんにちは");
+
+    ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
+    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"));
+    assertThat(prompt.getValue())
+        .contains("0~19:")
+        .contains("20~49:")
+        .contains("50~79:")
+        .contains("80~100:")
+        .contains("80 미만에서는 그런 사연을 먼저 꺼내지 않음");
   }
 
   @Test
@@ -575,5 +617,105 @@ class ChatServiceTest {
     catchThrowableOfType(RuntimeException.class, () -> chatService.chat(1L, "r01", "やあ"));
 
     verify(memoryService, never()).summarizeIfNeeded(any(), any());
+  }
+
+  // ---- 하루 대화 상한 ----
+
+  /** 주민·친밀도 조회와 Gemini 대답을 준비한다(상한 테스트 공통). */
+  private void givenResidentAndReply() {
+    Resident resident = resident();
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
+    lenient()
+        .when(friendshipRepository.findByUserIdAndResidentId(any(), any()))
+        .thenReturn(Optional.empty());
+    lenient()
+        .when(geminiClient.generate(any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
+  }
+
+  private void chatTimes(Long userId, int times) {
+    for (int i = 0; i < times; i++) {
+      chatService.chat(userId, "r01", "こんにちは");
+    }
+  }
+
+  private ApiException chatAndCatch(Long userId) {
+    return catchThrowableOfType(ApiException.class, () -> chatService.chat(userId, "r01", "こんにちは"));
+  }
+
+  @Test
+  void chat_하루_상한까지는_정상이고_넘으면_429이며_Gemini를_부르지_않는다() {
+    givenResidentAndReply();
+
+    chatTimes(1L, ChatService.DAILY_CHAT_LIMIT);
+    ApiException exception = chatAndCatch(1L);
+
+    assertThat(exception.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+    assertThat(exception.getMessage()).contains("졸려요");
+    verify(geminiClient, times(ChatService.DAILY_CHAT_LIMIT)).generate(any(), any(), any());
+    // 상한에 걸린 말은 기록·친밀도에도 반영되지 않는다.
+    verify(friendshipService, times(ChatService.DAILY_CHAT_LIMIT)).recordChat(any(), any());
+  }
+
+  @Test
+  void chat_Gemini가_실패하면_횟수를_돌려준다() {
+    givenResidentAndReply();
+    chatTimes(1L, ChatService.DAILY_CHAT_LIMIT - 1);
+    when(geminiClient.generate(any(), any(), any()))
+        .thenThrow(new ApiException(com.kotonohamachi.chat.ChatErrorCode.GENERATION_FAILED))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
+
+    // 실패는 횟수에 세지 않으니, 실패한 뒤에도 남은 한 번을 쓸 수 있다.
+    assertThat(chatAndCatch(1L).getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY);
+    assertThat(chatService.chat(1L, "r01", "こんにちは").reply()).isEqualTo("やあ");
+    assertThat(chatAndCatch(1L).getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+  }
+
+  @Test
+  void chat_Google_한도_429로_실패해도_횟수를_돌려준다() {
+    givenResidentAndReply();
+    chatTimes(1L, ChatService.DAILY_CHAT_LIMIT - 1);
+    when(geminiClient.generate(any(), any(), any()))
+        .thenThrow(new ApiException(com.kotonohamachi.chat.ChatErrorCode.DAILY_LIMIT_EXCEEDED))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
+
+    assertThat(chatAndCatch(1L).getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+    // Google 쪽 한도 때문에 못 받은 대답은 우리 상한에 세지 않는다.
+    assertThat(chatService.chat(1L, "r01", "こんにちは").reply()).isEqualTo("やあ");
+  }
+
+  @Test
+  void chat_상한은_사용자별로_따로_센다() {
+    givenResidentAndReply();
+    chatTimes(1L, ChatService.DAILY_CHAT_LIMIT);
+
+    assertThat(chatAndCatch(1L).getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+    assertThat(chatService.chat(2L, "r01", "こんにちは").reply()).isEqualTo("やあ");
+  }
+
+  @Test
+  void chat_한국_시간으로_날짜가_바뀌면_횟수가_초기화된다() {
+    givenResidentAndReply();
+    // 2026-03-10 23:59 KST(= 14:59Z)에 상한까지 쓴다.
+    now.set(Instant.parse("2026-03-10T14:59:00Z"));
+    chatTimes(1L, ChatService.DAILY_CHAT_LIMIT);
+    assertThat(chatAndCatch(1L).getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+
+    // 1분 뒤 = 2026-03-11 00:00 KST. 같은 UTC 날짜(03-10)지만 한국 날짜는 바뀐다.
+    now.set(Instant.parse("2026-03-10T15:00:00Z"));
+
+    assertThat(chatService.chat(1L, "r01", "こんにちは").reply()).isEqualTo("やあ");
+  }
+
+  @Test
+  void chat_빈_메시지는_횟수에_세지_않는다() {
+    givenResidentAndReply();
+    for (int i = 0; i < ChatService.DAILY_CHAT_LIMIT + 5; i++) {
+      chatService.chat(1L, "r01", "  ");
+    }
+
+    // 빈 메시지를 상한보다 많이 보내도 실제 대화는 상한만큼 그대로 할 수 있다.
+    chatTimes(1L, ChatService.DAILY_CHAT_LIMIT);
+    assertThat(chatAndCatch(1L).getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
   }
 }

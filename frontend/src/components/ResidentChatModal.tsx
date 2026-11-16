@@ -56,6 +56,8 @@ function ResidentChatModal({
   const [lines, setLines] = useState<ChatLine[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // 하루 대화 상한(429)에 걸렸을 때 주민이 하는 말. 오류가 아니라 "졸려요" 연출이라 따로 둔다.
+  const [sleepyMessage, setSleepyMessage] = useState<string | null>(null);
   // 마지막 대답으로 오른 친밀도. 0이면 보여 주지 않는다.
   const [friendshipGain, setFriendshipGain] = useState(0);
   // 기록 불러오기 상태는 전송 오류와 따로 둔다(서로 덮어쓰지 않게).
@@ -136,6 +138,7 @@ function ResidentChatModal({
     isSendingRef.current = true;
     setIsSending(true);
     setErrorMessage(null);
+    setSleepyMessage(null);
     setFriendshipGain(0);
     clearSpeechError();
     // 듣는 중에 직접 보냈다면 마이크를 끄고, 답장 음성이 마이크로 들어가지 않게 한다.
@@ -155,6 +158,15 @@ function ResidentChatModal({
       setFriendshipGain(answer.friendshipGain);
       speakJapanese(answer.reply, { slug: residentSlug, voice });
     } catch (error) {
+      if (error instanceof ApiError && error.status === 429) {
+        if (isMountedRef.current) {
+          // 대답을 못 받았으니 방금 붙인 내 말풍선은 빼고, 쓴 말은 입력창에 돌려준다(그 사이 새로 쓴 글은 지키지 않는다).
+          setLines((previous) => previous.slice(0, -1));
+          setText((current) => current || message);
+          setSleepyMessage(error.message);
+        }
+        return;
+      }
       setErrorMessage(
         error instanceof ApiError
           ? error.message
@@ -340,6 +352,11 @@ function ResidentChatModal({
             </ul>
             {isHistoryLoading && <p>이전 대화를 불러오는 중…</p>}
             {historyErrorMessage && <p role="alert">{historyErrorMessage}</p>}
+            {sleepyMessage && (
+              <p className={styles.sleepyNotice} role="status">
+                <strong>{residentName}</strong>: 💤 {sleepyMessage}
+              </p>
+            )}
             {errorMessage && <p role="alert">{errorMessage}</p>}
             {speechErrorMessage && <p role="alert">{speechErrorMessage}</p>}
             {!speechSupported && (
