@@ -4,7 +4,7 @@ import { ApiError } from '../api/client';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { cancelSpeechRecognition } from '../lib/speechRecognition';
 import { speakJapanese, stopSpeaking } from '../lib/speechSynthesis';
-import { calculateTextSimilarity, toHiragana, toKatakana } from '../lib/textSimilarity';
+import { findBestSpeechMatch, toHiragana, toKatakana } from '../lib/textSimilarity';
 import {
   completeStage,
   getStageContent,
@@ -28,34 +28,6 @@ const STAGE_LABELS: Record<ThemeStage, string> = {
   READING: '독해',
   REVIEW: '복습',
 };
-
-/** 음성 인식 결과와 정답 문구를 비교하기 전에 공백 차이를 무시하도록 정리한다. */
-function normalizeForSpeechComparison(text: string): string {
-  return text.replace(/\s+/g, '').trim();
-}
-
-/**
- * 음성 인식 결과의 정확도를 계산한다. 정답 표기(한자 등)와 비교한 유사도, 읽는 법(가나)이 있다면
- * 그것과 비교한 유사도(가타카나는 히라가나로 맞춰서 비교) 중 더 높은 쪽을 쓴다 — 음성 인식이 같은
- * 발음을 한자로 돌려주든 가나로 돌려주든 둘 중 하나는 맞힌 걸로 보기 위해서다.
- */
-function calculateSpeechAccuracy(transcript: string, quizItem: QuizItem): number {
-  const normalizedTranscript = normalizeForSpeechComparison(transcript);
-  const surfaceAccuracy = calculateTextSimilarity(
-    normalizedTranscript,
-    normalizeForSpeechComparison(quizItem.correctAnswer),
-  );
-
-  if (!quizItem.reading) {
-    return surfaceAccuracy;
-  }
-
-  const readingAccuracy = calculateTextSimilarity(
-    toHiragana(normalizedTranscript),
-    toHiragana(normalizeForSpeechComparison(quizItem.reading)),
-  );
-  return Math.max(surfaceAccuracy, readingAccuracy);
-}
 
 /**
  * 소리로 읽어 줄 글자를 정한다. 한자 한 글자는 문맥이 없어 엔진이 잘못 읽기 쉬우니 읽는 법을 쓰고, 단어·표현·
@@ -99,6 +71,9 @@ function ThemeLearningPage() {
     clearError: clearSpeechError,
   } = useSpeechRecognition();
   const [speechAccuracy, setSpeechAccuracy] = useState<number | null>(null);
+  // 화면에 보여 줄 "인식된 말"(후보 중 정답에 가장 가까운 것). 원인을 알 수 있게 한다.
+  const [recognizedText, setRecognizedText] = useState<string | null>(null);
+  const [speechFailCount, setSpeechFailCount] = useState(0);
   const [isReadingHintShown, setIsReadingHintShown] = useState(false);
 
   useEffect(() => {
@@ -170,6 +145,8 @@ function ThemeLearningPage() {
           setFeedback(null);
           clearSpeechError();
           setSpeechAccuracy(null);
+          setRecognizedText(null);
+          setSpeechFailCount(0);
           setIsReadingHintShown(false);
         }
       })
@@ -231,6 +208,8 @@ function ThemeLearningPage() {
     setFeedback(null);
     clearSpeechError();
     setSpeechAccuracy(null);
+    setRecognizedText(null);
+    setSpeechFailCount(0);
     setIsReadingHintShown(false);
   }
 
@@ -250,10 +229,22 @@ function ThemeLearningPage() {
       return;
     }
 
-    startListening((transcript) => {
-      const accuracy = calculateSpeechAccuracy(transcript, currentQuizItem);
+    setRecognizedText(null);
+    startListening((transcript, candidates) => {
+      const best = findBestSpeechMatch(
+        candidates,
+        currentQuizItem.correctAnswer,
+        currentQuizItem.reading,
+      );
+      const accuracy = best?.accuracy ?? 0;
       setSpeechAccuracy(accuracy);
-      setFeedback(accuracy >= SPEECH_PASS_THRESHOLD ? 'correct' : 'incorrect');
+      setRecognizedText(best?.transcript ?? transcript);
+      if (accuracy >= SPEECH_PASS_THRESHOLD) {
+        setFeedback('correct');
+      } else {
+        setFeedback('incorrect');
+        setSpeechFailCount((count) => count + 1);
+      }
     });
   }
 
@@ -331,6 +322,11 @@ function ThemeLearningPage() {
 
   const currentStageIndex = STAGE_ORDER.indexOf(theme.currentStage);
   const isReviewStage = activeStage === 'REVIEW';
+  // 말하기: 3번 통과 못 했거나 "分からない"로 힌트를 본 뒤에는 정답을 보여 주고 통과 없이 넘어갈 수 있다.
+  const isSpeechSkippable =
+    isReviewStage &&
+    feedback !== 'correct' &&
+    (speechFailCount >= MAX_WRONG_ATTEMPTS || isReadingHintShown);
 
   return (
     <main className={styles.page}>
@@ -446,6 +442,7 @@ function ThemeLearningPage() {
                   )}
                   {isReadingHintShown && feedback !== 'correct' && (
                     <div className={styles.readingHint}>
+                      <span className={styles.readingText}>{currentQuizItem.correctAnswer}</span>
                       <span className={styles.readingText}>
                         {currentQuizItem.reading
                           ? `${toHiragana(currentQuizItem.reading)} / ${toKatakana(currentQuizItem.reading)}`
@@ -489,8 +486,28 @@ function ThemeLearningPage() {
                     <p className={styles.quizFeedbackIncorrect}>
                       정확도 {Math.round(speechAccuracy * 100)}%였습니다.{' '}
                       {Math.round(SPEECH_PASS_THRESHOLD * 100)}% 이상이어야 통과합니다. 다시
-                      말해보세요.
+                      말해보세요. ({speechFailCount}/{MAX_WRONG_ATTEMPTS})
                     </p>
+                  )}
+                  {recognizedText !== null && (
+                    <p className={styles.quizFeedbackHint}>인식된 말: {recognizedText}</p>
+                  )}
+                  {isSpeechSkippable && (
+                    <div className={styles.quizFeedbackCorrectRow}>
+                      <p className={styles.quizFeedbackHint}>
+                        정답은 "{currentQuizItem.correctAnswer}"
+                        {currentQuizItem.reading &&
+                          ` (${toHiragana(currentQuizItem.reading)} / ${toKatakana(currentQuizItem.reading)})`}
+                        입니다. 소리 내어 읽어 보고 다음으로 넘어가세요.
+                      </p>
+                      <button
+                        type="button"
+                        className={styles.nextQuestionButton}
+                        onClick={handleNextQuizItem}
+                      >
+                        {currentIndex + 1 < quizItems!.length ? '다음 문제' : '완료'}
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (
