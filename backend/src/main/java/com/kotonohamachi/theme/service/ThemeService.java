@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
@@ -303,10 +304,13 @@ public class ThemeService {
   }
 
   private List<ThemeQuizItemResponse> toReadingQuizItems(List<ThemeReadingPassage> passages) {
+    // 위키백과 지문처럼 번역이 없는(NULL) 지문은 번역 맞히기 문제를 만들 수 없어 건너뛴다.
     List<String> answerPool = themeReadingPassageRepository.findAll().stream()
         .map(ThemeReadingPassage::getTranslation)
+        .filter(Objects::nonNull)
         .toList();
     return passages.stream()
+        .filter(passage -> passage.getTranslation() != null)
         .map(passage -> toQuizItem(
             passage.getPassage(),
             passage.getTranslation(),
