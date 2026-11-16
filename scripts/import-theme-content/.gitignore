@@ -4,3 +4,5 @@ drafts/*.json
 !drafts/.gitkeep
 cache/
 candidates/wiki/
+drafts/wiki/
+approved/
