@@ -8,6 +8,7 @@ public enum ChatErrorCode implements ErrorCode {
   MESSAGE_INVALID(HttpStatus.BAD_REQUEST, "메시지가 비어 있거나 너무 깁니다."),
   RESIDENT_NOT_FOUND(HttpStatus.NOT_FOUND, "주민을 찾을 수 없습니다."),
   DAILY_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "오늘은 이야기를 많이 해서 졸려요. 내일 또 이야기해요."),
+  LESSON_REQUIRED(HttpStatus.FORBIDDEN, "오늘의 학습을 먼저 끝내야 주민과 이야기할 수 있어요."),
   UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "주민과 대화할 수 없습니다."),
   GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "주민의 대답을 만들지 못했습니다.");
 

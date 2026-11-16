@@ -74,7 +74,7 @@ function TownPage() {
     getTodayRecommendation()
       .then((theme) => {
         if (!cancelled) {
-          // 완료한 테마는 배너에서 숨기고 완료한 테마 목록에서만 보여 준다.
+          // 완료한 학습는 배너에서 숨기고 완료한 학습 목록에서만 보여 준다.
           setTodayTheme(theme && !theme.completed ? theme : null);
         }
       })
@@ -243,8 +243,8 @@ function TownPage() {
           <Link
             to="/town/themes"
             className={styles.iconButton}
-            aria-label="완료한 테마"
-            title="완료한 테마"
+            aria-label="완료한 학습"
+            title="완료한 학습"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
@@ -287,7 +287,6 @@ function TownPage() {
         <Link to={`/town/themes/${todayTheme.id}`} className={styles.todayLearningBanner}>
           <span className={styles.todayLearningText}>
             <span className={styles.todayLearningLabel}>1순위 · 오늘의 학습</span>
-            <span className={styles.todayLearningTitle}>{todayTheme.title}</span>
           </span>
           <span className={styles.todayLearningCta}>시작하기 →</span>
         </Link>

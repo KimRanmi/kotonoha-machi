@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
+import { getTodayRecommendation } from '../api/theme';
 import { getChatDay, getChatDays, getChatHistory, sendChatMessage } from '../api/chat';
 import type { ChatDay, ChatHistoryItem } from '../api/chat';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -58,6 +60,9 @@ function ResidentChatModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // 하루 대화 상한(429)에 걸렸을 때 주민이 하는 말. 오류가 아니라 "졸려요" 연출이라 따로 둔다.
   const [sleepyMessage, setSleepyMessage] = useState<string | null>(null);
+  // 오늘의 학습을 끝내기 전이라 서버가 대화를 막았을 때(403)의 안내.
+  const [lessonRequiredMessage, setLessonRequiredMessage] = useState<string | null>(null);
+  const navigate = useNavigate();
   // 마지막 대답으로 오른 친밀도. 0이면 보여 주지 않는다.
   const [friendshipGain, setFriendshipGain] = useState(0);
   // 기록 불러오기 상태는 전송 오류와 따로 둔다(서로 덮어쓰지 않게).
@@ -139,6 +144,7 @@ function ResidentChatModal({
     setIsSending(true);
     setErrorMessage(null);
     setSleepyMessage(null);
+    setLessonRequiredMessage(null);
     setFriendshipGain(0);
     clearSpeechError();
     // 듣는 중에 직접 보냈다면 마이크를 끄고, 답장 음성이 마이크로 들어가지 않게 한다.
@@ -167,6 +173,14 @@ function ResidentChatModal({
         }
         return;
       }
+      if (error instanceof ApiError && error.status === 403) {
+        if (isMountedRef.current) {
+          setLines((previous) => previous.slice(0, -1));
+          setText((current) => current || message);
+          setLessonRequiredMessage(error.message);
+        }
+        return;
+      }
       setErrorMessage(
         error instanceof ApiError
           ? error.message
@@ -175,6 +189,16 @@ function ResidentChatModal({
     } finally {
       isSendingRef.current = false;
       setIsSending(false);
+    }
+  };
+
+  /** 오늘의 학습 화면으로 간다. 오늘의 학습을 못 찾으면 마을 화면으로 보낸다. */
+  const goToTodayLesson = async () => {
+    try {
+      const today = await getTodayRecommendation();
+      navigate(today ? `/town/themes/${today.id}` : '/town');
+    } catch {
+      navigate('/town');
     }
   };
 
@@ -355,6 +379,14 @@ function ResidentChatModal({
             {sleepyMessage && (
               <p className={styles.sleepyNotice} role="status">
                 <strong>{residentName}</strong>: 💤 {sleepyMessage}
+              </p>
+            )}
+            {lessonRequiredMessage && (
+              <p role="alert">
+                {lessonRequiredMessage}{' '}
+                <button type="button" onClick={goToTodayLesson}>
+                  오늘의 학습하러 가기
+                </button>
               </p>
             )}
             {errorMessage && <p role="alert">{errorMessage}</p>}
