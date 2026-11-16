@@ -2,14 +2,18 @@ package com.kotonohamachi.vocabulary.controller;
 
 import com.kotonohamachi.auth.service.AuthPrincipal;
 import com.kotonohamachi.user.User;
+import com.kotonohamachi.vocabulary.dto.ChatWordRequest;
+import com.kotonohamachi.vocabulary.dto.ChatWordResponse;
 import com.kotonohamachi.vocabulary.dto.VocabularyResponse;
 import com.kotonohamachi.vocabulary.service.VocabularyService;
 import java.util.List;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 학습 단어장 조회 API. */
+/** 학습 단어장 조회·대화 중 단어 저장 API. */
 @RestController
 public class VocabularyController {
 
@@ -34,5 +38,19 @@ public class VocabularyController {
   public List<VocabularyResponse> getVocabulary(Authentication authentication) {
     User user = AuthPrincipal.resolve(authentication);
     return vocabularyService.getVocabulary(user.getId());
+  }
+
+  /**
+   * 대화 중 사용자가 고른 단어를 사전에서 찾아 본인 단어장에 저장한다.
+   *
+   * @param authentication 현재 요청의 인증 정보
+   * @param request 고른 단어
+   * @return 저장 결과(이미 있던 단어면 alreadySaved=true)
+   */
+  @PostMapping("/api/vocabulary/chat")
+  public ChatWordResponse saveChatWord(
+      Authentication authentication, @RequestBody ChatWordRequest request) {
+    User user = AuthPrincipal.resolve(authentication);
+    return vocabularyService.saveChatWord(user.getId(), request.word());
   }
 }

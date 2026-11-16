@@ -131,3 +131,17 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* 드래그로 고른 단어 아래에 뜨는 저장 버튼. 화면 좌표(fixed)로 놓고, 가운데 맞춤한다. */
+.saveWordButton {
+  position: fixed;
+  z-index: 20;
+  transform: translateX(-50%);
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-text);
+  color: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}

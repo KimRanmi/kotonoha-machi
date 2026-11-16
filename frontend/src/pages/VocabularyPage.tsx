@@ -62,6 +62,10 @@ function VocabularyPage() {
             ))}
           </ul>
         )}
+        <p className={styles.message}>
+          대화에서 저장한 단어의 읽는 법·JLPT·영어 뜻은 JMdict(CC BY-SA 4.0, jisho.org 제공)에서
+          가져오며, 한국어 뜻은 영어 뜻을 AI로 번역한 것입니다.
+        </p>
       </div>
     </main>
   );
