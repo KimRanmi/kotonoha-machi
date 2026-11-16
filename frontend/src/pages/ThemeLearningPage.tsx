@@ -40,6 +40,15 @@ function getSpokenText(quizItem: QuizItem): string {
   return isSingleCharacter ? (quizItem.reading ?? quizItem.prompt) : quizItem.prompt;
 }
 
+/** 위키백과 리비전 링크(`...&oldid=123`)에서 리비전 번호를 꺼낸다. 없으면 빈 문자열. */
+function getRevisionId(sourceUrl: string): string {
+  try {
+    return new URL(sourceUrl).searchParams.get('oldid') ?? '';
+  } catch {
+    return '';
+  }
+}
+
 function ThemeLearningPage() {
   const { themeId } = useParams<{ themeId: string }>();
   const numericThemeId = Number(themeId);
@@ -402,14 +411,33 @@ function ThemeLearningPage() {
           <div className={styles.card}>
             <p className={styles.passage}>{reading.passage}</p>
             {reading.sourceTitle && reading.sourceUrl && (
-              <p className={styles.sourceNote}>
-                출처: 일본어 위키백과 「
-                <a href={reading.sourceUrl} target="_blank" rel="noopener noreferrer">
-                  {reading.sourceTitle}
-                </a>
-                」({reading.sourceUrl}){reading.license && `, ${reading.license}`}
-                {reading.excerpt && ' — 도입 단락 발췌'}
-              </p>
+              <>
+                <p className={styles.sourceNote}>
+                  출처: 일본어 위키백과 「
+                  <a href={reading.sourceUrl} target="_blank" rel="noopener noreferrer">
+                    {reading.sourceTitle}
+                  </a>
+                  」(
+                  <a
+                    href={`${reading.sourceUrl}&action=history`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    문서 이력
+                  </a>
+                  )
+                  {getRevisionId(reading.sourceUrl) &&
+                    ` 리비전 ${getRevisionId(reading.sourceUrl)}`}
+                  {reading.excerpt && ', 도입 단락 발췌(괄호 설명 삭제)'}
+                  {reading.license && ` / 라이선스: ${reading.license}`}
+                </p>
+                {reading.license && (
+                  <p className={styles.sourceNote}>
+                    아래 문제와 해설은 위 지문을 바탕으로 만든 파생물이며 {reading.license}으로
+                    제공됩니다.
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
