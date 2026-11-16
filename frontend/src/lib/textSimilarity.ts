@@ -12,6 +12,41 @@ export function calculateTextSimilarity(a: string, b: string): number {
   return 1 - distance / Math.max(a.length, b.length);
 }
 
+/** 음성 인식 결과와 정답 문구를 비교하기 전에 공백 차이를 무시하도록 정리한다. */
+function normalizeForSpeechComparison(text: string): string {
+  return text.replace(/\s+/g, '').trim();
+}
+
+/**
+ * 음성 인식 후보 목록 중 정답과 가장 잘 맞는 것을 고른다. 각 후보를 정답 표기(한자 등)와 비교한 유사도,
+ * 읽는 법(가나)이 있다면 그것과 비교한 유사도(가타카나는 히라가나로 맞춰서 비교) 중 큰 값을 그 후보의
+ * 정확도로 보고, 정확도가 가장 높은 후보와 그 값을 돌려준다. 인식 엔진이 같은 발음을 한자로 돌려주든
+ * 가나로 돌려주든, 후보 중 하나만 맞아도 맞힌 걸로 보기 위해서다. 후보가 없으면 null.
+ */
+export function findBestSpeechMatch(
+  candidates: string[],
+  correctAnswer: string,
+  reading: string | null | undefined,
+): { transcript: string; accuracy: number } | null {
+  const normalizedAnswer = normalizeForSpeechComparison(correctAnswer);
+  const normalizedReading = reading ? toHiragana(normalizeForSpeechComparison(reading)) : null;
+  let best: { transcript: string; accuracy: number } | null = null;
+  for (const candidate of candidates) {
+    const normalized = normalizeForSpeechComparison(candidate);
+    let accuracy = calculateTextSimilarity(normalized, normalizedAnswer);
+    if (normalizedReading) {
+      accuracy = Math.max(
+        accuracy,
+        calculateTextSimilarity(toHiragana(normalized), normalizedReading),
+      );
+    }
+    if (best === null || accuracy > best.accuracy) {
+      best = { transcript: candidate, accuracy };
+    }
+  }
+  return best;
+}
+
 const KATAKANA_START = 0x30a1;
 const KATAKANA_END = 0x30f6;
 const KATAKANA_TO_HIRAGANA_OFFSET = 0x60;
