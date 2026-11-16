@@ -174,7 +174,8 @@ function ThemeLearningPage() {
   const currentQuizItem =
     quizItems && currentIndex < quizItems.length ? quizItems[currentIndex] : null;
   const allQuizItemsAnswered = quizItems !== null && currentIndex >= quizItems.length;
-  const canAdvanceStage = allQuizItemsAnswered;
+  // 복습(말하기)은 연습용이라 하나도 안 풀어도 바로 다음으로 넘어갈 수 있다. 다른 단계는 끝까지 풀어야 한다.
+  const canAdvanceStage = allQuizItemsAnswered || activeStage === 'REVIEW';
 
   function handleSelectOption(option: string) {
     if (!currentQuizItem || feedback === 'correct') {
@@ -322,8 +323,8 @@ function ThemeLearningPage() {
 
   const currentStageIndex = STAGE_ORDER.indexOf(theme.currentStage);
   const isReviewStage = activeStage === 'REVIEW';
-  // 말하기: 3번 통과 못 했거나 "分からない"로 힌트를 본 뒤에는 정답을 보여 주고 통과 없이 넘어갈 수 있다.
-  const isSpeechSkippable =
+  // 말하기: 3번 통과 못 했거나 "分からない"로 힌트를 본 뒤에는 정답과 읽는 법을 알려 준다(넘어가기는 늘 열려 있다).
+  const isSpeechAnswerShown =
     isReviewStage &&
     feedback !== 'correct' &&
     (speechFailCount >= MAX_WRONG_ATTEMPTS || isReadingHintShown);
@@ -484,30 +485,29 @@ function ThemeLearningPage() {
                   )}
                   {feedback === 'incorrect' && speechAccuracy !== null && (
                     <p className={styles.quizFeedbackIncorrect}>
-                      정확도 {Math.round(speechAccuracy * 100)}%였습니다.{' '}
-                      {Math.round(SPEECH_PASS_THRESHOLD * 100)}% 이상이어야 통과합니다. 다시
-                      말해보세요. ({speechFailCount}/{MAX_WRONG_ATTEMPTS})
+                      정확도 {Math.round(speechAccuracy * 100)}% (참고용입니다. 안 맞아도 넘어갈 수
+                      있어요.)
                     </p>
                   )}
                   {recognizedText !== null && (
                     <p className={styles.quizFeedbackHint}>인식된 말: {recognizedText}</p>
                   )}
-                  {isSpeechSkippable && (
-                    <div className={styles.quizFeedbackCorrectRow}>
-                      <p className={styles.quizFeedbackHint}>
-                        정답은 "{currentQuizItem.correctAnswer}"
-                        {currentQuizItem.reading &&
-                          ` (${toHiragana(currentQuizItem.reading)} / ${toKatakana(currentQuizItem.reading)})`}
-                        입니다. 소리 내어 읽어 보고 다음으로 넘어가세요.
-                      </p>
-                      <button
-                        type="button"
-                        className={styles.nextQuestionButton}
-                        onClick={handleNextQuizItem}
-                      >
-                        {currentIndex + 1 < quizItems!.length ? '다음 문제' : '완료'}
-                      </button>
-                    </div>
+                  {isSpeechAnswerShown && (
+                    <p className={styles.quizFeedbackHint}>
+                      정답은 "{currentQuizItem.correctAnswer}"
+                      {currentQuizItem.reading &&
+                        ` (${toHiragana(currentQuizItem.reading)} / ${toKatakana(currentQuizItem.reading)})`}
+                      입니다. 소리 내어 읽어 보세요.
+                    </p>
+                  )}
+                  {feedback !== 'correct' && (
+                    <button
+                      type="button"
+                      className={styles.nextQuestionButton}
+                      onClick={handleNextQuizItem}
+                    >
+                      {currentIndex + 1 < quizItems!.length ? '넘어가기' : '완료'}
+                    </button>
                   )}
                 </div>
               ) : (
@@ -550,7 +550,7 @@ function ThemeLearningPage() {
                 <div className={styles.quizFeedbackCorrectRow}>
                   <p className={styles.quizFeedbackCorrect}>
                     {isReviewStage && speechAccuracy !== null
-                      ? `정확도 ${Math.round(speechAccuracy * 100)}%로 정답입니다!`
+                      ? `정확도 ${Math.round(speechAccuracy * 100)}%, 잘했어요!`
                       : '정답입니다!'}
                   </p>
                   <button
