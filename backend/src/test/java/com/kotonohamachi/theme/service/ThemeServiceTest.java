@@ -227,7 +227,7 @@ class ThemeServiceTest {
         ApiException.class, () -> themeService.completeStage(1L, 2L, ThemeStage.KANJI));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-    assertThat(exception.getMessage()).contains("오늘은 이미 테마를 하나 완료");
+    assertThat(exception.getMessage()).contains("오늘은 이미 학습을 완료");
     verify(themeProgressRepository, never()).save(any());
   }
 
@@ -245,7 +245,7 @@ class ThemeServiceTest {
         ApiException.class, () -> themeService.completeStage(1L, 2L, ThemeStage.KANJI));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-    assertThat(exception.getMessage()).contains("오늘의 테마가 아닙니다");
+    assertThat(exception.getMessage()).contains("오늘의 학습이 아닙니다");
     verify(themeProgressRepository, never()).save(any());
   }
 
