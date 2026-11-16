@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { getTodayRecommendation } from '../api/theme';
+import { saveChatWord } from '../api/vocabulary';
 import { getChatDay, getChatDays, getChatHistory, sendChatMessage } from '../api/chat';
 import type { ChatDay, ChatHistoryItem } from '../api/chat';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -62,6 +63,10 @@ function ResidentChatModal({
   const [sleepyMessage, setSleepyMessage] = useState<string | null>(null);
   // 오늘의 학습을 끝내기 전이라 서버가 대화를 막았을 때(403)의 안내.
   const [lessonRequiredMessage, setLessonRequiredMessage] = useState<string | null>(null);
+  // 말풍선에서 드래그해 고른 단어와, "단어장에 저장" 버튼을 띄울 화면 좌표.
+  const [pick, setPick] = useState<{ word: string; left: number; top: number } | null>(null);
+  const [isSavingWord, setIsSavingWord] = useState(false);
+  const [wordNotice, setWordNotice] = useState<{ message: string; isError: boolean } | null>(null);
   const navigate = useNavigate();
   // 마지막 대답으로 오른 친밀도. 0이면 보여 주지 않는다.
   const [friendshipGain, setFriendshipGain] = useState(0);
@@ -97,6 +102,12 @@ function ResidentChatModal({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  // 화면을 바꾸면 떠 있던 저장 버튼과 안내를 지운다.
+  useEffect(() => {
+    setPick(null);
+    setWordNotice(null);
+  }, [view]);
 
   // 열 때 이전에 나눈 대화를 불러온다. 불러오는 사이 새로 보낸 말은 그 뒤에 이어 붙는다.
   useEffect(() => {
@@ -260,6 +271,64 @@ function ResidentChatModal({
     }
   };
 
+  /** 마우스를 뗄 때, 말풍선의 일본어 글자를 드래그해 골랐다면 저장 버튼을 그 아래에 띄운다. */
+  const handleSelectionEnd = () => {
+    const selection = window.getSelection();
+    const word = selection?.toString().trim() ?? '';
+    if (!selection || selection.rangeCount === 0 || !word) {
+      setPick(null);
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    const container =
+      range.commonAncestorContainer instanceof Element
+        ? range.commonAncestorContainer
+        : range.commonAncestorContainer.parentElement;
+    // 번역·이름처럼 일본어 본문(data-jp)이 아닌 곳을 고른 경우는 무시한다.
+    if (!container?.closest('[data-jp]')) {
+      setPick(null);
+      return;
+    }
+    const rect = range.getBoundingClientRect();
+    setPick({ word, left: rect.left + rect.width / 2, top: rect.bottom + 6 });
+  };
+
+  /** 고른 단어를 단어장에 저장하고 결과를 안내한다. */
+  const handleSaveWord = async () => {
+    if (!pick || isSavingWord) {
+      return;
+    }
+    const { word } = pick;
+    setIsSavingWord(true);
+    setWordNotice(null);
+    try {
+      const result = await saveChatWord(word);
+      if (!isMountedRef.current) {
+        return;
+      }
+      const { surfaceForm, reading, meaning } = result.entry;
+      setWordNotice({
+        message: result.alreadySaved
+          ? `「${surfaceForm}」은(는) 이미 단어장에 있어요.`
+          : `「${surfaceForm}」(${reading}) 단어장에 저장했어요: ${meaning}`,
+        isError: false,
+      });
+    } catch (error) {
+      if (isMountedRef.current) {
+        setWordNotice({
+          message: error instanceof ApiError ? error.message : '단어를 저장하지 못했습니다.',
+          isError: true,
+        });
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsSavingWord(false);
+        setPick(null);
+      }
+      window.getSelection()?.removeAllRanges();
+    }
+  };
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     void sendMessage(text);
@@ -286,6 +355,7 @@ function ResidentChatModal({
         aria-modal="true"
         aria-label={`${residentName}와의 대화`}
         onClick={(event) => event.stopPropagation()}
+        onMouseUp={handleSelectionEnd}
       >
         <header className={styles.header}>
           <h2 className={styles.title}>{residentName}</h2>
@@ -357,7 +427,8 @@ function ResidentChatModal({
             <ul className={styles.lines}>
               {dayLines.map((line, index) => (
                 <li key={index} className={styles.line}>
-                  <strong>{line.speaker === 'me' ? '나' : residentName}</strong>: {line.text}
+                  <strong>{line.speaker === 'me' ? '나' : residentName}</strong>:{' '}
+                  <span data-jp>{line.text}</span>
                   {line.translation && <div className={styles.translation}>{line.translation}</div>}
                 </li>
               ))}
@@ -369,7 +440,8 @@ function ResidentChatModal({
             <ul className={styles.lines} aria-live="polite">
               {lines.map((line, index) => (
                 <li key={index} className={styles.line}>
-                  <strong>{line.speaker === 'me' ? '나' : residentName}</strong>: {line.text}
+                  <strong>{line.speaker === 'me' ? '나' : residentName}</strong>:{' '}
+                  <span data-jp>{line.text}</span>
                   {line.translation && <div className={styles.translation}>{line.translation}</div>}
                 </li>
               ))}
@@ -413,6 +485,20 @@ function ResidentChatModal({
               </button>
             </form>
           </>
+        )}
+        {wordNotice && <p role={wordNotice.isError ? 'alert' : 'status'}>{wordNotice.message}</p>}
+        {pick && (
+          <button
+            type="button"
+            className={styles.saveWordButton}
+            style={{ left: pick.left, top: pick.top }}
+            // 버튼을 눌러도 드래그로 고른 선택이 풀리지 않게 한다.
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => void handleSaveWord()}
+            disabled={isSavingWord}
+          >
+            {isSavingWord ? '저장 중…' : '단어장에 저장'}
+          </button>
         )}
       </section>
     </div>

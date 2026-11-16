@@ -22,6 +22,7 @@ import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.vocabulary.VocabularyEntry;
 import com.kotonohamachi.vocabulary.VocabularyErrorCode;
 import com.kotonohamachi.vocabulary.VocabularySource;
+import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import com.kotonohamachi.vocabulary.repository.VocabularyRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -48,6 +49,12 @@ class VocabularyServiceTest {
 
   @Mock
   private UserRepository userRepository;
+
+  @Mock
+  private DictionaryClient dictionaryClient;
+
+  @Mock
+  private MeaningTranslator meaningTranslator;
 
   @Captor
   private ArgumentCaptor<List<VocabularyEntry>> entriesCaptor;
@@ -211,6 +218,32 @@ class VocabularyServiceTest {
 
     assertThat(saved).isZero();
     verifyNoInteractions(vocabularyRepository, userRepository);
+  }
+
+  @Test
+  void normalizeWord_앞뒤_문장부호와_공백을_떼고_중간_공백은_거절한다() {
+    assertThat(VocabularyService.normalizeWord(" 「漆器」。 ")).isEqualTo("漆器");
+    assertThatThrownBy(() -> VocabularyService.normalizeWord("漆器 です"))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> VocabularyService.normalizeWord("。。"))
+        .isInstanceOf(ApiException.class);
+  }
+
+  @Test
+  void saveChatWord_하루_상한에_도달하면_번역_없이_429로_거절한다() {
+    DictionaryWord found = new DictionaryWord("雪", "ゆき", "snow", null);
+    when(dictionaryClient.lookup("雪")).thenReturn(Optional.of(found));
+    when(vocabularyRepository.findByUserIdAndSurfaceFormAndReading(1L, "雪", "ゆき"))
+        .thenReturn(Optional.empty());
+    when(vocabularyRepository.countByUserIdAndSourceAndSavedAtGreaterThanEqual(
+            eq(1L), eq(VocabularySource.CHAT), any()))
+        .thenReturn((long) VocabularyService.DAILY_CHAT_WORD_LIMIT);
+
+    assertThatThrownBy(() -> vocabularyService.saveChatWord(1L, "雪"))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+    verifyNoInteractions(meaningTranslator);
   }
 
   private static VocabularyEntry existing(String surface, String reading) {
