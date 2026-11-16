@@ -14,6 +14,7 @@ import com.kotonohamachi.chat.ChatErrorCode;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.chat.service.GeminiClient;
 import com.kotonohamachi.common.ApiException;
+import com.kotonohamachi.theme.service.ThemeService;
 import jakarta.servlet.Filter;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,9 @@ class ChatControllerIntegrationTest {
   @MockitoBean
   private GeminiClient geminiClient;
 
+  @MockitoBean
+  private ThemeService themeService;
+
   @Autowired
   private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
@@ -60,6 +64,8 @@ class ChatControllerIntegrationTest {
 
   @BeforeEach
   void setUp() {
+    // 기본은 오늘 학습을 끝낸 상태(대화 가능).
+    when(themeService.canChatToday(any())).thenReturn(true);
     mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
         .addFilters(webApplicationContext.getBean("springSecurityFilterChain", Filter.class))
         .build();
@@ -108,6 +114,20 @@ class ChatControllerIntegrationTest {
                 {"message":"%s"}
                 """.formatted(message)))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void 오늘_학습을_끝내지_않으면_대화는_403을_반환한다() throws Exception {
+    MockHttpSession session = signUpVerifyAndLogin();
+    when(themeService.canChatToday(any())).thenReturn(false);
+
+    mockMvc
+        .perform(post("/api/residents/r01/chat")
+            .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"message\":\"こんにちは\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("오늘의 학습을 먼저 끝내야 주민과 이야기할 수 있어요."));
   }
 
   @Test

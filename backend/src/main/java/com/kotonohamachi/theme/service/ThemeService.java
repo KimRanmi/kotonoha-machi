@@ -138,6 +138,18 @@ public class ThemeService {
         .findFirst();
   }
 
+  /**
+   * 주민과 대화할 수 있는지 판단한다. 오늘(한국 시간) 학습을 완료했으면 열린다. 오늘 학습을 아직 끝내지 않았으면
+   * 닫히고, 모든 학습을 이미 끝내 더 추천할 학습이 없으면(오늘 완료한 것도 없음) 막을 이유가 없어 열린다.
+   *
+   * @param userId 사용자 ID
+   * @return 대화할 수 있으면 true
+   */
+  @Transactional(readOnly = true)
+  public boolean canChatToday(Long userId) {
+    return getTodayRecommendedTheme(userId).map(ThemeResponse::completed).orElse(true);
+  }
+
   /** 오늘(한국 시간) 완료한 테마 진행 중 가장 최근 것을 찾는다. */
   private Optional<ThemeProgress> findLatestCompletedToday(List<ThemeProgress> progressList) {
     return progressList.stream()

@@ -15,6 +15,7 @@ import com.kotonohamachi.resident.dto.FriendshipChange;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
 import com.kotonohamachi.resident.service.ResidentFriendshipService;
+import com.kotonohamachi.theme.service.ThemeService;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -88,6 +89,7 @@ public class ChatService {
   private final ResidentFriendshipService friendshipService;
   private final ChatMemoryService memoryService;
   private final GeminiClient geminiClient;
+  private final ThemeService themeService;
   private final Clock clock;
   private final Map<Long, DailyCount> dailyCounts = new ConcurrentHashMap<>();
 
@@ -100,6 +102,7 @@ public class ChatService {
    * @param friendshipService 친밀도 서비스
    * @param memoryService 지난 대화 맥락(요약 메모 + 최근 대화) 서비스
    * @param geminiClient Gemini 클라이언트
+   * @param themeService 학습 서비스(오늘 학습을 끝냈는지 확인)
    */
   @Autowired
   public ChatService(
@@ -108,7 +111,8 @@ public class ChatService {
       ChatMessageRepository chatMessageRepository,
       ResidentFriendshipService friendshipService,
       ChatMemoryService memoryService,
-      GeminiClient geminiClient) {
+      GeminiClient geminiClient,
+      ThemeService themeService) {
     this(
         residentRepository,
         friendshipRepository,
@@ -116,6 +120,7 @@ public class ChatService {
         friendshipService,
         memoryService,
         geminiClient,
+        themeService,
         Clock.system(KOREA_ZONE));
   }
 
@@ -127,6 +132,7 @@ public class ChatService {
       ResidentFriendshipService friendshipService,
       ChatMemoryService memoryService,
       GeminiClient geminiClient,
+      ThemeService themeService,
       Clock clock) {
     this.residentRepository = residentRepository;
     this.friendshipRepository = friendshipRepository;
@@ -134,6 +140,7 @@ public class ChatService {
     this.friendshipService = friendshipService;
     this.memoryService = memoryService;
     this.geminiClient = geminiClient;
+    this.themeService = themeService;
     this.clock = clock;
   }
 
@@ -144,7 +151,7 @@ public class ChatService {
    * @param residentSlug 대화할 주민의 고유 키(예: r01)
    * @param message 플레이어의 메시지
    * @return 주민의 일본어 대사·한국어 번역과 대화 뒤의 친밀도(메시지가 비었으면 다시 말해 달라는 안내)
-   * @throws ApiException 메시지가 너무 길면(400), 주민이 없으면(404), 하루 대화 상한을 넘으면(429), 대화할 수 없으면(502/503)
+   * @throws ApiException 메시지가 너무 길면(400), 주민이 없으면(404), 오늘 학습을 끝내지 않았으면(403), 하루 대화 상한을 넘으면(429), 대화할 수 없으면(502/503)
    */
   public ChatResultResponse chat(Long userId, String residentSlug, String message) {
     String normalizedMessage = message == null ? "" : message.strip();
@@ -152,6 +159,10 @@ public class ChatService {
       throw new ApiException(ChatErrorCode.MESSAGE_INVALID);
     }
     Resident resident = findResident(residentSlug);
+    // 오늘의 학습을 끝내야 주민과 대화할 수 있다(프런트 잠금과 별개로 서버가 강제한다).
+    if (!themeService.canChatToday(userId)) {
+      throw new ApiException(ChatErrorCode.LESSON_REQUIRED);
+    }
     int friendshipLevel = friendshipRepository
         .findByUserIdAndResidentId(userId, resident.getId())
         .map(ResidentFriendship::getLevel)
