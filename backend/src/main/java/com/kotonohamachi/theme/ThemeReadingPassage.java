@@ -33,7 +33,7 @@ public class ThemeReadingPassage {
   @Column(nullable = false)
   private String passage;
 
-  @Column
+  @Column(nullable = false)
   private String translation;
 
   @Column(name = "display_order", nullable = false)
