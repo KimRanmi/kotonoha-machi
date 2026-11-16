@@ -10,9 +10,9 @@
 
 ## 결정
 1. **스키마(`V39`)**: `theme_reading_passage`에 `source_title`·`source_url`·`license`·`is_excerpt`를 더하고
-   `translation`을 NULL 허용으로 바꿨다. 새 `theme_reading_question`(질문, 보기 4개, 정답 번호 1~4, 순서)을 만들었다.
+   `translation`을 NULL 허용으로 바꿨다. 새 `theme_reading_question`(질문, 보기 4개, 정답 번호 1~4, **정답 해설 `explanation`**, 순서 — 작업 A 요청으로 해설 열을 더함)을 만들었다.
 2. **API**: 독해만 `GET /api/themes/{id}/reading`(지문 + 출처 + 문제 목록, 없으면 204)을 따로 둔다. 문제는 기존
-   `ThemeQuizItemResponse`를 재사용한다(질문=`prompt`, 보기=`options`, 정답 보기=`correctAnswer`). 그러면 프런트의
+   `ThemeQuizItemResponse`와 같은 모양에 해설이 더해진 `ThemeReadingQuestionResponse`를 쓴다(질문=`prompt`, 보기=`options`, 정답 보기=`correctAnswer`). 그러면 프런트의
    정답 비교와 "3번 틀리면 정답 표시" 규칙을 그대로 쓴다. 기존 `/stages/READING/content`는 빈 목록을 돌려준다.
    - 대안: 독해 전용 DTO만 새로 만들기(프런트 문제 화면을 따로 만들어야 해서 더 복잡해 보류).
 3. **건너뛰기는 백엔드 `completeStage`에서 처리한다.** 예문 단계를 끝내 독해가 다음 단계가 됐을 때, 이해 문제가 있는

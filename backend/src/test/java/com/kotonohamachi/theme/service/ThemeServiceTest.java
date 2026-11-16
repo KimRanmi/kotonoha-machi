@@ -339,8 +339,8 @@ class ThemeServiceTest {
   void getReading_이해_문제가_있는_지문과_출처를_반환한다() {
     Theme theme = new Theme("카페에서 주문하기");
     ThemeReadingPassage passage = new ThemeReadingPassage(theme, 3, "今日は雨です。", null, 1);
-    ThemeReadingQuestion question =
-        new ThemeReadingQuestion(passage, "今日の天気は？", List.of("雨", "晴れ", "雪", "曇り"), 1, 1);
+    ThemeReadingQuestion question = new ThemeReadingQuestion(
+        passage, "今日の天気は？", List.of("雨", "晴れ", "雪", "曇り"), 1, "本文に雨とあるため。", 1);
     when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
     when(themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(1L))
         .thenReturn(List.of(passage));
@@ -354,6 +354,7 @@ class ThemeServiceTest {
     assertThat(reading.questions().get(0).prompt()).isEqualTo("今日の天気は？");
     assertThat(reading.questions().get(0).options()).containsExactly("雨", "晴れ", "雪", "曇り");
     assertThat(reading.questions().get(0).correctAnswer()).isEqualTo("雨");
+    assertThat(reading.questions().get(0).explanation()).isEqualTo("本文に雨とあるため。");
   }
 
   @Test
@@ -390,8 +391,8 @@ class ThemeServiceTest {
     progress.completeCurrentStage(); // WORD -> EXPRESSION
     progress.completeCurrentStage(); // EXPRESSION -> EXAMPLE
     ThemeReadingPassage passage = new ThemeReadingPassage(theme, 3, "今日は雨です。", null, 1);
-    ThemeReadingQuestion question =
-        new ThemeReadingQuestion(passage, "今日の天気は？", List.of("雨", "晴れ", "雪", "曇り"), 1, 1);
+    ThemeReadingQuestion question = new ThemeReadingQuestion(
+        passage, "今日の天気は？", List.of("雨", "晴れ", "雪", "曇り"), 1, "本文に雨とあるため。", 1);
     when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
     when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
     when(themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(1L))

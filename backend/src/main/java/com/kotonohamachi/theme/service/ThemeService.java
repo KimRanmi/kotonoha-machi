@@ -12,6 +12,7 @@ import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
 import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
+import com.kotonohamachi.theme.dto.ThemeReadingQuestionResponse;
 import com.kotonohamachi.theme.dto.ThemeReadingResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
 import com.kotonohamachi.theme.repository.ThemeExampleRepository;
@@ -253,13 +254,14 @@ public class ThemeService {
             passage.getLicense(),
             passage.isExcerpt(),
             questions.stream()
-                .map(question -> new ThemeQuizItemResponse(
+                .map(question -> new ThemeReadingQuestionResponse(
                     question.getQuestion(),
                     question.getChoices(),
                     question.getCorrectChoice(),
                     null,
                     passage.getJlptLevel(),
-                    null))
+                    null,
+                    question.getExplanation()))
                 .toList()));
       }
     }

@@ -34,6 +34,8 @@ export interface QuizItem {
   jlptLevel: number | null;
   /** 한글 뜻/번역. 복습(REVIEW)에서만 채워진다. */
   meaning: string | null;
+  /** 왜 그 보기가 정답인지 설명. 독해(READING) 이해 문제에서만 채워진다. */
+  explanation?: string;
 }
 
 /** 독해(READING) 단계의 지문과 출처, 이해 문제. 문제는 다른 단계와 같은 객관식 항목이다(보기 순서는 저장된 그대로). */

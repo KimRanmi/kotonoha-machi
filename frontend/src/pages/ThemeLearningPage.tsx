@@ -588,6 +588,9 @@ function ThemeLearningPage() {
                       ? `정확도 ${Math.round(speechAccuracy * 100)}%, 잘했어요!`
                       : '정답입니다!'}
                   </p>
+                  {currentQuizItem.explanation && (
+                    <p className={styles.quizFeedbackHint}>{currentQuizItem.explanation}</p>
+                  )}
                   <button
                     type="button"
                     className={styles.nextQuestionButton}

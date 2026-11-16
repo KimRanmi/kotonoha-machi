@@ -1042,3 +1042,4 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
 - 주민 대화를 오늘 학습 완료 후에만 열도록 했다(`0040`, 검토 중). `ThemeService.canChatToday`가 판단하고 `ChatService.chat`이 아니면 403(`LESSON_REQUIRED`)을 던진다. 이동은 막지 않는다. 프런트 대화창은 403이면 쓴 말을 돌려주고 "오늘의 학습하러 가기" 버튼을 보인다.
   - 검증: 백엔드 `spotlessApply`·`test` 통과(서비스·통합 403 테스트 추가), 프런트 prettier·tsc·eslint 통과.
   - 확인 못 한 것: 실제 화면에서 잠금 안내와 버튼 동작.
+  - 작업 A 요청으로 `theme_reading_question`에 `explanation TEXT NOT NULL`(정답 해설)을 더했다. `V39`는 아직 push 전이라 파일을 그대로 고쳤다(이미 로컬 DB에 V39를 적용했다면 DB를 새로 만들어야 한다). API 문제 항목에 `explanation`이 담기고, 프런트는 정답을 맞힌 뒤 해설을 보여 준다. 백엔드 test·프런트 tsc/lint 통과, 화면은 직접 못 봤다.

@@ -16,5 +16,6 @@ CREATE TABLE theme_reading_question (
     choice_3 TEXT NOT NULL,
     choice_4 TEXT NOT NULL,
     answer_index INTEGER NOT NULL CHECK (answer_index BETWEEN 1 AND 4),
+    explanation TEXT NOT NULL,
     display_order INTEGER NOT NULL
 );

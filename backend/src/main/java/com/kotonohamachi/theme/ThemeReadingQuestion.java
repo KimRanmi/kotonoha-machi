@@ -42,6 +42,9 @@ public class ThemeReadingQuestion {
   @Column(name = "answer_index", nullable = false)
   private int answerIndex;
 
+  @Column(nullable = false)
+  private String explanation;
+
   @Column(name = "display_order", nullable = false)
   private int displayOrder;
 
@@ -55,6 +58,7 @@ public class ThemeReadingQuestion {
    * @param question 질문
    * @param choices 보기 4개(순서대로 1~4번)
    * @param answerIndex 정답 번호(1~4)
+   * @param explanation 정답 해설(왜 그 보기가 정답인지)
    * @param displayOrder 지문 안에서 보여줄 순서
    */
   public ThemeReadingQuestion(
@@ -62,6 +66,7 @@ public class ThemeReadingQuestion {
       String question,
       List<String> choices,
       int answerIndex,
+      String explanation,
       int displayOrder) {
     this.passage = passage;
     this.question = question;
@@ -70,6 +75,7 @@ public class ThemeReadingQuestion {
     this.choice3 = choices.get(2);
     this.choice4 = choices.get(3);
     this.answerIndex = answerIndex;
+    this.explanation = explanation;
     this.displayOrder = displayOrder;
   }
 
@@ -98,5 +104,14 @@ public class ThemeReadingQuestion {
    */
   public String getCorrectChoice() {
     return getChoices().get(answerIndex - 1);
+  }
+
+  /**
+   * 정답 해설을 반환한다.
+   *
+   * @return 정답 해설
+   */
+  public String getExplanation() {
+    return explanation;
   }
 }
