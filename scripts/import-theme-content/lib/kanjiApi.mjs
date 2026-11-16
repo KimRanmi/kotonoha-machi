@@ -72,3 +72,16 @@ export async function computeWordJlptLevel(surfaceForm) {
   }
   return levels.length > 0 ? Math.min(...levels) : null;
 }
+
+/** 표기와 완전히 같은 variant들의 읽는 법을 모두 돌려준다(시트 값 대조용). 없으면 빈 배열. */
+export async function fetchWordReadings(surfaceForm) {
+  const firstCharacter = Array.from(surfaceForm)[0];
+  const response = await fetch(`${BASE_URL}/words/${encodeURIComponent(firstCharacter)}`);
+  if (!response.ok) {
+    return [];
+  }
+  const entries = await response.json();
+  return entries.flatMap((entry) =>
+    entry.variants.filter((v) => v.written === surfaceForm).map((v) => v.pronounced),
+  );
+}

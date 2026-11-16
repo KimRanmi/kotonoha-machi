@@ -7,10 +7,10 @@
 // 4. kuromoji로 예문의 읽는 법을 자동 생성한다.
 // 5. drafts/<테마 슬러그>.json에 초안을 쓴다 — 이 파일은 사람이 검토·수정한 뒤 finalize.mjs에
 //    넘겨야 한다. 이 스크립트는 DB나 SQL 파일을 직접 건드리지 않는다.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { suggestCandidates, suggestExampleSearchKeywords } from './lib/gemini.mjs';
+import { suggestCandidates, translateMeanings } from './lib/gemini.mjs';
 import { fetchKanji, fetchWord, computeWordJlptLevel } from './lib/kanjiApi.mjs';
 import { searchJapaneseExample } from './lib/tatoebaApi.mjs';
 import { generateReading } from './lib/furigana.mjs';
@@ -23,10 +23,17 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const options = {};
   for (let i = 0; i < args.length; i += 2) {
+    if (args[i] === '--to-sheet') {
+      options.toSheet = true;
+      i -= 1; // 값이 없는 옵션이라 한 칸만 넘긴다
+      continue;
+    }
     options[args[i].replace(/^--/, '')] = args[i + 1];
   }
-  if (!options.title || !options.topic) {
-    throw new Error('사용법: npm run propose -- --title "<테마 제목>" --topic "<주제 설명>"');
+  if (!options.title || (!options.topic && !options.candidates)) {
+    throw new Error(
+      '사용법: npm run propose -- --title "<테마 제목>" (--topic "<주제 설명>" | --candidates <후보.json>) [--to-sheet]',
+    );
   }
   return options;
 }
@@ -72,36 +79,89 @@ async function buildVocabularyEntries(candidates) {
   return { accepted, rejected };
 }
 
-async function buildExampleEntries(apiKey, title, vocabularyWords) {
+const MAX_EXAMPLES = 4;
+
+async function buildExampleEntries(vocabularyWords) {
   const accepted = [];
   const rejected = [];
-  if (vocabularyWords.length === 0) {
-    return { accepted, rejected };
-  }
-
-  const keywords = await suggestExampleSearchKeywords(apiKey, title, vocabularyWords);
+  const seen = new Set();
   let displayOrder = 1;
-  for (const keyword of keywords) {
+  for (const keyword of vocabularyWords) {
+    if (accepted.length >= MAX_EXAMPLES) {
+      break;
+    }
     const example = await searchJapaneseExample(keyword);
-    if (!example) {
-      rejected.push({ keyword, reason: 'Tatoeba에서 검색 결과 없음' });
+    if (!example || seen.has(example.japaneseSentence)) {
+      rejected.push({ keyword, reason: 'Tatoeba에서 한국어 번역이 있는 예문 없음' });
       continue;
     }
+    seen.add(example.japaneseSentence);
     const reading = await generateReading(example.japaneseSentence);
-    accepted.push({ ...example, reading, displayOrder: displayOrder++ });
+    accepted.push({
+      ...example,
+      reading,
+      readingStatus: '자동 생성(검수 필요)',
+      displayOrder: displayOrder++,
+    });
   }
   return { accepted, rejected };
 }
 
+/** 영어 뜻을 한국어로 번역해 meaning에 넣고, 원문은 meaningEn에 남긴다. */
+async function translateEntries(apiKey, kanjiEntries, vocabularyEntries) {
+  const targets = [...kanjiEntries, ...vocabularyEntries];
+  const items = targets.map((entry, index) => ({ id: String(index), english: entry.meaning }));
+  const translated = await translateMeanings(apiKey, items);
+  targets.forEach((entry, index) => {
+    entry.meaningEn = entry.meaning;
+    entry.meaning = translated[String(index)] ?? entry.meaning;
+    entry.meaningStatus = '번역 초안(검수 필요)';
+  });
+}
+
+/** 초안을 구글 시트(Apps Script 웹훅)에 review=draft 행으로 보낸다. */
+async function sendToSheet(draft, topic) {
+  const { THEME_SHEET_WEBHOOK_URL: url, THEME_SHEET_WEBHOOK_TOKEN: auth } = process.env;
+  if (!url || !auth) {
+    throw new Error('THEME_SHEET_WEBHOOK_URL / THEME_SHEET_WEBHOOK_TOKEN이 .env에 없습니다.');
+  }
+  const t = draft.title;
+  const rows = {
+    themes: [[t, topic]],
+    kanji: draft.kanji.map((k) => [t, k.kanji, k.onReading, k.kunReading, k.meaning, k.jlptLevel, k.displayOrder, 'draft']),
+    vocabulary: Object.entries(draft.vocabulary).flatMap(([stage, entries]) =>
+      entries.map((w) => [t, stage, w.surfaceForm, w.reading, w.meaning, w.jlptLevel, w.displayOrder, 'draft']),
+    ),
+    examples: draft.examples.map((e) => [t, e.japaneseSentence, e.reading, e.translation, e.displayOrder, 'draft']),
+  };
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ token: auth, theme: t, rows }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const result = await response.json().catch(() => null);
+  if (!result?.ok) {
+    throw new Error(`시트에 쓰지 못했습니다: ${result?.error ?? `HTTP ${response.status}`}`);
+  }
+  console.log(`시트에 review=draft로 추가했습니다: ${JSON.stringify(result.counts)}`);
+}
+
 async function main() {
-  const { title, topic } = parseArgs();
+  const { title, topic, candidates: candidatesPath, toSheet } = parseArgs();
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY가 없습니다. .env.example을 복사해 .env를 만들고 채워주세요.');
   }
 
-  console.log(`"${title}" 테마 후보를 Gemini에게 추천받는 중...`);
-  const candidates = await suggestCandidates(apiKey, title, topic);
+  let candidates;
+  if (candidatesPath) {
+    console.log(`후보 파일 ${candidatesPath}을 사용합니다(Gemini 후보 추천 생략).`);
+    candidates = JSON.parse(readFileSync(path.resolve(candidatesPath), 'utf-8'));
+  } else {
+    console.log(`"${title}" 테마 후보를 Gemini에게 추천받는 중...`);
+    candidates = await suggestCandidates(apiKey, title, topic);
+  }
 
   console.log('kanjiapi.dev로 한자/단어/표현을 조회·검증하는 중...');
   const kanji = await buildKanjiEntries(candidates.kanji ?? []);
@@ -112,7 +172,10 @@ async function main() {
   const vocabularyWords = [...word.accepted, ...expression.accepted].map(
     (entry) => entry.surfaceForm,
   );
-  const examples = await buildExampleEntries(apiKey, title, vocabularyWords);
+  const examples = await buildExampleEntries(vocabularyWords);
+
+  console.log('영어 뜻을 한국어로 번역하는 중(Gemini 1회)...');
+  await translateEntries(apiKey, kanji.accepted, [...word.accepted, ...expression.accepted]);
 
   const draft = {
     title,
@@ -139,6 +202,9 @@ async function main() {
   );
   if (draft.rejected.length > 0) {
     console.log(`거부된 후보 ${draft.rejected.length}개(이유는 draft 파일의 "rejected" 참고).`);
+  }
+  if (toSheet) {
+    await sendToSheet(draft, topic ?? '');
   }
   console.log('초안 파일을 열어 직접 검토·수정한 뒤, 아래 명령으로 마이그레이션을 생성하세요:');
   console.log(`  npm run finalize -- --draft drafts/${slug}.json`);
