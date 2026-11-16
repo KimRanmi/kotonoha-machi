@@ -13,15 +13,18 @@ import com.kotonohamachi.theme.ThemeExample;
 import com.kotonohamachi.theme.ThemeKanji;
 import com.kotonohamachi.theme.ThemeProgress;
 import com.kotonohamachi.theme.ThemeReadingPassage;
+import com.kotonohamachi.theme.ThemeReadingQuestion;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
 import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
+import com.kotonohamachi.theme.dto.ThemeReadingResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
 import com.kotonohamachi.theme.repository.ThemeExampleRepository;
 import com.kotonohamachi.theme.repository.ThemeKanjiRepository;
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
 import com.kotonohamachi.theme.repository.ThemeReadingPassageRepository;
+import com.kotonohamachi.theme.repository.ThemeReadingQuestionRepository;
 import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
@@ -61,6 +64,9 @@ class ThemeServiceTest {
   private ThemeReadingPassageRepository themeReadingPassageRepository;
 
   @Mock
+  private ThemeReadingQuestionRepository themeReadingQuestionRepository;
+
+  @Mock
   private UserRepository userRepository;
 
   @Mock
@@ -77,6 +83,7 @@ class ThemeServiceTest {
         themeVocabularyRepository,
         themeExampleRepository,
         themeReadingPassageRepository,
+        themeReadingQuestionRepository,
         userRepository,
         vocabularyService);
   }
@@ -220,7 +227,7 @@ class ThemeServiceTest {
         ApiException.class, () -> themeService.completeStage(1L, 2L, ThemeStage.KANJI));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-    assertThat(exception.getMessage()).contains("오늘은 이미 테마를 하나 완료");
+    assertThat(exception.getMessage()).contains("오늘은 이미 학습을 완료");
     verify(themeProgressRepository, never()).save(any());
   }
 
@@ -238,7 +245,7 @@ class ThemeServiceTest {
         ApiException.class, () -> themeService.completeStage(1L, 2L, ThemeStage.KANJI));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-    assertThat(exception.getMessage()).contains("오늘의 테마가 아닙니다");
+    assertThat(exception.getMessage()).contains("오늘의 학습이 아닙니다");
     verify(themeProgressRepository, never()).save(any());
   }
 
@@ -329,23 +336,73 @@ class ThemeServiceTest {
   }
 
   @Test
-  void getStageContent_READING_단계는_번역을_정답으로_한_보기_목록을_반환한다() {
+  void getReading_이해_문제가_있는_지문과_출처를_반환한다() {
     Theme theme = new Theme("카페에서 주문하기");
-    ThemeReadingPassage target = new ThemeReadingPassage(theme, 3, "今日は雨です。", "오늘은 비가 옵니다.", 1);
-    ThemeReadingPassage other = new ThemeReadingPassage(theme, 2, "彼は駅に着きました。", "그는 역에 도착했습니다.", 2);
+    ThemeReadingPassage passage = new ThemeReadingPassage(theme, 3, "今日は雨です。", null, 1);
+    ThemeReadingQuestion question = new ThemeReadingQuestion(
+        passage, "今日の天気は？", List.of("雨", "晴れ", "雪", "曇り"), 1, "本文に雨とあるため。", 1);
     when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
     when(themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(1L))
-        .thenReturn(List.of(target));
-    when(themeReadingPassageRepository.findAll()).thenReturn(List.of(target, other));
+        .thenReturn(List.of(passage));
+    when(themeReadingQuestionRepository.findAllByPassageIdOrderByDisplayOrder(any()))
+        .thenReturn(List.of(question));
 
-    List<ThemeQuizItemResponse> content = themeService.getStageContent(1L, ThemeStage.READING);
+    ThemeReadingResponse reading = themeService.getReading(1L).orElseThrow();
 
-    assertThat(content).hasSize(1);
-    ThemeQuizItemResponse item = content.get(0);
-    assertThat(item.prompt()).isEqualTo("今日は雨です。");
-    assertThat(item.correctAnswer()).isEqualTo("오늘은 비가 옵니다.");
-    assertThat(item.options()).contains("오늘은 비가 옵니다.", "그는 역에 도착했습니다.");
-    assertThat(item.jlptLevel()).isEqualTo(3);
+    assertThat(reading.passage()).isEqualTo("今日は雨です。");
+    assertThat(reading.questions()).hasSize(1);
+    assertThat(reading.questions().get(0).prompt()).isEqualTo("今日の天気は？");
+    assertThat(reading.questions().get(0).options()).containsExactly("雨", "晴れ", "雪", "曇り");
+    assertThat(reading.questions().get(0).correctAnswer()).isEqualTo("雨");
+    assertThat(reading.questions().get(0).explanation()).isEqualTo("本文に雨とあるため。");
+  }
+
+  @Test
+  void getReading_이해_문제가_없으면_빈_값을_반환한다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeReadingPassage passage = new ThemeReadingPassage(theme, 3, "今日は雨です。", "번역", 1);
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(1L))
+        .thenReturn(List.of(passage));
+
+    assertThat(themeService.getReading(1L)).isEmpty();
+  }
+
+  @Test
+  void completeStage_이해_문제가_없는_테마는_EXAMPLE_다음_독해를_건너뛰고_REVIEW로_간다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    progress.completeCurrentStage(); // KANJI -> WORD
+    progress.completeCurrentStage(); // WORD -> EXPRESSION
+    progress.completeCurrentStage(); // EXPRESSION -> EXAMPLE
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
+
+    ThemeProgressResponse response = themeService.completeStage(1L, 1L, ThemeStage.EXAMPLE);
+
+    assertThat(response.currentStage()).isEqualTo(ThemeStage.REVIEW);
+  }
+
+  @Test
+  void completeStage_이해_문제가_있는_테마는_EXAMPLE_다음_READING에서_멈춘다() {
+    Theme theme = new Theme("카페에서 주문하기");
+    ThemeProgress progress = new ThemeProgress(user(), theme);
+    progress.completeCurrentStage(); // KANJI -> WORD
+    progress.completeCurrentStage(); // WORD -> EXPRESSION
+    progress.completeCurrentStage(); // EXPRESSION -> EXAMPLE
+    ThemeReadingPassage passage = new ThemeReadingPassage(theme, 3, "今日は雨です。", null, 1);
+    ThemeReadingQuestion question = new ThemeReadingQuestion(
+        passage, "今日の天気は？", List.of("雨", "晴れ", "雪", "曇り"), 1, "本文に雨とあるため。", 1);
+    when(themeRepository.findById(1L)).thenReturn(Optional.of(theme));
+    when(themeProgressRepository.findByUserIdAndThemeId(1L, 1L)).thenReturn(Optional.of(progress));
+    when(themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(1L))
+        .thenReturn(List.of(passage));
+    when(themeReadingQuestionRepository.findAllByPassageIdOrderByDisplayOrder(any()))
+        .thenReturn(List.of(question));
+
+    ThemeProgressResponse response = themeService.completeStage(1L, 1L, ThemeStage.EXAMPLE);
+
+    assertThat(response.currentStage()).isEqualTo(ThemeStage.READING);
   }
 
   @Test

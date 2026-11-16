@@ -4,6 +4,7 @@ import com.kotonohamachi.auth.service.AuthPrincipal;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
 import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
+import com.kotonohamachi.theme.dto.ThemeReadingResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
 import com.kotonohamachi.theme.service.ThemeService;
 import com.kotonohamachi.user.User;
@@ -84,5 +85,19 @@ public class ThemeController {
   public List<ThemeQuizItemResponse> getStageContent(
       @PathVariable Long themeId, @PathVariable ThemeStage stage) {
     return themeService.getStageContent(themeId, stage);
+  }
+
+  /**
+   * 독해(READING) 단계의 지문(출처 포함)과 이해 문제를 조회한다.
+   *
+   * @param themeId 조회할 테마 ID
+   * @return 지문과 문제(이해 문제가 없으면 204 No Content)
+   */
+  @GetMapping("/api/themes/{themeId}/reading")
+  public ResponseEntity<ThemeReadingResponse> getReading(@PathVariable Long themeId) {
+    return themeService
+        .getReading(themeId)
+        .map(ResponseEntity::ok)
+        .orElseGet(() -> ResponseEntity.noContent().build());
   }
 }

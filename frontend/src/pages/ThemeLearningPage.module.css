@@ -303,3 +303,17 @@
   font-weight: 700;
   color: var(--color-primary);
 }
+
+.passage {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+
+.sourceNote {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+  word-break: break-all;
+}

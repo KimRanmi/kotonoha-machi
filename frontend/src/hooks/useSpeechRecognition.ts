@@ -7,7 +7,7 @@ import {
 } from '../lib/speechRecognition';
 
 /**
- * 마이크 음성 인식의 화면 상태(듣는 중 여부, 오류 메시지)를 관리한다. 테마 학습과 주민 대화가 함께 쓴다.
+ * 마이크 음성 인식의 화면 상태(듣는 중 여부, 오류 메시지)를 관리한다. 오늘의 학습과 주민 대화가 함께 쓴다.
  * 컴포넌트가 사라지면 켜져 있던 마이크 인식도 멈춘다. 인식을 직접 멈추려면 `cancelSpeechRecognition`을 쓴다.
  */
 export function useSpeechRecognition() {

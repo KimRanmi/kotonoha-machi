@@ -26,6 +26,7 @@ import com.kotonohamachi.resident.dto.FriendshipChange;
 import com.kotonohamachi.resident.repository.ResidentFriendshipRepository;
 import com.kotonohamachi.resident.repository.ResidentRepository;
 import com.kotonohamachi.resident.service.ResidentFriendshipService;
+import com.kotonohamachi.theme.service.ThemeService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -45,6 +46,9 @@ import org.springframework.http.HttpStatus;
 /** {@link ChatService}의 입력 검증, 주민 조회, 프롬프트 치환을 Mockito로 단위 테스트한다. */
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
+
+  @Mock
+  private ThemeService themeService;
 
   @Mock
   private ResidentRepository residentRepository;
@@ -72,6 +76,8 @@ class ChatServiceTest {
 
   @BeforeEach
   void setUp() {
+    // 기본은 오늘 학습을 끝낸 상태(대화 가능). 막히는 경우는 아래 전용 테스트에서 바꾼다.
+    lenient().when(themeService.canChatToday(any())).thenReturn(true);
     chatService = new ChatService(
         residentRepository,
         friendshipRepository,
@@ -79,6 +85,7 @@ class ChatServiceTest {
         friendshipService,
         memoryService,
         geminiClient,
+        themeService,
         new Clock() {
           @Override
           public ZoneId getZone() {
@@ -108,6 +115,19 @@ class ChatServiceTest {
     when(resident.getPersonality()).thenReturn("ぶっきらぼう");
     when(resident.getCurrentContext()).thenReturn("広場で散歩中");
     return resident;
+  }
+
+  @Test
+  void 오늘_학습을_끝내지_않았으면_403이고_Gemini를_부르지_않는다() {
+    Resident resident = mock(Resident.class);
+    when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
+    when(themeService.canChatToday(1L)).thenReturn(false);
+
+    ApiException error =
+        catchThrowableOfType(ApiException.class, () -> chatService.chat(1L, "r01", "こんにちは"));
+
+    assertThat(error.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
+    verify(geminiClient, never()).generate(any(), any(), any());
   }
 
   @Test
