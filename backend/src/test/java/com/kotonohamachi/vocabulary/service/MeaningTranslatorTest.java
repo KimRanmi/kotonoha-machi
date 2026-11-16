@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.kotonohamachi.chat.ChatErrorCode;
 import com.kotonohamachi.chat.service.GeminiClient;
 import com.kotonohamachi.common.ApiException;
-import com.kotonohamachi.vocabulary.DictionaryWord;
+import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import org.junit.jupiter.api.Test;
 
 /** 번역 캐시와 실패 시 영어 뜻 폴백을 검증한다. */

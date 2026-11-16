@@ -14,7 +14,7 @@ import com.kotonohamachi.chat.ChatSpeaker;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.common.ApiException;
-import com.kotonohamachi.vocabulary.DictionaryWord;
+import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

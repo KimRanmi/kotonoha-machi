@@ -6,13 +6,16 @@ import com.kotonohamachi.theme.ThemeVocabulary;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
-import com.kotonohamachi.vocabulary.DictionaryWord;
 import com.kotonohamachi.vocabulary.VocabularyEntry;
 import com.kotonohamachi.vocabulary.VocabularyErrorCode;
 import com.kotonohamachi.vocabulary.VocabularySource;
 import com.kotonohamachi.vocabulary.dto.ChatWordResponse;
+import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import com.kotonohamachi.vocabulary.dto.VocabularyResponse;
 import com.kotonohamachi.vocabulary.repository.VocabularyRepository;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +34,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class VocabularyService {
 
   private static final int MAX_WORD_LENGTH = 30;
+  /** 하루에 대화로 새로 저장할 수 있는 단어 수. 번역(Gemini 무료 한도)과 사전 호출이 바닥나지 않게 막는다. */
+  static final int DAILY_CHAT_WORD_LIMIT = 30;
+
+  private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
   /** 선택 영역 양끝에 딸려 온 문장부호(일본어·영어)를 떼는 정규식. */
   private static final String EDGE_PUNCTUATION =
       "^[\\p{Punct}\\p{IsPunctuation}\\s]+|[\\p{Punct}\\p{IsPunctuation}\\s]+$";
@@ -83,6 +90,15 @@ public class VocabularyService {
         userId, found.surfaceForm(), found.reading());
     if (existing.isPresent()) {
       return new ChatWordResponse(true, VocabularyResponse.from(existing.get()));
+    }
+
+    // 이미 있는 단어는 위에서 돌려보냈으므로, 여기부터가 번역을 쓰는 새 저장이다.
+    OffsetDateTime todayStart =
+        LocalDate.now(KOREA_ZONE).atStartOfDay(KOREA_ZONE).toOffsetDateTime();
+    if (vocabularyRepository.countByUserIdAndSourceAndSavedAtGreaterThanEqual(
+            userId, VocabularySource.CHAT, todayStart)
+        >= DAILY_CHAT_WORD_LIMIT) {
+      throw new ApiException(VocabularyErrorCode.DAILY_WORD_LIMIT_EXCEEDED);
     }
 
     String meaning = meaningTranslator.toKorean(found);

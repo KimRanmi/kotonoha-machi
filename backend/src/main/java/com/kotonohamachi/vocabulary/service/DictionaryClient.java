@@ -1,8 +1,8 @@
 package com.kotonohamachi.vocabulary.service;
 
 import com.kotonohamachi.common.ApiException;
-import com.kotonohamachi.vocabulary.DictionaryWord;
 import com.kotonohamachi.vocabulary.VocabularyErrorCode;
+import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;

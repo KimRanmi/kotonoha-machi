@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.kotonohamachi.auth.service.EmailSender;
 import com.kotonohamachi.chat.service.GeminiClient;
-import com.kotonohamachi.vocabulary.DictionaryWord;
+import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import com.kotonohamachi.vocabulary.service.DictionaryClient;
 import jakarta.servlet.Filter;
 import java.util.ArrayList;

@@ -2,7 +2,7 @@ package com.kotonohamachi.vocabulary.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.kotonohamachi.vocabulary.DictionaryWord;
+import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 

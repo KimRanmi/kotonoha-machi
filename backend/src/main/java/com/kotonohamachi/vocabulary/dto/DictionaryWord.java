@@ -1,4 +1,4 @@
-package com.kotonohamachi.vocabulary;
+package com.kotonohamachi.vocabulary.dto;
 
 /**
  * 사전(JMdict)이 알려준 단어 정보.

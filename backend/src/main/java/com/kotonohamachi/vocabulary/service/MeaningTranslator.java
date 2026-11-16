@@ -2,7 +2,7 @@ package com.kotonohamachi.vocabulary.service;
 
 import com.kotonohamachi.chat.service.GeminiClient;
 import com.kotonohamachi.common.ApiException;
-import com.kotonohamachi.vocabulary.DictionaryWord;
+import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
