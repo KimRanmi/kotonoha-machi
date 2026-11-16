@@ -9,5 +9,5 @@
   "excludedCategoryKeywords": [
     "存命人物", "日本の政治家", "犯罪", "事件", "事故", "戦争", "テロ", "宗教", "暴力", "性", "政党", "政治", "災害", "殺人", "自殺", "人種差別"
   ],
-  "excludedTitlePatterns": ["^\\d+年$", "^\\d+月\\d+日$", "年$", "^\\d+月$", "一覧", "^Wikipedia:", "^曖昧さ回避"]
+  "excludedTitlePatterns": ["一覧", "^Wikipedia:", "^曖昧さ回避"]
 }

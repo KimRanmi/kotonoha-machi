@@ -12,7 +12,6 @@ const FILTER = JSON.parse(
 
 export const MIN_LENGTH = 150;
 export const MAX_LENGTH = 500;
-const MAX_DIGIT_RATIO = 0.08;
 const MAX_PAREN_RATIO = 0.2;
 const MAX_PROPER_NOUN_RATIO = 0.25;
 const MAX_LINES = 8; // 목록처럼 줄이 너무 많으면 제외
@@ -59,8 +58,6 @@ export async function evaluate(entry) {
   );
   if (badCategory) return { excluded: `제외 분류 ${badCategory}` };
   if (text.split('\n').length > MAX_LINES) return { excluded: '줄이 많음(목록형)' };
-  const digitRatio = (text.match(/[0-9０-９]/g) ?? []).length / text.length;
-  if (digitRatio > MAX_DIGIT_RATIO) return { excluded: `숫자 비율 ${digitRatio.toFixed(2)}` };
   const paren = parenRatio(text);
   if (paren > MAX_PAREN_RATIO) return { excluded: `괄호 비율 ${paren.toFixed(2)}` };
 
