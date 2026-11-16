@@ -3,6 +3,7 @@
 // 위키백과 지문 학습 초안을 Flyway 마이그레이션 SQL로 만든다(학습 하나당 파일 하나). DB에 직접 실행하지 않는다.
 // 저장 형식은 세션 B와 맞춘 약속: theme_reading_passage(+source_title/source_url/license/is_excerpt, translation NULL),
 // theme_reading_question(question, choice_1~4, answer_index, explanation, display_order).
+// --explanations-only: 이미 DB에 들어간 학습의 해설만 고치는 UPDATE 마이그레이션 하나(V<n>__update_lesson_explanations.sql)를 만든다.
 // 보류(status) 학습, 번역 전 뜻, 문제가 부족한 학습은 만들지 않고 이유를 출력한다.
 import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -77,9 +78,29 @@ function buildSql(d) {
   return { sql: L.join('\n') + '\n', dropped };
 }
 
+function buildExplanationUpdates(drafts) {
+  const L = ['-- 위키백과 학습의 이해 문제 해설을 한국어로 고친다(처음 생성 때 일본어로 나온 해설 교체).', ''];
+  for (const d of drafts) {
+    for (const [i, x] of d.questions.entries()) {
+      const passage = `(SELECT id FROM theme_reading_passage WHERE theme_id = (SELECT id FROM themes WHERE title = ${q(d.title)}) AND display_order = 1)`;
+      L.push(`UPDATE theme_reading_question SET explanation = ${q(x.explanation)} WHERE passage_id = ${passage} AND display_order = ${i + 1};`);
+    }
+  }
+  return L.join('\n') + '\n';
+}
+
 const files = opt('--draft') ? [path.resolve(opt('--draft'))] : args.includes('--all')
   ? readdirSync(DRAFT_DIR).filter((f) => f.endsWith('.json')).map((f) => path.join(DRAFT_DIR, f))
   : (() => { throw new Error('사용법: npm run finalize-wiki -- --all  또는  --draft drafts/wiki/<파일>.json'); })();
+
+if (args.includes('--explanations-only')) {
+  const drafts = files.map((f) => JSON.parse(readFileSync(f, 'utf8'))).filter((d) => d.status !== '보류' && d.questions?.length);
+  const version = Math.max(...usedVersions(), B_SCHEMA_VERSION) + 1;
+  const name = `V${version}__update_lesson_explanations.sql`;
+  writeFileSync(path.join(MIGRATION_DIR, name), buildExplanationUpdates(drafts));
+  console.log(`생성 ${name} (학습 ${drafts.length}개, 문제 ${drafts.reduce((n, d) => n + d.questions.length, 0)}개)`);
+  process.exit(0);
+}
 
 let version = Math.max(...usedVersions(), B_SCHEMA_VERSION, Number(opt('--first-version') ?? 0) - 1) + 1;
 let made = 0;
