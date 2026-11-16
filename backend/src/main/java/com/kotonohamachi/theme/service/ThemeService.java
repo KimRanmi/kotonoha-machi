@@ -7,15 +7,18 @@ import com.kotonohamachi.theme.ThemeExample;
 import com.kotonohamachi.theme.ThemeKanji;
 import com.kotonohamachi.theme.ThemeProgress;
 import com.kotonohamachi.theme.ThemeReadingPassage;
+import com.kotonohamachi.theme.ThemeReadingQuestion;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
 import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
+import com.kotonohamachi.theme.dto.ThemeReadingResponse;
 import com.kotonohamachi.theme.dto.ThemeResponse;
 import com.kotonohamachi.theme.repository.ThemeExampleRepository;
 import com.kotonohamachi.theme.repository.ThemeKanjiRepository;
 import com.kotonohamachi.theme.repository.ThemeProgressRepository;
 import com.kotonohamachi.theme.repository.ThemeReadingPassageRepository;
+import com.kotonohamachi.theme.repository.ThemeReadingQuestionRepository;
 import com.kotonohamachi.theme.repository.ThemeRepository;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
@@ -53,6 +56,7 @@ public class ThemeService {
   private final ThemeVocabularyRepository themeVocabularyRepository;
   private final ThemeExampleRepository themeExampleRepository;
   private final ThemeReadingPassageRepository themeReadingPassageRepository;
+  private final ThemeReadingQuestionRepository themeReadingQuestionRepository;
   private final UserRepository userRepository;
   private final VocabularyService vocabularyService;
 
@@ -65,6 +69,7 @@ public class ThemeService {
    * @param themeVocabularyRepository 테마 단어·표현 콘텐츠 저장소
    * @param themeExampleRepository 테마 예문 콘텐츠 저장소
    * @param themeReadingPassageRepository 테마 독해 지문 콘텐츠 저장소
+   * @param themeReadingQuestionRepository 테마 독해 이해 문제 저장소
    * @param userRepository 사용자 저장소
    * @param vocabularyService 단어장 서비스
    */
@@ -75,6 +80,7 @@ public class ThemeService {
       ThemeVocabularyRepository themeVocabularyRepository,
       ThemeExampleRepository themeExampleRepository,
       ThemeReadingPassageRepository themeReadingPassageRepository,
+      ThemeReadingQuestionRepository themeReadingQuestionRepository,
       UserRepository userRepository,
       VocabularyService vocabularyService) {
     this.themeRepository = themeRepository;
@@ -83,6 +89,7 @@ public class ThemeService {
     this.themeVocabularyRepository = themeVocabularyRepository;
     this.themeExampleRepository = themeExampleRepository;
     this.themeReadingPassageRepository = themeReadingPassageRepository;
+    this.themeReadingQuestionRepository = themeReadingQuestionRepository;
     this.userRepository = userRepository;
     this.vocabularyService = vocabularyService;
   }
@@ -171,6 +178,10 @@ public class ThemeService {
       throw new ApiException(ThemeErrorCode.STAGE_OUT_OF_ORDER);
     }
     progress.completeCurrentStage();
+    // 독해 지문·문제가 없는 테마는 독해 단계를 건너뛰고 바로 복습으로 보낸다(사용자가 막히지 않게).
+    if (progress.canComplete(ThemeStage.READING) && findReading(themeId).isEmpty()) {
+      progress.completeCurrentStage();
+    }
     vocabularyService.saveThemeWords(userId, themeId, stage);
 
     return new ThemeProgressResponse(themeId, progress.getCurrentStage(), progress.isCompleted());
@@ -179,7 +190,7 @@ public class ThemeService {
   /**
    * 테마의 한 단계에 나오는 항목들을 조회한다. {@link ThemeStage#KANJI}는 한자 글자가 문제, {@link
    * ThemeStage#WORD}·{@link ThemeStage#EXPRESSION}은 단어·표현 표기가 문제, {@link ThemeStage#EXAMPLE}은
-   * 예문 문장이, {@link ThemeStage#READING}은 지문 문장이 문제이고, 정답은 각각의 뜻·번역인 객관식이다.
+   * 예문 문장이 문제이고, 정답은 각각의 뜻·번역인 객관식이다. {@link ThemeStage#READING}은 지문이 함께 필요해 이 메서드가 아닌 {@link #getReading}을 쓴다(여기서는 빈 목록).
    * {@link ThemeStage#REVIEW}는 객관식이 아니라, 이 테마에서 배운 한자·단어·표현·예문을 전부 모아 소리 내어
    * 따라 읽는 말하기 연습 목록이다.
    *
@@ -200,11 +211,47 @@ public class ThemeService {
             stage);
       case EXAMPLE ->
         toExampleQuizItems(themeExampleRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
-      case READING ->
-        toReadingQuizItems(
-            themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(themeId));
+      case READING -> List.of(); // 독해는 지문이 함께 필요해 getReading()으로 따로 조회한다
       case REVIEW -> toReviewItems(themeId);
     };
+  }
+
+  /**
+   * 독해(READING) 단계의 지문과 이해 문제를 조회한다. 이해 문제가 있는 첫 번째 지문을 쓴다.
+   *
+   * @param themeId 조회할 테마 ID
+   * @return 지문과 문제(이해 문제가 있는 지문이 없으면 빈 값 — 이 경우 독해 단계는 건너뛴다)
+   */
+  @Transactional(readOnly = true)
+  public Optional<ThemeReadingResponse> getReading(Long themeId) {
+    findThemeOrThrow(themeId);
+    return findReading(themeId);
+  }
+
+  private Optional<ThemeReadingResponse> findReading(Long themeId) {
+    for (ThemeReadingPassage passage :
+        themeReadingPassageRepository.findAllByThemeIdOrderByDisplayOrder(themeId)) {
+      List<ThemeReadingQuestion> questions =
+          themeReadingQuestionRepository.findAllByPassageIdOrderByDisplayOrder(passage.getId());
+      if (!questions.isEmpty()) {
+        return Optional.of(new ThemeReadingResponse(
+            passage.getPassage(),
+            passage.getSourceTitle(),
+            passage.getSourceUrl(),
+            passage.getLicense(),
+            passage.isExcerpt(),
+            questions.stream()
+                .map(question -> new ThemeQuizItemResponse(
+                    question.getQuestion(),
+                    question.getChoices(),
+                    question.getCorrectChoice(),
+                    null,
+                    passage.getJlptLevel(),
+                    null))
+                .toList()));
+      }
+    }
+    return Optional.empty();
   }
 
   private List<ThemeQuizItemResponse> toKanjiQuizItems(List<ThemeKanji> kanjiList) {
@@ -299,20 +346,6 @@ public class ThemeService {
             answerPool,
             example.getReading(),
             null))
-        .toList();
-  }
-
-  private List<ThemeQuizItemResponse> toReadingQuizItems(List<ThemeReadingPassage> passages) {
-    List<String> answerPool = themeReadingPassageRepository.findAll().stream()
-        .map(ThemeReadingPassage::getTranslation)
-        .toList();
-    return passages.stream()
-        .map(passage -> toQuizItem(
-            passage.getPassage(),
-            passage.getTranslation(),
-            answerPool,
-            null,
-            passage.getJlptLevel()))
         .toList();
   }
 

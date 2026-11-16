@@ -156,7 +156,7 @@ class ThemeControllerIntegrationTest {
     mockMvc
         .perform(post("/api/themes/999999/stages/KANJI/complete").session(session))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.message").value("존재하지 않는 테마입니다."));
+        .andExpect(jsonPath("$.message").value("존재하지 않는 학습입니다."));
   }
 
   @Test
@@ -194,7 +194,7 @@ class ThemeControllerIntegrationTest {
     mockMvc
         .perform(post("/api/themes/" + secondThemeId + "/stages/KANJI/complete").session(session))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.message").value("오늘의 테마가 아닙니다. 오늘의 테마만 진행할 수 있습니다."));
+        .andExpect(jsonPath("$.message").value("오늘의 학습이 아닙니다. 오늘의 학습만 진행할 수 있습니다."));
   }
 
   @Test
@@ -227,12 +227,9 @@ class ThemeControllerIntegrationTest {
         .andExpect(status().isOk());
     mockMvc
         .perform(post("/api/themes/" + themeId + "/stages/EXAMPLE/complete").session(session))
-        .andExpect(status().isOk());
-    mockMvc
-        .perform(post("/api/themes/" + themeId + "/stages/READING/complete").session(session))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.currentStage").value("REVIEW"))
-        .andExpect(jsonPath("$.completed").value(false));
+        // 독해 문제가 없는 학습이라 READING은 자동으로 건너뛴다.
+        .andExpect(jsonPath("$.currentStage").value("REVIEW"));
     mockMvc
         .perform(post("/api/themes/" + themeId + "/stages/REVIEW/complete").session(session))
         .andExpect(status().isOk())
@@ -278,16 +275,13 @@ class ThemeControllerIntegrationTest {
   }
 
   @Test
-  void READING_단계_콘텐츠는_V9가_심은_실제_지문_데이터를_반환한다() throws Exception {
+  void 독해_문제가_없는_학습은_reading_조회가_204를_반환한다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     Long themeId = firstThemeId(session);
 
     mockMvc
-        .perform(get("/api/themes/" + themeId + "/stages/READING/content").session(session))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].prompt").exists())
-        .andExpect(jsonPath("$[0].correctAnswer").exists())
-        .andExpect(jsonPath("$[0].jlptLevel").exists());
+        .perform(get("/api/themes/" + themeId + "/reading").session(session))
+        .andExpect(status().isNoContent());
   }
 
   @Test
