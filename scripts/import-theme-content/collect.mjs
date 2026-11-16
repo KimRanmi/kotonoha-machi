@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchAnniversaryLinks, fetchCategoryMembers, fetchIntros, oldidUrl, writeCache } from './lib/wikipedia.mjs';
 import { saveKanjiCache } from './lib/kanjiCache.mjs';
-import { evaluate } from './lib/passageScore.mjs';
+import { evaluate, removeParentheses } from './lib/passageScore.mjs';
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -46,7 +46,8 @@ console.log(`${source}: 링크 ${titles.length}개`);
 const intros = await fetchIntros(titles);
 const passed = [];
 const excludedLog = [];
-for (const entry of intros) {
+for (const original of intros) {
+  const entry = { ...original, extract: removeParentheses(original.extract) };
   const result = await evaluate(entry);
   if (result.excluded) {
     excludedLog.push(`${entry.title}: ${result.excluded}`);

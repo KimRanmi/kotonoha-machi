@@ -29,6 +29,18 @@ function getTokenizer() {
   return tokenizerPromise;
 }
 
+/** 괄호 안 설명(읽는 법·영어 표기 등)을 모두 지운다. 중첩도 처리한다. 원문을 고친 것이라 출처에 "발췌·일부 가공"을 밝힌다. */
+export function removeParentheses(text) {
+  let depth = 0;
+  let out = '';
+  for (const ch of text) {
+    if ('（('.includes(ch)) depth++;
+    else if ('）)'.includes(ch)) depth = Math.max(0, depth - 1);
+    else if (depth === 0) out += ch;
+  }
+  return out.replace(/[ \t]+\n/g, '\n').replace(/｡\s*/g, '。').trim();
+}
+
 /** 괄호(全角・半角) 안 글자 수 비율 */
 function parenRatio(text) {
   let depth = 0;

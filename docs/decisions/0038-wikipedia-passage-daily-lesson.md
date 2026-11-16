@@ -30,10 +30,16 @@
   라이선스에 영향이 있는지는 판단하지 않았다. 공개 배포 전에 별도로 확인이 필요하다.
 - 제외한 후보: Livedoor News Corpus는 CC BY-ND(개작 금지), 위키뉴스는 CC BY 2.5로 달라 폐쇄된 것으로 보여 제외.
 
+## 지문 가공: 괄호 설명 삭제 (2026-11-16 사용자 결정)
+
+도입 단락의 괄호 안 설명(읽는 법·영어 표기·별칭 등 `（…）`, `(…)`, 중첩 포함)은 학습 화면에서 읽기 불편해 **모두 삭제**한다.
+원문을 고치는 것이므로 출처 표기의 "도입 단락 발췌"를 **"도입 단락 발췌, 괄호 설명 삭제"**로 바꿔 변경 사실을 밝힌다(`is_excerpt`는 true 그대로).
+화면 문구는 세션 B와 맞춘다.
+
 ## 출처 표기 문구 초안 (화면용, 지문 아래)
 
 > 출처: 일본어 위키백과 「{문서 제목}」([문서 이력]({이력 링크}))
-> 리비전 {oldid}, 도입 단락 발췌 / 라이선스: [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.ja)
+> 리비전 {oldid}, 도입 단락 발췌(괄호 설명 삭제) / 라이선스: [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.ja)
 
 - 문서 링크는 리비전 고정 링크(`https://ja.wikipedia.org/w/index.php?title=…&oldid=…`), 이력 링크는
   `…&action=history`.
