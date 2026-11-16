@@ -231,6 +231,7 @@ function ThemeLearningPage() {
     }
 
     setRecognizedText(null);
+    setSpeechAccuracy(null);
     startListening((transcript, candidates) => {
       const best = findBestSpeechMatch(
         candidates,
@@ -323,11 +324,12 @@ function ThemeLearningPage() {
 
   const currentStageIndex = STAGE_ORDER.indexOf(theme.currentStage);
   const isReviewStage = activeStage === 'REVIEW';
-  // 말하기: 3번 통과 못 했거나 "分からない"로 힌트를 본 뒤에는 정답과 읽는 법을 알려 준다(넘어가기는 늘 열려 있다).
+  // 말하기: 3번 통과 못 하면 정답과 읽는 법을 알려 준다("分からない" 힌트 블록이 이미 보이면 중복이라 생략, 넘어가기는 늘 열려 있다).
   const isSpeechAnswerShown =
     isReviewStage &&
     feedback !== 'correct' &&
-    (speechFailCount >= MAX_WRONG_ATTEMPTS || isReadingHintShown);
+    speechFailCount >= MAX_WRONG_ATTEMPTS &&
+    !isReadingHintShown;
 
   return (
     <main className={styles.page}>
