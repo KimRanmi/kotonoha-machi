@@ -32,6 +32,8 @@ export interface QuizItem {
   correctAnswer: string;
   reading: string | null;
   jlptLevel: number | null;
+  /** 한글 뜻/번역. 복습(REVIEW)에서만 채워진다. */
+  meaning: string | null;
 }
 
 /** 모든 테마를 로그인한 사용자 자신의 진행 상태와 함께 가져온다. */

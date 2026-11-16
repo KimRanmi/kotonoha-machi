@@ -18,8 +18,11 @@ export function useSpeechRecognition() {
 
   useEffect(() => cancelSpeechRecognition, []);
 
-  /** 한 번 듣고, 인식된 텍스트를 `onResult`로 넘긴다. 이미 듣는 중이면 무시한다. */
-  function start(onResult: (transcript: string) => void) {
+  /**
+   * 한 번 듣고, 최선 후보 텍스트를 `onResult`의 첫 인자로 넘긴다. 두 번째 인자는 모든 후보 목록(첫 항목이
+   * 최선 후보)이다 — 기존 호출부는 첫 인자만 받으면 그대로 동작한다. 이미 듣는 중이면 무시한다.
+   */
+  function start(onResult: (transcript: string, candidates: string[]) => void) {
     if (isListeningRef.current) {
       return;
     }
@@ -33,13 +36,14 @@ export function useSpeechRecognition() {
     };
 
     recognizeJapaneseSpeech()
-      .then((transcript) => {
+      .then((candidates) => {
         finish();
+        const transcript = candidates[0] ?? '';
         if (!transcript.trim()) {
           setErrorMessage('음성을 인식하지 못했습니다. 다시 시도해주세요.');
           return;
         }
-        onResult(transcript);
+        onResult(transcript, candidates);
       })
       .catch((error: unknown) => {
         finish();

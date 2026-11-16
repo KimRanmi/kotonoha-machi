@@ -47,6 +47,9 @@ export class SpeechCancelledError extends Error {}
  */
 const SILENCE_TIMEOUT_MS = 5000;
 
+/** 인식 엔진에게 요청할 후보(대안 해석) 수. 희귀 단어는 첫 후보가 엉뚱한 한자일 때가 많아 여러 개를 받는다. */
+const MAX_ALTERNATIVES = 5;
+
 let activeRecognition: SpeechRecognitionLike | null = null;
 // 사용자가 취소한 인식. 취소 뒤 늦게 도착하는 종료 신호로 중간 결과가 전송되지 않게 가려낸다.
 const cancelledRecognitions = new WeakSet<SpeechRecognitionLike>();
@@ -60,10 +63,28 @@ export function cancelSpeechRecognition(): void {
 }
 
 /**
- * 마이크로 한 번 말한 내용을 일본어로 인식해 텍스트로 돌려준다. 지원하지 않는 브라우저거나 인식에 실패하면
- * 안내 메시지를 담아 reject한다.
+ * 연속 인식의 결과 조각들에서 후보 문자열 목록을 만든다. 조각마다 후보가 따로 있으므로 "k번째 후보끼리"
+ * 이어 붙이고(그 조각에 k번째 후보가 없으면 첫 후보로 대신한다), 중복은 뺀다. 첫 항목은 최선 후보다.
  */
-export function recognizeJapaneseSpeech(): Promise<string> {
+function buildCandidates(results: ArrayLike<ArrayLike<SpeechRecognitionResultLike>>): string[] {
+  const candidates: string[] = [];
+  for (let k = 0; k < MAX_ALTERNATIVES; k += 1) {
+    let combined = '';
+    for (let i = 0; i < results.length; i += 1) {
+      combined += (results[i]?.[k] ?? results[i]?.[0])?.transcript ?? '';
+    }
+    if (combined.trim() && !candidates.includes(combined)) {
+      candidates.push(combined);
+    }
+  }
+  return candidates;
+}
+
+/**
+ * 마이크로 한 번 말한 내용을 일본어로 인식해 후보 문자열 목록(첫 항목이 최선 후보)으로 돌려준다. 지원하지
+ * 않는 브라우저거나 인식에 실패하면 안내 메시지를 담아 reject한다.
+ */
+export function recognizeJapaneseSpeech(): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const SpeechRecognitionImpl = getSpeechRecognitionConstructor();
     if (!SpeechRecognitionImpl) {
@@ -75,16 +96,12 @@ export function recognizeJapaneseSpeech(): Promise<string> {
     recognition.lang = 'ja-JP';
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    let transcript = '';
+    recognition.maxAlternatives = MAX_ALTERNATIVES;
+    let candidates: string[] = [];
     let silenceTimer: ReturnType<typeof setTimeout> | undefined;
     recognition.onresult = (event) => {
       // 연속 인식에서는 지금까지의 모든 결과가 들어 있으므로 매번 처음부터 이어 붙인다.
-      let combined = '';
-      for (let i = 0; i < event.results.length; i += 1) {
-        combined += event.results[i]?.[0]?.transcript ?? '';
-      }
-      transcript = combined;
+      candidates = buildCandidates(event.results);
       // 말이 이어지는 동안은 타이머를 계속 미루고, 조용해지면 인식을 마친다.
       clearTimeout(silenceTimer);
       silenceTimer = setTimeout(() => recognition.stop(), SILENCE_TIMEOUT_MS);
@@ -100,9 +117,9 @@ export function recognizeJapaneseSpeech(): Promise<string> {
       clearIfActive();
       if (event.error === 'aborted') {
         reject(new SpeechCancelledError());
-      } else if (transcript.trim() && !cancelledRecognitions.has(recognition)) {
+      } else if (candidates.length > 0 && !cancelledRecognitions.has(recognition)) {
         // 말을 하던 중 오류로 끊겨도 이미 인식한 말은 살린다.
-        resolve(transcript);
+        resolve(candidates);
       } else {
         reject(new Error('음성을 인식하지 못했습니다. 다시 시도해주세요.'));
       }
@@ -111,8 +128,8 @@ export function recognizeJapaneseSpeech(): Promise<string> {
     recognition.onend = () => {
       clearTimeout(silenceTimer);
       clearIfActive();
-      if (transcript.trim() && !cancelledRecognitions.has(recognition)) {
-        resolve(transcript);
+      if (candidates.length > 0 && !cancelledRecognitions.has(recognition)) {
+        resolve(candidates);
       } else {
         reject(new SpeechCancelledError());
       }

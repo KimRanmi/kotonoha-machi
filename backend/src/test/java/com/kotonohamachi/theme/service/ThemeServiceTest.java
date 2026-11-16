@@ -376,6 +376,9 @@ class ThemeServiceTest {
         .extracting(ThemeQuizItemResponse::reading)
         .containsExactly("コン", "ちゅうもん", "いらっしゃいませ", "かのじょはこうちゃをちゅうもんした。");
     assertThat(content)
+        .extracting(ThemeQuizItemResponse::meaning)
+        .containsExactly("혼잡", "주문", "어서 오세요", "그녀는 차 한 잔을 주문했다.");
+    assertThat(content)
         .allSatisfy(item -> assertThat(item.correctAnswer()).isEqualTo(item.prompt()));
     assertThat(content).allSatisfy(item -> assertThat(item.options()).isEmpty());
   }
