@@ -403,6 +403,9 @@ function ThemeLearningPage() {
                 <span className={styles.levelBadge}>N{currentQuizItem.jlptLevel}</span>
               )}
               <p className={styles.prompt}>{currentQuizItem.prompt}</p>
+              {isReviewStage && currentQuizItem.meaning && (
+                <p className={styles.readingText}>{currentQuizItem.meaning}</p>
+              )}
 
               {!isReviewStage && (
                 <div className={styles.promptTools}>

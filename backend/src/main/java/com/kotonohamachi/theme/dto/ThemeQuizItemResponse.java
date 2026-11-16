@@ -13,7 +13,14 @@ import java.util.List;
  * @param correctAnswer 정답 보기(뜻 또는 번역). REVIEW는 예외적으로 {@code prompt}와 같은 값이다.
  * @param reading 히라가나 읽는 법. 학습 화면의 읽는 법 보기·소리 재생과 REVIEW의 음성 인식 비교(결과가 한자
  *     대신 가나로 나올 때)에 쓴다. 독해 지문(READING)은 읽는 법 데이터가 없어 null이다.
+ * @param meaning 한글 뜻/번역. REVIEW에서만 채워 말하기 연습 중에도 뜻을 함께 보여주는 데 쓰고, 그 외 단계는 정답이
+ *     뜻이라 null이다.
  * @param jlptLevel JLPT 레벨(5=N5 ~ 1=N1). 예문(EXAMPLE) 단계는 레벨 데이터가 없어 null이다.
  */
 public record ThemeQuizItemResponse(
-    String prompt, List<String> options, String correctAnswer, String reading, Integer jlptLevel) {}
+    String prompt,
+    List<String> options,
+    String correctAnswer,
+    String reading,
+    Integer jlptLevel,
+    String meaning) {}
