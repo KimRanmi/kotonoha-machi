@@ -21,8 +21,28 @@ npm run pick -- --pick 3,7,12            # 후보 파일의 번호로 승인 →
   기준이 어긋나면 항목을 고치지 말고 이 상수·설정 파일을 고친다.
 - **기계가 못 거르는 것**: 금지 단어에 안 걸리는 민감한 맥락(논란·편향된 서술), 본문 오류, 지문으로서의 재미·적합성.
   그래서 사람이 후보 파일의 본문을 눈으로 확인하고 번호를 고른다.
-- `cache/`, `candidates/wiki/`는 git에 올리지 않는다(위키백과 본문, CC BY-SA). `approved/readings.json` 커밋 여부는 아직 미정.
+- `cache/`, `candidates/wiki/`, `drafts/wiki/`, `approved/`는 git에 올리지 않는다(위키백과 본문, CC BY-SA). `approved/readings.json` 커밋 여부는 아직 미정.
 - API 규칙: 요청은 하나씩, 1.2초 간격, `maxlag`, User-Agent는 `kotonoha-import-tool/0.1`(연락처 없음).
+
+### 2~3단계: 지문 → 학습 초안 → 이해 문제 → SQL
+
+```bash
+npm run pick -- --pick 3,7,12                 # (1단계) 지문 승인 → approved/readings.json
+npm run draft -- --translate                  # 한자 3·단어 3·표현 2·예문 초안 + 영어 뜻/예문의 한국어 번역(Gemini 2회)
+npm run questions                             # 이해 문제 생성 + 정답을 가린 재검증(Gemini 지문 5개당 2회)
+npm run finalize-wiki -- --all                # drafts/wiki/*.json → V<n>__upsert_lesson_<제목>.sql
+```
+
+- `draft`: kuromoji로 명사→단어(WORD), 동사·형용사→표현(EXPRESSION), 한자는 지문 안 N1~N3 중 어려운 순. 뜻·읽는 법·레벨은
+  kanjiapi.dev(우선순위로 못 정하는 다의어, 지문과 사전의 읽는 법이 다른 단어는 "확인 필요"), 예문은 Tatoeba(한국어 번역이 없으면
+  영어 쌍을 찾아 Gemini가 일본어 문장을 한국어로 옮김). 같은 한자의 변형(称す/称する)은 하나만 쓴다.
+- `questions`: 질문·보기는 일본어(N1~N3), 해설은 한국어. 만든 문제를 정답 없이 다시 풀게 해서 정답이 다르거나 유일하지 않으면 버린다.
+  남은 문제가 2개 미만이면 그 학습은 보류(`status`)다.
+- **Gemini 무료 한도는 모델당 하루 20회**다. 10개 학습이면 번역 2회 + 문제 4회 정도다. 한도(429)에 걸리면 저장된 곳까지 두고 멈추며,
+  다시 실행하면 문제가 없는 학습부터 이어서 한다. 앱 대화도 같은 한도를 쓰니 주의한다.
+- 학습마다 "확인 필요" 목록은 `drafts/wiki/*.json`의 `suspects`와 `finalize-wiki` 출력에 나온다. 사람은 이 목록과 표본 몇 개만 본다.
+- `finalize-wiki`는 번호를 `max(로컬, origin/master, 39) + 1`부터 쓴다(39는 세션 B의 스키마). B의 스키마(`theme_reading_passage`의
+  `source_*` 열, `theme_reading_question`)가 `master`에 올라온 뒤에 로컬 DB에 적용해 검증한다.
 
 아래는 이전 방식(테마별 콘텐츠)이다.
 
