@@ -47,4 +47,15 @@ class DictionaryClientTest {
   void 결과가_없으면_빈_값이다() {
     assertThat(DictionaryClient.parse("{\"data\":[]}", "ほげ")).isEmpty();
   }
+
+  @Test
+  void 영어_뜻이_너무_길면_자른다() {
+    String longDefinition = "a".repeat(500);
+    String body = "{\"data\":[{\"jlpt\":[],\"japanese\":[{\"word\":\"長\",\"reading\":\"ちょう\"}],"
+        + "\"senses\":[{\"english_definitions\":[\"" + longDefinition
+        + "\"],\"parts_of_speech\":[\"Noun\"]}]}]}";
+
+    assertThat(DictionaryClient.parse(body, "長").orElseThrow().englishMeaning())
+        .hasSize(DictionaryClient.MAX_MEANING_LENGTH);
+  }
 }

@@ -31,6 +31,8 @@ public class DictionaryClient {
   private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
   private static final Pattern JLPT_TAG = Pattern.compile("jlpt-n([1-5])");
   private static final int MAX_DEFINITIONS = 3;
+  /** 영어 뜻 길이 상한. 번역 실패 시 그대로 저장돼도 단어장 meaning 컬럼(300자)을 넘지 않게 한다. */
+  static final int MAX_MEANING_LENGTH = 200;
 
   private final RestClient restClient;
 
@@ -56,6 +58,10 @@ public class DictionaryClient {
           restClient.get().uri(ENDPOINT + "?keyword={keyword}", word).retrieve().body(String.class);
     } catch (RestClientException e) {
       log.error("사전 조회 실패: {}", e.getClass().getSimpleName());
+      throw new ApiException(VocabularyErrorCode.DICTIONARY_UNAVAILABLE);
+    }
+    if (body == null || body.isBlank()) {
+      log.error("사전 응답 본문이 비어 있습니다.");
       throw new ApiException(VocabularyErrorCode.DICTIONARY_UNAVAILABLE);
     }
     try {
@@ -106,7 +112,10 @@ public class DictionaryClient {
         }
       }
       if (!definitions.isEmpty()) {
-        return String.join(", ", definitions);
+        String joined = String.join(", ", definitions);
+        return joined.length() > MAX_MEANING_LENGTH
+            ? joined.substring(0, MAX_MEANING_LENGTH)
+            : joined;
       }
     }
     return "";
