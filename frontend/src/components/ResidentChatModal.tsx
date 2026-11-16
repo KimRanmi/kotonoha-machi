@@ -15,6 +15,9 @@ import styles from './ResidentChatModal.module.css';
 /** 서버가 받는 메시지 최대 길이. */
 const MAX_MESSAGE_LENGTH = 200;
 
+/** 오늘의 학습을 끝내기 전에 대화를 막을 때 보여 주는 안내(서버 403 문구와 같다). */
+const LESSON_REQUIRED_MESSAGE = '오늘의 학습을 먼저 끝내야 주민과 이야기할 수 있어요.';
+
 interface ChatLine {
   speaker: 'me' | 'resident';
   text: string;
@@ -63,6 +66,9 @@ function ResidentChatModal({
   // 오늘의 학습을 끝내기 전이라 서버가 대화를 막았을 때(403)의 안내.
   const [lessonRequiredMessage, setLessonRequiredMessage] = useState<string | null>(null);
   const navigate = useNavigate();
+  // 오늘의 학습을 끝냈는지 확인한 결과. 확인 전(null)에는 입력창을 숨기고, 확인에 실패하면 서버(403)가 막는다.
+  const [lessonRequired, setLessonRequired] = useState<boolean | null>(null);
+  const isLessonLocked = lessonRequired === true || lessonRequiredMessage !== null;
   // 마지막 대답으로 오른 친밀도. 0이면 보여 주지 않는다.
   const [friendshipGain, setFriendshipGain] = useState(0);
   // 기록 불러오기 상태는 전송 오류와 따로 둔다(서로 덮어쓰지 않게).
@@ -97,6 +103,25 @@ function ResidentChatModal({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  // 열 때 오늘의 학습을 끝냈는지 확인해, 끝내기 전이면 말하기 전에 대화를 막는다.
+  useEffect(() => {
+    let cancelled = false;
+    getTodayRecommendation()
+      .then((theme) => {
+        if (!cancelled) {
+          setLessonRequired(theme !== null && !theme.completed);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLessonRequired(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 열 때 이전에 나눈 대화를 불러온다. 불러오는 사이 새로 보낸 말은 그 뒤에 이어 붙는다.
   useEffect(() => {
@@ -381,9 +406,9 @@ function ResidentChatModal({
                 <strong>{residentName}</strong>: 💤 {sleepyMessage}
               </p>
             )}
-            {lessonRequiredMessage && (
+            {isLessonLocked && (
               <p role="alert">
-                {lessonRequiredMessage}{' '}
+                {lessonRequiredMessage ?? LESSON_REQUIRED_MESSAGE}{' '}
                 <button type="button" onClick={goToTodayLesson}>
                   오늘의 학습하러 가기
                 </button>
@@ -396,22 +421,24 @@ function ResidentChatModal({
                 이 브라우저는 음성 인식을 지원하지 않습니다. Chrome에서 이용해주세요.
               </p>
             )}
-            <form onSubmit={handleSubmit}>
-              <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
-              <button
-                type="button"
-                onClick={isListening ? cancelSpeechRecognition : handleVoiceInput}
-                disabled={!speechSupported || isSending}
-              >
-                {isListening ? '✕ 듣기 취소' : '🎤 말하기'}
-              </button>
-              <button
-                type="submit"
-                disabled={isSending || !text.trim() || text.length > MAX_MESSAGE_LENGTH}
-              >
-                {isSending ? '답장을 기다리는 중…' : '보내기'}
-              </button>
-            </form>
+            {lessonRequired !== null && !isLessonLocked && (
+              <form onSubmit={handleSubmit}>
+                <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
+                <button
+                  type="button"
+                  onClick={isListening ? cancelSpeechRecognition : handleVoiceInput}
+                  disabled={!speechSupported || isSending}
+                >
+                  {isListening ? '✕ 듣기 취소' : '🎤 말하기'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSending || !text.trim() || text.length > MAX_MESSAGE_LENGTH}
+                >
+                  {isSending ? '답장을 기다리는 중…' : '보내기'}
+                </button>
+              </form>
+            )}
           </>
         )}
       </section>
