@@ -22,3 +22,16 @@ export async function searchJapaneseExample(query) {
   }
   return null;
 }
+
+/** 한국어 번역이 없을 때의 보조: 일본어 문장과 영어 번역 쌍을 찾는다. 못 찾으면 null. */
+export async function searchJapaneseExampleWithEnglish(query) {
+  const url = `${BASE_URL}?from=jpn&to=eng&query=${encodeURIComponent(query)}`;
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const data = await response.json();
+  for (const result of data.results ?? []) {
+    const english = result.translations.flat().find((t) => t.lang_tag === 'en');
+    if (english) return { japaneseSentence: result.text, english: english.text };
+  }
+  return null;
+}
