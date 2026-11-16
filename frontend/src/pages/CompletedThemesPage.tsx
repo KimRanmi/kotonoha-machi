@@ -20,7 +20,7 @@ function CompletedThemesPage() {
       .catch((error: unknown) => {
         if (!cancelled) {
           setErrorMessage(
-            error instanceof ApiError ? error.message : '테마를 불러오지 못했습니다.',
+            error instanceof ApiError ? error.message : '학습을 불러오지 못했습니다.',
           );
         }
       });
@@ -36,7 +36,7 @@ function CompletedThemesPage() {
         <Link to="/town" className={styles.backLink}>
           ← 마을로 돌아가기
         </Link>
-        <h1 className={styles.title}>완료한 테마</h1>
+        <h1 className={styles.title}>완료한 학습</h1>
 
         {errorMessage ? (
           <p className={styles.error} role="alert">
@@ -45,7 +45,7 @@ function CompletedThemesPage() {
         ) : themes === null ? (
           <p className={styles.message}>불러오는 중입니다…</p>
         ) : themes.length === 0 ? (
-          <p className={styles.message}>아직 완료한 테마가 없어요.</p>
+          <p className={styles.message}>아직 완료한 학습이 없어요.</p>
         ) : (
           <ul className={styles.list}>
             {themes.map((theme) => (

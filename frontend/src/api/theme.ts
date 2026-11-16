@@ -2,7 +2,7 @@ import { apiFetch } from './client';
 
 export type ThemeStage = 'KANJI' | 'WORD' | 'EXPRESSION' | 'EXAMPLE' | 'READING' | 'REVIEW';
 
-/** 테마 학습 목록에 나오는 테마 하나와 로그인한 사용자의 진행 상태. */
+/** 학습 목록에 나오는 학습 하나와 로그인한 사용자의 진행 상태. */
 export interface Theme {
   id: number;
   title: string;
@@ -10,7 +10,7 @@ export interface Theme {
   completed: boolean;
 }
 
-/** 테마 단계 완료 처리 후 돌아오는 진행 상태. */
+/** 학습 단계 완료 처리 후 돌아오는 진행 상태. */
 export interface ThemeProgress {
   themeId: number;
   currentStage: ThemeStage;
@@ -18,7 +18,7 @@ export interface ThemeProgress {
 }
 
 /**
- * 테마 단계 콘텐츠 하나. `prompt`(한자 글자/단어·표현 표기/예문 문장/독해 지문)를 보여주고 `options` 중
+ * 학습 단계 콘텐츠 하나. `prompt`(한자 글자/단어·표현 표기/예문 문장)를 보여주고 `options` 중
  * `correctAnswer`를 고르게 하는 객관식이다. 데이터가 부족하면 `options`가 4개보다 적을 수 있다. `jlptLevel`은
  * 예문(EXAMPLE) 단계에선 레벨 데이터가 없어 `null`이다. REVIEW 단계는 예외적으로 선택지가 없는 말하기 연습이라
  * `options`가 항상 빈 배열이고, `correctAnswer`는 뜻이 아니라 `prompt`와 같은 값(음성 인식 결과와 비교할 기준
@@ -36,15 +36,26 @@ export interface QuizItem {
   meaning: string | null;
 }
 
-/** 모든 테마를 로그인한 사용자 자신의 진행 상태와 함께 가져온다. */
+/** 독해(READING) 단계의 지문과 출처, 이해 문제. 문제는 다른 단계와 같은 객관식 항목이다(보기 순서는 저장된 그대로). */
+export interface ReadingContent {
+  passage: string;
+  sourceTitle: string | null;
+  sourceUrl: string | null;
+  license: string | null;
+  /** 글의 일부(도입 단락)만 발췌했으면 true. */
+  excerpt: boolean;
+  questions: QuizItem[];
+}
+
+/** 모든 학습을 로그인한 사용자 자신의 진행 상태와 함께 가져온다. */
 export async function getThemes(): Promise<Theme[]> {
   const response = await apiFetch('/api/themes');
   return response.json();
 }
 
 /**
- * "오늘의 학습" 배너에 보여 줄 테마를 가져온다. 오늘(한국 시간) 안에 테마를 완료했으면 새 테마 대신 그
- * 완료한 테마(`completed: true`)를 돌려주고, 모든 테마를 끝냈으면 `null`이다.
+ * "오늘의 학습" 배너에 보여 줄 학습을 가져온다. 오늘(한국 시간) 안에 학습을 완료했으면 새 학습 대신 그
+ * 완료한 학습(`completed: true`)을 돌려주고, 모든 학습을 끝냈으면 `null`이다.
  */
 export async function getTodayRecommendation(): Promise<Theme | null> {
   const response = await apiFetch('/api/themes/today-recommendation');
@@ -54,19 +65,28 @@ export async function getTodayRecommendation(): Promise<Theme | null> {
   return response.json();
 }
 
-/** 테마의 한 단계에 나오는 항목들을 객관식 문제로 가져온다. */
+/** 학습의 한 단계에 나오는 항목들을 객관식 문제로 가져온다. */
 export async function getStageContent(themeId: number, stage: ThemeStage): Promise<QuizItem[]> {
   const response = await apiFetch(`/api/themes/${themeId}/stages/${stage}/content`);
   return response.json();
 }
 
 /**
- * 테마의 한 단계를 완료 처리하고 다음 단계로 진행한다. 지금 진행해야 할 단계가 아니면(건너뛰기나 이미 끝난 단계
+ * 학습의 한 단계를 완료 처리하고 다음 단계로 진행한다. 지금 진행해야 할 단계가 아니면(건너뛰기나 이미 끝난 단계
  * 재요청) `ApiError`를 던진다.
  */
 export async function completeStage(themeId: number, stage: ThemeStage): Promise<ThemeProgress> {
   const response = await apiFetch(`/api/themes/${themeId}/stages/${stage}/complete`, {
     method: 'POST',
   });
+  return response.json();
+}
+
+/** 독해 단계의 지문과 이해 문제를 가져온다. 이해 문제가 없는 학습(독해를 건너뜀)이면 `null`이다. */
+export async function getReading(themeId: number): Promise<ReadingContent | null> {
+  const response = await apiFetch(`/api/themes/${themeId}/reading`);
+  if (response.status === 204) {
+    return null;
+  }
   return response.json();
 }
