@@ -100,6 +100,7 @@ async function pickVocabulary(tokens, kind, count, taken, suspects, rejected) {
   const picked = [];
   for (const c of ranked) {
     if (picked.length >= count) break;
+    if (taken.has(kanjiKey(c.surface))) continue; // 이미 고른 단어와 한자가 같은 변형(称す/称する)
     const word = await lookupWord(c.surface);
     if (!word) {
       rejected.push({ type: kind, surfaceForm: c.surface, reason: 'kanjiapi.dev에서 못 찾음' });
