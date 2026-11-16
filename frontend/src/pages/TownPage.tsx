@@ -287,7 +287,6 @@ function TownPage() {
         <Link to={`/town/themes/${todayTheme.id}`} className={styles.todayLearningBanner}>
           <span className={styles.todayLearningText}>
             <span className={styles.todayLearningLabel}>1순위 · 오늘의 학습</span>
-            <span className={styles.todayLearningTitle}>{todayTheme.title}</span>
           </span>
           <span className={styles.todayLearningCta}>시작하기 →</span>
         </Link>

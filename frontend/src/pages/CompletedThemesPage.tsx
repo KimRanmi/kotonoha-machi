@@ -48,10 +48,10 @@ function CompletedThemesPage() {
           <p className={styles.message}>아직 완료한 학습이 없어요.</p>
         ) : (
           <ul className={styles.list}>
-            {themes.map((theme) => (
+            {themes.map((theme, index) => (
               <li key={theme.id}>
                 <Link to={`/town/themes/${theme.id}`} className={styles.item}>
-                  <span className={styles.itemTitle}>{theme.title}</span>
+                  <span className={styles.itemTitle}>학습 {index + 1}</span>
                   <span className={styles.itemCta}>다시 보기 →</span>
                 </Link>
               </li>
