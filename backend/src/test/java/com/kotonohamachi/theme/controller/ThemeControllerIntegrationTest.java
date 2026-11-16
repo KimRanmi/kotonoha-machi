@@ -132,6 +132,19 @@ class ThemeControllerIntegrationTest {
   }
 
   @Test
+  void 기존_학습은_지워지고_위키백과_학습_10개만_남는다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+
+    mockMvc
+        .perform(get("/api/themes").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(10))
+        .andExpect(jsonPath("$[?(@.title == '카페에서 주문하기')]").isEmpty())
+        .andExpect(jsonPath("$[?(@.title == '자기소개하기')]").isEmpty())
+        .andExpect(jsonPath("$[0].title").value("X線"));
+  }
+
+  @Test
   void 아직_시작하지_않은_테마는_KANJI_단계와_완료되지_않은_상태로_내려온다() throws Exception {
     MockHttpSession session = newLoggedInSession();
 
@@ -228,7 +241,10 @@ class ThemeControllerIntegrationTest {
     mockMvc
         .perform(post("/api/themes/" + themeId + "/stages/EXAMPLE/complete").session(session))
         .andExpect(status().isOk())
-        // 독해 문제가 없는 학습이라 READING은 자동으로 건너뛴다.
+        .andExpect(jsonPath("$.currentStage").value("READING"));
+    mockMvc
+        .perform(post("/api/themes/" + themeId + "/stages/READING/complete").session(session))
+        .andExpect(status().isOk())
         .andExpect(jsonPath("$.currentStage").value("REVIEW"));
     mockMvc
         .perform(post("/api/themes/" + themeId + "/stages/REVIEW/complete").session(session))
@@ -256,10 +272,10 @@ class ThemeControllerIntegrationTest {
     mockMvc
         .perform(get("/api/themes/" + themeId + "/stages/KANJI/content").session(session))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].prompt").value("混"))
-        .andExpect(jsonPath("$[0].correctAnswer").value("섞다, 혼합되다"))
+        .andExpect(jsonPath("$[0].prompt").value("磁"))
+        .andExpect(jsonPath("$[0].correctAnswer").value("자석, 도자기"))
         .andExpect(jsonPath("$[0].options").isArray())
-        .andExpect(jsonPath("$[0].jlptLevel").value(2));
+        .andExpect(jsonPath("$[0].jlptLevel").value(1));
   }
 
   @Test
@@ -275,13 +291,20 @@ class ThemeControllerIntegrationTest {
   }
 
   @Test
-  void 독해_문제가_없는_학습은_reading_조회가_204를_반환한다() throws Exception {
+  void 독해_조회는_지문_출처_이해_문제와_해설을_반환한다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     Long themeId = firstThemeId(session);
 
     mockMvc
         .perform(get("/api/themes/" + themeId + "/reading").session(session))
-        .andExpect(status().isNoContent());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.passage").isNotEmpty())
+        .andExpect(jsonPath("$.sourceTitle").value("X線"))
+        .andExpect(jsonPath("$.license").value("CC BY-SA 4.0"))
+        .andExpect(jsonPath("$.excerpt").value(true))
+        .andExpect(jsonPath("$.questions.length()").value(3))
+        .andExpect(jsonPath("$.questions[0].options.length()").value(4))
+        .andExpect(jsonPath("$.questions[0].explanation").isNotEmpty());
   }
 
   @Test
@@ -292,9 +315,9 @@ class ThemeControllerIntegrationTest {
     mockMvc
         .perform(get("/api/themes/" + themeId + "/stages/REVIEW/content").session(session))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].prompt").value("混"))
-        .andExpect(jsonPath("$[0].correctAnswer").value("混"))
-        .andExpect(jsonPath("$[0].reading").value("コン"))
+        .andExpect(jsonPath("$[0].prompt").value("磁"))
+        .andExpect(jsonPath("$[0].correctAnswer").value("磁"))
+        .andExpect(jsonPath("$[0].reading").value("ジ"))
         .andExpect(jsonPath("$[0].options").isEmpty());
   }
 
