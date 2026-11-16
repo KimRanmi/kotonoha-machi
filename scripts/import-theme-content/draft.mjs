@@ -12,9 +12,9 @@ import kuromoji from 'kuromoji';
 import { getKanji, saveKanjiCache } from './lib/kanjiCache.mjs';
 import { lookupWord } from './lib/wordLookup.mjs';
 import { computeWordJlptLevel } from './lib/kanjiApi.mjs';
-import { searchJapaneseExample } from './lib/tatoebaApi.mjs';
+import { searchJapaneseExample, searchJapaneseExampleWithEnglish } from './lib/tatoebaApi.mjs';
 import { generateReading } from './lib/furigana.mjs';
-import { translateMeanings } from './lib/gemini.mjs';
+import { translateMeanings, translateExamples } from './lib/gemini.mjs';
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const KANJI_COUNT = 3;
@@ -41,6 +41,10 @@ function buildTokenizer() {
       .builder({ dicPath: path.join(CURRENT_DIR, 'node_modules', 'kuromoji', 'dict') })
       .build((e, t) => (e ? reject(e) : resolve(t))),
   );
+}
+
+function kanjiKey(surface) {
+  return `K:${Array.from(surface).filter((ch) => KANJI_RE.test(ch)).join('')}`;
 }
 
 /** 어려운 순(레벨 숫자가 작을수록 어려움) → 지문 내 등장 횟수 많은 순 */
@@ -84,7 +88,7 @@ function collectTokens(tokens, kind) {
 async function pickVocabulary(tokens, kind, count, taken, suspects, rejected) {
   const ranked = [];
   for (const c of collectTokens(tokens, kind)) {
-    if (taken.has(c.surface)) continue;
+    if (taken.has(c.surface) || taken.has(kanjiKey(c.surface))) continue;
     const level = await computeWordJlptLevel(c.surface);
     if (!inRange(level)) {
       rejected.push({ type: kind, surfaceForm: c.surface, reason: `레벨 N1~N3 밖(jlpt=${level})` });
@@ -108,6 +112,7 @@ async function pickVocabulary(tokens, kind, count, taken, suspects, rejected) {
     }
     if (flags.length) suspects.push(`${kind} ${c.surface}: ${flags.join('; ')}`);
     taken.add(c.surface);
+    taken.add(kanjiKey(c.surface)); // 称す/称する처럼 한자가 같은 변형은 하나만 쓴다
     picked.push({
       surfaceForm: word.surfaceForm,
       reading: word.reading,
@@ -127,14 +132,23 @@ async function pickExamples(vocab, suspects, rejected) {
   for (const w of vocab) {
     if (examples.length >= MAX_EXAMPLES) break;
     await new Promise((r) => setTimeout(r, 400));
-    const ex = await searchJapaneseExample(w.surfaceForm).catch(() => null);
+    let ex = await searchJapaneseExample(w.surfaceForm).catch(() => null);
+    let fromEnglish = false;
     if (!ex || seen.has(ex.japaneseSentence)) {
-      rejected.push({ type: 'example', keyword: w.surfaceForm, reason: 'Tatoeba에 한국어 번역 있는 예문 없음' });
-      continue;
+      // 한국어 번역이 없으면 영어 번역 쌍을 찾고, 한국어는 Gemini가 일본어 문장을 옮긴다(--translate)
+      await new Promise((r) => setTimeout(r, 400));
+      const en = await searchJapaneseExampleWithEnglish(w.surfaceForm).catch(() => null);
+      if (!en || seen.has(en.japaneseSentence)) {
+        rejected.push({ type: 'example', keyword: w.surfaceForm, reason: 'Tatoeba에 번역 있는 예문 없음' });
+        continue;
+      }
+      ex = { japaneseSentence: en.japaneseSentence, translation: null, english: en.english };
+      fromEnglish = true;
     }
     seen.add(ex.japaneseSentence);
     examples.push({
       ...ex,
+      ...(fromEnglish ? { translationStatus: '번역 전(영어 쌍에서)' } : {}),
       keyword: w.surfaceForm,
       reading: await generateReading(ex.japaneseSentence),
       readingStatus: '자동 생성(검수 필요)',
@@ -194,6 +208,15 @@ for (const item of approved) {
 }
 saveKanjiCache();
 
+function writeAll() {
+  for (const d of drafts) {
+    const slug = d.title.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '');
+    writeFileSync(path.join(outDir, `${slug}.json`), JSON.stringify(d, null, 2) + '\n');
+  }
+}
+writeAll(); // 번역에서 실패해도 초안은 남긴다
+
+try {
 if (translate) {
   if (!process.env.GEMINI_API_KEY) throw new Error('--translate에는 GEMINI_API_KEY가 필요합니다(.env).');
   const targets = drafts.flatMap((d) => [...d.kanji, ...Object.values(d.vocabulary).flat()]);
@@ -207,8 +230,27 @@ if (translate) {
   });
 }
 
-for (const d of drafts) {
-  const slug = d.title.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '');
-  writeFileSync(path.join(outDir, `${slug}.json`), JSON.stringify(d, null, 2) + '\n');
+if (translate) {
+  const need = drafts.flatMap((d) => d.examples.filter((e) => e.translation === null));
+  if (need.length > 0) {
+    console.log(`예문 ${need.length}개를 한국어로 번역(Gemini 1회)...`);
+    const res = await translateExamples(
+      process.env.GEMINI_API_KEY,
+      need.map((e, i) => ({ id: String(i), japanese: e.japaneseSentence, english: e.english })),
+    );
+    need.forEach((e, i) => {
+      if (res[String(i)]) {
+        e.translation = res[String(i)];
+        e.translationStatus = '번역 초안(검수 필요)';
+      }
+    });
+  }
 }
+
+} catch (error) {
+  console.error(`\n번역 실패(Gemini 한도일 수 있음): ${error.message.slice(0, 200)}`);
+  console.error('초안은 저장돼 있습니다. 한도가 풀린 뒤 npm run draft -- --translate 를 다시 실행하세요.');
+  process.exitCode = 1;
+}
+writeAll();
 console.log(`\n초안 ${drafts.length}개를 drafts/wiki/에 저장했습니다.`);
