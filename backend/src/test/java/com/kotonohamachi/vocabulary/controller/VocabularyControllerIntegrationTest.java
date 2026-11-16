@@ -202,17 +202,17 @@ class VocabularyControllerIntegrationTest {
     Long userId = lastUserId();
     jdbcTemplate.update(
         "INSERT INTO user_vocabulary (user_id, surface_form, reading, meaning, source)"
-            + " VALUES (?, '混雑', 'こんざつ', '미리 저장된 뜻', 'CHAT')",
+            + " VALUES (?, '電磁波', 'でんじは', '미리 저장된 뜻', 'CHAT')",
         userId);
 
     complete(session, themeId, "KANJI");
     complete(session, themeId, "WORD");
 
     assertThat(vocabularyCount(session)).isEqualTo(3);
-    assertThat(countRows(userId, "混雑", "こんざつ")).isEqualTo(1);
+    assertThat(countRows(userId, "電磁波", "でんじは")).isEqualTo(1);
     // 기존 행은 덮어쓰지 않는다.
     assertThat(jdbcTemplate.queryForObject(
-            "SELECT source FROM user_vocabulary WHERE user_id = ? AND surface_form = '混雑'",
+            "SELECT source FROM user_vocabulary WHERE user_id = ? AND surface_form = '電磁波'",
             String.class,
             userId))
         .isEqualTo("CHAT");
@@ -223,12 +223,12 @@ class VocabularyControllerIntegrationTest {
     MockHttpSession session = newLoggedInSession();
     Long themeId = firstThemeId(session);
     Long userId = lastUserId();
-    // WORD의 '満席'을 EXPRESSION에도 넣고, 같은 EXPRESSION 안에 '種類'를 두 번 넣어 겹침을 만든다.
+    // WORD의 '撮影'을 EXPRESSION에도 넣고, 같은 EXPRESSION 안에 '述べる'를 두 번 넣어 겹침을 만든다.
     List<Long> addedIds = new ArrayList<>();
     try {
-      addedIds.add(insertThemeVocabulary(themeId, "EXPRESSION", "満席", "まんせき", 10));
-      addedIds.add(insertThemeVocabulary(themeId, "EXPRESSION", "種類", "しゅるい", 11));
-      addedIds.add(insertThemeVocabulary(themeId, "EXPRESSION", "種類", "しゅるい", 12));
+      addedIds.add(insertThemeVocabulary(themeId, "EXPRESSION", "撮影", "さつえい", 10));
+      addedIds.add(insertThemeVocabulary(themeId, "EXPRESSION", "述べる", "のべる", 11));
+      addedIds.add(insertThemeVocabulary(themeId, "EXPRESSION", "述べる", "のべる", 12));
 
       complete(session, themeId, "KANJI");
       complete(session, themeId, "WORD");
@@ -238,8 +238,8 @@ class VocabularyControllerIntegrationTest {
 
       // 표현 2개만 새로 늘고, 겹친 3건은 건너뛴다.
       assertThat(vocabularyCount(session)).isEqualTo(5);
-      assertThat(countRows(userId, "満席", "まんせき")).isEqualTo(1);
-      assertThat(countRows(userId, "種類", "しゅるい")).isEqualTo(1);
+      assertThat(countRows(userId, "撮影", "さつえい")).isEqualTo(1);
+      assertThat(countRows(userId, "述べる", "のべる")).isEqualTo(1);
     } finally {
       for (Long id : addedIds) {
         jdbcTemplate.update("DELETE FROM theme_vocabulary WHERE id = ?", id);
