@@ -6,7 +6,12 @@
   "scripts": {
     "propose": "node --env-file=.env propose.mjs",
     "finalize": "node finalize.mjs",
-    "import": "node --env-file-if-exists=.env import-sheet.mjs"
+    "import": "node --env-file-if-exists=.env import-sheet.mjs",
+    "collect": "node collect.mjs",
+    "pick": "node pick.mjs",
+    "draft": "node --env-file-if-exists=.env draft.mjs",
+    "questions": "node --env-file-if-exists=.env questions.mjs",
+    "finalize-wiki": "node finalize-wiki.mjs"
   },
   "dependencies": {
     "kuromoji": "^0.1.2"

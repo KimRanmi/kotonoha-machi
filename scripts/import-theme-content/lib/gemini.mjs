@@ -74,3 +74,47 @@ ${JSON.stringify(items)}
 아래 JSON 형식으로만 응답해줘: {"<id>": "<한국어 뜻>", ...}`;
   return extractJson(await callGemini(apiKey, prompt));
 }
+
+/**
+ * Tatoeba 일본어 예문을 한국어로 "옮기기만" 한다. 영어 번역(참고용)을 같이 줘서 뜻이 어긋나지 않게 한다.
+ * items: {id, japanese, english}, 결과: {id: 한국어}. 초안이라 사람이 표본을 확인한다.
+ */
+export async function translateExamples(apiKey, items) {
+  if (items.length === 0) return {};
+  const prompt = `아래는 일본어 예문과, 그 영어 번역(참고용)이야. 일본어 문장을 자연스러운 한국어로
+옮기기만 해줘. 영어 번역은 뜻을 확인하는 데만 쓰고, 내용을 더하거나 빼지 마.
+${JSON.stringify(items)}
+아래 JSON 형식으로만 응답해줘: {"<id>": "<한국어 번역>", ...}`;
+  return extractJson(await callGemini(apiKey, prompt));
+}
+
+/**
+ * 지문마다 JLPT N1~N3 독해 문제 초안(객관식 4지선다)을 만든다. 질문·보기는 일본어, 해설은 한국어.
+ * passages: {id, text}. 결과: {"<id>": [{question, choices:[4], answerIndex(1~4), explanation}]}.
+ */
+export async function generateQuestions(apiKey, passages) {
+  const prompt = `아래 일본어 지문마다 JLPT N1~N3 독해 시험 같은 객관식 문제를 3개씩 만들어줘.
+- 질문과 보기 4개는 일본어(N1~N3 수준)로 쓴다. 정답은 보기 중 정확히 1개.
+- 반드시 지문에 적힌 내용만으로 풀 수 있어야 하고, 배경지식이 필요하면 안 된다. 오답은 지문과 어긋나거나 지문에 없는 내용이어야 한다.
+- 정답이 두 개 이상으로 읽힐 수 있는 보기는 만들지 마.
+- 해설(explanation)은 한국어로, 정답인 이유와 근거가 되는 지문 속 문장을 짧게 적는다. "1번" 같은 보기 번호는 쓰지 말고 보기 내용으로 말한다.
+- answerIndex는 1~4이고 문제마다 고르게 흩어지게 한다.
+${JSON.stringify(passages)}
+아래 JSON 형식으로만 응답해줘:
+{"<id>": [{"question": "...", "choices": ["...", "...", "...", "..."], "answerIndex": 1, "explanation": "..."}]}`;
+  return extractJson(await callGemini(apiKey, prompt));
+}
+
+/**
+ * 만든 문제를 "정답을 가린 채" 다시 풀게 한다: 지문만 보고 정답을 고르고, 다른 보기도 정답이 될 수 있는지 판단.
+ * items: {id, passage, question, choices}. 결과: {"<id>": {answer(1~4), unique(boolean), reason}}.
+ */
+export async function verifyQuestions(apiKey, items) {
+  const prompt = `아래 각 항목은 일본어 지문과 객관식 문제야. 지문에 적힌 내용만 보고 풀어줘.
+- answer: 정답이라고 생각하는 보기 번호(1~4)
+- unique: 정답이 그 보기 하나뿐이면 true, 다른 보기도 지문 기준으로 맞을 수 있거나 정답이 없으면 false
+- reason: 한국어로 한 줄
+${JSON.stringify(items)}
+아래 JSON 형식으로만 응답해줘: {"<id>": {"answer": 1, "unique": true, "reason": "..."}}`;
+  return extractJson(await callGemini(apiKey, prompt));
+}

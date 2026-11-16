@@ -3,6 +3,49 @@
 테마 학습 콘텐츠(한자·단어·표현·예문)를 새 테마용으로 추가할 때 쓰는 1회성 개발 도구다.
 백엔드/프런트엔드 앱과 완전히 분리돼 있고, 앱에는 전혀 포함되지 않는다.
 
+## 위키백과 지문 → 오늘의 학습 (1단계: 지문 후보 고르기)
+
+결정 배경은 `docs/decisions/0038-wikipedia-passage-daily-lesson.md`. 시트·Apps Script는 쓰지 않는다.
+
+```bash
+npm run collect -- --month 11            # 11월 전체 날짜 문서의 「記念日・年中行事」 링크에서 후보 수집
+npm run collect -- --date 11月16日        # 날짜 하나만
+npm run collect -- --category 良質な記事 --limit 200   # 보조: 분류에서
+npm run pick -- --pick 3,7,12            # 후보 파일의 번호로 승인 → approved/readings.json
+```
+
+- `collect`는 위키백과 공식 API로 도입 단락·리비전 번호(`oldid`)·분류를 가져와 `cache/`에 저장하고(다시 부르지 않음),
+  거름·점수를 매겨 `candidates/wiki/<이름>.md`에 상위 후보(기본 10개)와 제외 이유를 쓴다. 429가 나면 다시 실행하면 캐시부터 이어서 한다.
+- 자동 거름: 길이 150~500자, 괄호·고유명사 비율, 제목 패턴(一覧 등. 연도·날짜 제목과 숫자 비율은 거르지 않음), 금지 단어·제외 분류(`config/wiki-filter.json`).
+- 점수: N1~N3 한자의 서로 다른 개수와 비율이 높을수록 +, JLPT 목록 밖 한자·고유명사·괄호가 많으면 −(`lib/passageScore.mjs`).
+  기준이 어긋나면 항목을 고치지 말고 이 상수·설정 파일을 고친다.
+- **기계가 못 거르는 것**: 금지 단어에 안 걸리는 민감한 맥락(논란·편향된 서술), 본문 오류, 지문으로서의 재미·적합성.
+  그래서 사람이 후보 파일의 본문을 눈으로 확인하고 번호를 고른다.
+- `cache/`, `candidates/wiki/`, `drafts/wiki/`, `approved/`는 git에 올리지 않는다(위키백과 본문, CC BY-SA). `approved/readings.json` 커밋 여부는 아직 미정.
+- API 규칙: 요청은 하나씩, 1.2초 간격, `maxlag`, User-Agent는 `kotonoha-import-tool/0.1`(연락처 없음).
+
+### 2~3단계: 지문 → 학습 초안 → 이해 문제 → SQL
+
+```bash
+npm run pick -- --pick 3,7,12                 # (1단계) 지문 승인 → approved/readings.json
+npm run draft -- --translate                  # 한자 3·단어 3·표현 2·예문 초안 + 영어 뜻/예문의 한국어 번역(Gemini 2회)
+npm run questions                             # 이해 문제 생성 + 정답을 가린 재검증(Gemini 지문 5개당 2회)
+npm run finalize-wiki -- --all                # drafts/wiki/*.json → V<n>__upsert_lesson_<제목>.sql
+```
+
+- `draft`: kuromoji로 명사→단어(WORD), 동사·형용사→표현(EXPRESSION), 한자는 지문 안 N1~N3 중 어려운 순. 뜻·읽는 법·레벨은
+  kanjiapi.dev(우선순위로 못 정하는 다의어, 지문과 사전의 읽는 법이 다른 단어는 "확인 필요"), 예문은 Tatoeba(한국어 번역이 없으면
+  영어 쌍을 찾아 Gemini가 일본어 문장을 한국어로 옮김). 같은 한자의 변형(称す/称する)은 하나만 쓴다.
+- `questions`: 질문·보기는 일본어(N1~N3), 해설은 한국어. 만든 문제를 정답 없이 다시 풀게 해서 정답이 다르거나 유일하지 않으면 버린다.
+  남은 문제가 2개 미만이면 그 학습은 보류(`status`)다.
+- **Gemini 무료 한도는 모델당 하루 20회**다. 10개 학습이면 번역 2회 + 문제 4회 정도다. 한도(429)에 걸리면 저장된 곳까지 두고 멈추며,
+  다시 실행하면 문제가 없는 학습부터 이어서 한다. 앱 대화도 같은 한도를 쓰니 주의한다.
+- 학습마다 "확인 필요" 목록은 `drafts/wiki/*.json`의 `suspects`와 `finalize-wiki` 출력에 나온다. 사람은 이 목록과 표본 몇 개만 본다.
+- `finalize-wiki`는 번호를 `max(로컬, origin/master, 39) + 1`부터 쓴다(39는 세션 B의 스키마). B의 스키마(`theme_reading_passage`의
+  `source_*` 열, `theme_reading_question`)가 `master`에 올라온 뒤에 로컬 DB에 적용해 검증한다.
+
+아래는 이전 방식(테마별 콘텐츠)이다.
+
 ## 새 흐름: 구글 시트가 원본 (`npm run import`)
 
 테마 콘텐츠의 원본은 구글 시트 "kotonoha-machi 테마 콘텐츠"(탭 `themes`, `kanji`, `vocabulary`,
