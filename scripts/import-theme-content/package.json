@@ -11,7 +11,8 @@
     "pick": "node pick.mjs",
     "draft": "node --env-file-if-exists=.env draft.mjs",
     "questions": "node --env-file-if-exists=.env questions.mjs",
-    "finalize-wiki": "node finalize-wiki.mjs"
+    "finalize-wiki": "node finalize-wiki.mjs",
+    "fix-explanations": "node --env-file-if-exists=.env fix-explanations.mjs"
   },
   "dependencies": {
     "kuromoji": "^0.1.2"

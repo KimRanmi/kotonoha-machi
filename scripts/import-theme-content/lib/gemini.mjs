@@ -97,7 +97,7 @@ export async function generateQuestions(apiKey, passages) {
 - 질문과 보기 4개는 일본어(N1~N3 수준)로 쓴다. 정답은 보기 중 정확히 1개.
 - 반드시 지문에 적힌 내용만으로 풀 수 있어야 하고, 배경지식이 필요하면 안 된다. 오답은 지문과 어긋나거나 지문에 없는 내용이어야 한다.
 - 정답이 두 개 이상으로 읽힐 수 있는 보기는 만들지 마.
-- 해설(explanation)은 한국어로, 정답인 이유와 근거가 되는 지문 속 문장을 짧게 적는다. "1번" 같은 보기 번호는 쓰지 말고 보기 내용으로 말한다.
+- 해설(explanation)은 반드시 한국어(한글)로 쓴다. 일본어 문장만 적으면 안 된다. 정답인 이유를 한국어로 설명하고, 근거가 되는 지문 속 구절은 「」로 인용한다. "1번" 같은 보기 번호는 쓰지 말고 보기 내용으로 말한다.
 - answerIndex는 1~4이고 문제마다 고르게 흩어지게 한다.
 ${JSON.stringify(passages)}
 아래 JSON 형식으로만 응답해줘:
@@ -116,5 +116,20 @@ export async function verifyQuestions(apiKey, items) {
 - reason: 한국어로 한 줄
 ${JSON.stringify(items)}
 아래 JSON 형식으로만 응답해줘: {"<id>": {"answer": 1, "unique": true, "reason": "..."}}`;
+  return extractJson(await callGemini(apiKey, prompt));
+}
+
+/**
+ * 일본어로 잘못 나온 해설을 한국어로 다시 쓴다. items: {id, passage, question, correctAnswer, explanation}.
+ * 지문에 없는 내용은 더하지 않고 정답인 이유와 지문 속 근거만 설명한다. 결과: {id: 한국어 해설}.
+ */
+export async function rewriteExplanations(apiKey, items) {
+  if (items.length === 0) return {};
+  const prompt = `아래 각 항목은 일본어 지문, 객관식 문제, 정답, 그리고 일본어로 적힌 해설이야.
+해설을 한국어(한글)로 다시 써줘. 규칙:
+- 정답이 왜 맞는지를 한국어로 설명하고, 근거가 되는 지문 속 구절은 「」로 그대로 인용한다.
+- 지문에 없는 내용을 더하지 않는다. 보기 번호(1번 등)는 쓰지 않는다. 1~2문장.
+${JSON.stringify(items)}
+아래 JSON 형식으로만 응답해줘: {"<id>": "<한국어 해설>", ...}`;
   return extractJson(await callGemini(apiKey, prompt));
 }

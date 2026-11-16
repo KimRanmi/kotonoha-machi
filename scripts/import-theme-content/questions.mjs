@@ -41,7 +41,7 @@ function validShape(q) {
     Array.isArray(q.choices) && q.choices.length === 4 &&
     new Set(q.choices).size === 4 && q.choices.every((c) => typeof c === 'string' && c) &&
     Number.isInteger(q.answerIndex) && q.answerIndex >= 1 && q.answerIndex <= 4 &&
-    typeof q.explanation === 'string' && q.explanation
+    typeof q.explanation === 'string' && /[\uac00-\ud7a3]/.test(q.explanation) // 해설은 한국어(한글 포함)여야 한다
   );
 }
 
