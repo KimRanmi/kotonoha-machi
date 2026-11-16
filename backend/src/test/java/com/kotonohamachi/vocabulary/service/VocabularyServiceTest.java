@@ -49,6 +49,12 @@ class VocabularyServiceTest {
   @Mock
   private UserRepository userRepository;
 
+  @Mock
+  private DictionaryClient dictionaryClient;
+
+  @Mock
+  private MeaningTranslator meaningTranslator;
+
   @Captor
   private ArgumentCaptor<List<VocabularyEntry>> entriesCaptor;
 
@@ -211,6 +217,15 @@ class VocabularyServiceTest {
 
     assertThat(saved).isZero();
     verifyNoInteractions(vocabularyRepository, userRepository);
+  }
+
+  @Test
+  void normalizeWord_앞뒤_문장부호와_공백을_떼고_중간_공백은_거절한다() {
+    assertThat(VocabularyService.normalizeWord(" 「漆器」。 ")).isEqualTo("漆器");
+    assertThatThrownBy(() -> VocabularyService.normalizeWord("漆器 です"))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> VocabularyService.normalizeWord("。。"))
+        .isInstanceOf(ApiException.class);
   }
 
   private static VocabularyEntry existing(String surface, String reading) {

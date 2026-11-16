@@ -6,14 +6,17 @@ import com.kotonohamachi.theme.ThemeVocabulary;
 import com.kotonohamachi.theme.repository.ThemeVocabularyRepository;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
+import com.kotonohamachi.vocabulary.DictionaryWord;
 import com.kotonohamachi.vocabulary.VocabularyEntry;
 import com.kotonohamachi.vocabulary.VocabularyErrorCode;
 import com.kotonohamachi.vocabulary.VocabularySource;
+import com.kotonohamachi.vocabulary.dto.ChatWordResponse;
 import com.kotonohamachi.vocabulary.dto.VocabularyResponse;
 import com.kotonohamachi.vocabulary.repository.VocabularyRepository;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,14 +25,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 사용자의 학습 단어장에 단어를 저장한다. 뜻·읽는 법·JLPT 레벨은 AI가 만들지 않고 DB에 있는 실제 사전 데이터를
- * 그대로 복사한다. (대화 중 단어 저장은 대화 기능이 구현된 뒤에 추가한다.)
+ * 그대로 복사한다.
  */
 @Service
 public class VocabularyService {
 
+  private static final int MAX_WORD_LENGTH = 30;
+  /** 선택 영역 양끝에 딸려 온 문장부호(일본어·영어)를 떼는 정규식. */
+  private static final String EDGE_PUNCTUATION =
+      "^[\\p{Punct}\\p{IsPunctuation}\\s]+|[\\p{Punct}\\p{IsPunctuation}\\s]+$";
+
   private final VocabularyRepository vocabularyRepository;
   private final ThemeVocabularyRepository themeVocabularyRepository;
   private final UserRepository userRepository;
+  private final DictionaryClient dictionaryClient;
+  private final MeaningTranslator meaningTranslator;
 
   /**
    * 생성자.
@@ -37,14 +47,70 @@ public class VocabularyService {
    * @param vocabularyRepository 단어장 저장소
    * @param themeVocabularyRepository 테마 단어·표현 콘텐츠 저장소
    * @param userRepository 사용자 저장소
+   * @param dictionaryClient 사전 조회 클라이언트
+   * @param meaningTranslator 영어 뜻을 한국어로 옮기는 번역기
    */
   public VocabularyService(
       VocabularyRepository vocabularyRepository,
       ThemeVocabularyRepository themeVocabularyRepository,
-      UserRepository userRepository) {
+      UserRepository userRepository,
+      DictionaryClient dictionaryClient,
+      MeaningTranslator meaningTranslator) {
     this.vocabularyRepository = vocabularyRepository;
     this.themeVocabularyRepository = themeVocabularyRepository;
     this.userRepository = userRepository;
+    this.dictionaryClient = dictionaryClient;
+    this.meaningTranslator = meaningTranslator;
+  }
+
+  /**
+   * 대화 중 사용자가 고른 단어를 사전에서 찾아 단어장에 저장한다. 읽는 법·JLPT·뜻은 사전 데이터이고, AI는 영어 뜻을 한국어로
+   * 번역만 한다. 같은 표기+읽는 법이 이미 있으면 번역(Gemini 호출) 없이 기존 항목을 돌려준다. 외부 호출이 길어질 수 있어 이
+   * 메서드 전체를 트랜잭션으로 묶지 않는다.
+   *
+   * @param userId 단어장 주인 ID(로그인한 본인)
+   * @param rawWord 사용자가 고른 일본어 표기
+   * @return 저장 결과(이미 있었는지 여부 포함)
+   * @throws ApiException 단어가 형식에 맞지 않거나(400), 사전에 없거나(404), 사전 서버 문제(502)
+   */
+  public ChatWordResponse saveChatWord(Long userId, String rawWord) {
+    String word = normalizeWord(rawWord);
+    DictionaryWord found = dictionaryClient
+        .lookup(word)
+        .orElseThrow(() -> new ApiException(VocabularyErrorCode.WORD_NOT_FOUND));
+
+    Optional<VocabularyEntry> existing = vocabularyRepository.findByUserIdAndSurfaceFormAndReading(
+        userId, found.surfaceForm(), found.reading());
+    if (existing.isPresent()) {
+      return new ChatWordResponse(true, VocabularyResponse.from(existing.get()));
+    }
+
+    String meaning = meaningTranslator.toKorean(found);
+    VocabularyEntry entry = new VocabularyEntry(
+        findUserOrThrow(userId),
+        found.surfaceForm(),
+        found.reading(),
+        meaning,
+        found.jlptLevel(),
+        VocabularySource.CHAT);
+    try {
+      return new ChatWordResponse(false, VocabularyResponse.from(vocabularyRepository.save(entry)));
+    } catch (DataIntegrityViolationException exception) {
+      // 같은 단어 저장이 동시에 들어와 뒤에 온 요청이 유니크 제약에 걸린 경우: 먼저 저장된 항목을 돌려준다.
+      return vocabularyRepository
+          .findByUserIdAndSurfaceFormAndReading(userId, found.surfaceForm(), found.reading())
+          .map(saved -> new ChatWordResponse(true, VocabularyResponse.from(saved)))
+          .orElseThrow(() -> new ApiException(VocabularyErrorCode.SAVE_CONFLICT));
+    }
+  }
+
+  /** 앞뒤 공백·문장부호(「」。、 등)를 떼고, 비었거나 공백이 섞였거나 너무 길면 거절한다. */
+  static String normalizeWord(String rawWord) {
+    String word = rawWord == null ? "" : rawWord.strip().replaceAll(EDGE_PUNCTUATION, "");
+    if (word.isEmpty() || word.length() > MAX_WORD_LENGTH || word.matches(".*\\s.*")) {
+      throw new ApiException(VocabularyErrorCode.WORD_INVALID);
+    }
+    return word;
   }
 
   /**
