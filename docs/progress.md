@@ -1083,3 +1083,11 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 확인 못 한 것: 실제 3D 마을에서 주민에게 걸어가 여는 경로(브라우저가 백그라운드라 3D가 1fps여서, 임시 라우트로 대화창만 띄워 확인하고 되돌렸다). 터치(모바일) 선택. `npm run lint`(`eslint .`)는 이 환경에서 멈춰 `eslint src`로 대신 통과 확인했다.
 
 - 코드 리뷰 반영(`0041`): 빈 사전 응답은 502로, 사전 영어 뜻은 200자로 제한, `DictionaryWord`를 `dto/`로 이동, 대화 단어 저장 하루 30개 상한(429) 추가. 백엔드 `spotlessApply`·`test` 통과(상한 단위 테스트 추가). 프런트는 429 메시지를 기존 오류 안내로 그대로 보여 주며 화면에서 직접 확인하지는 못했다.
+
+## 2026-11-17 (운영 배포 구성 파일)
+
+- GCP VM 한 대에 docker compose로 올리기 위한 운영용 파일을 추가했다(`0042`): `docker-compose.prod.yml`(db 외부 비노출·볼륨, backend `restart: unless-stopped`, web=Caddy), `frontend/Dockerfile.prod`(빌드 후 Caddy가 정적 서빙+`/api` 프록시+HTTPS 자동), `frontend/Caddyfile`, `docs/deploy.md`. 개발용 `docker-compose.yml`은 그대로다. Caddy 도입은 사용자 승인을 받았다.
+- 같은 도메인 구성이라 프런트는 `VITE_API_BASE_URL=""`로 빌드하며 코드 수정은 없다. 프록시 뒤 소셜 로그인 콜백이 https로 만들어지도록 `server.forward-headers-strategy`를 환경변수(`FORWARD_HEADERS_STRATEGY`, 기본 none, 운영 compose가 framework)로 열었다. Gemini 기본 모델을 `gemini-3.5-flash-lite`로 바꿨다(`application.yml`, `.env.example`).
+  - 검증: `docker compose -f docker-compose.prod.yml config` 통과. `DOMAIN=localhost`로 실제 기동: Flyway V51 적용, `https://localhost` 프런트·SPA 경로 200, HTTP→HTTPS 308, `/api` 프록시 동작, 로그인 후 `Set-Cookie: Secure; HttpOnly; SameSite=Lax`와 `/api/auth/me` 200, 소셜 `redirect_uri=https://localhost/...`, 빌드된 번들에 `localhost:8080` 없음, 5432 외부 비노출. 확인 후 `down -v`로 정리.
+  - 확인 못 한 것: 실제 GCP VM·도메인·Let's Encrypt 발급, 가입 메일(로컬 Resend 발송 실패로 사용자는 DB에 직접 넣어 로그인 확인), 대화·TTS·마이크, 이 구성에서 브라우저 화면.
+  - 다음: 도메인 결정 → VM 생성 → `docs/deploy.md` 순서대로 배포 → 체크리스트 확인 → Gemini 결제 연결.
