@@ -1,0 +1,66 @@
+# 운영(서버 한 대)용: docker compose -f docker-compose.prod.yml up -d --build
+# 루트 .env에 DOMAIN, DB_PASSWORD를 적어 둔다(docs/deploy.md 참고). 개발용 docker-compose.yml과는 별개다.
+name: kotonoha-machi-prod
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kotonoha_machi
+      POSTGRES_USER: kotonoha_machi
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?루트 .env에 DB_PASSWORD를 적어 주세요}
+    # ports를 일부러 두지 않는다: 같은 compose 네트워크의 backend만 접근하고 외부에는 닫혀 있다.
+    volumes:
+      - kotonoha-machi-prod-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kotonoha_machi -d kotonoha_machi']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    # 이메일·소셜 로그인·Gemini·TTS 키는 backend/.env에서 읽는다.
+    env_file:
+      - ./backend/.env
+    # environment가 env_file보다 우선하므로 .env에 개발용 값이 남아 있어도 운영 값이 이긴다.
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: kotonoha_machi
+      DB_USERNAME: kotonoha_machi
+      DB_PASSWORD: ${DB_PASSWORD}
+      # 같은 도메인에서 서빙하므로 프런트 오리진 = 사이트 주소(CORS 허용·로그인 후 이동 주소).
+      FRONTEND_ORIGIN: https://${DOMAIN:?루트 .env에 DOMAIN을 적어 주세요}
+      SESSION_COOKIE_SECURE: 'true'
+      # Caddy가 넘기는 X-Forwarded-* 헤더를 믿어 소셜 로그인 콜백 주소가 https로 만들어지게 한다.
+      FORWARD_HEADERS_STRATEGY: framework
+    # ports 없음: 외부에서 8080에 직접 들어올 수 없고, web(Caddy)만 backend:8080으로 접근한다.
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    # 프런트 정적 파일 서빙 + 리버스 프록시 + HTTPS 자동 발급(Caddy).
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      # 발급받은 인증서를 보관한다. 지우면 재발급이 반복돼 발급 한도에 걸릴 수 있다.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+
+volumes:
+  kotonoha-machi-prod-db:
+  caddy-data:
+  caddy-config:
