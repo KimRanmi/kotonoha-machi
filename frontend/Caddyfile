@@ -3,8 +3,8 @@
 {$DOMAIN:localhost} {
 	encode gzip
 
-	# 백엔드가 맡는 경로: API, 소셜 로그인 시작/콜백
-	@backend path /api/* /oauth2/* /login/oauth2/*
+	# 백엔드가 맡는 경로: API, 소셜 로그인 시작/콜백, 헬스체크
+	@backend path /api/* /oauth2/* /login/oauth2/* /actuator/health
 	handle @backend {
 		reverse_proxy backend:8080
 	}

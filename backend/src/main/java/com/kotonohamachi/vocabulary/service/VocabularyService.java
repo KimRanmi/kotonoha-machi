@@ -101,7 +101,7 @@ public class VocabularyService {
       throw new ApiException(VocabularyErrorCode.DAILY_WORD_LIMIT_EXCEEDED);
     }
 
-    String meaning = meaningTranslator.toKorean(found);
+    String meaning = meaningTranslator.toKorean(found, userId);
     VocabularyEntry entry = new VocabularyEntry(
         findUserOrThrow(userId),
         found.surfaceForm(),

@@ -1142,3 +1142,14 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 후속: 조이스틱을 오른쪽 아래에 고정했다. 이어서 마을에서 조이스틱으로 컨비니 문 앞까지 걸어가 입장 버튼을 눌러 건물 안으로 들어가고, 안에서 조이스틱으로 걷다가 현관 매트에서 `外に出る` 버튼이 뜨는 전체 흐름을 모바일 에뮬레이션으로 확인했다.
   - 후속: 조이스틱을 데스크톱·모바일 모두에서 보이게 변경(`(pointer: coarse)` 조건 제거). 데스크톱 크기에서 조이스틱이 보이고 마우스 포인터 이벤트로 건물 안에서 이동하는 것을 확인했다.
   - 후속: 조이스틱 테두리가 다크 모드에서 검게 보여, 연한 초록 반투명(`rgba(78,139,95,0.35)`)으로 고정했다.
+
+## 2026-11-18 (모니터링: 헬스체크·Gemini 사용량 기록)
+
+- 서버 상태 확인용 `/actuator/health`(Spring Boot Actuator, 사용자 승인 후 의존성 추가)와, Gemini 호출을 `ai_usage` 테이블(V52)에 기록하는 기능을 추가했다. 결정 문서 `0045`, 사용법·UptimeRobot 설정·조회 SQL은 `docs/monitoring.md`.
+  - 헬스체크: health만 노출(나머지는 비활성), 세부 정보 숨김, DB 상태만 반영. `SecurityConfig`에서 health만 `permitAll`, Caddy는 `/actuator/health`만 백엔드로 전달.
+  - 사용량 기록: `GeminiClient.call()` 한 곳에서 대화·요약·번역 호출의 종류·모델·토큰 수·성공 여부·HTTP 상태·사용자 ID를 `AiUsageRecorder`(새 트랜잭션, 예외 삼킴)로 저장. 프롬프트·대화 내용은 저장하지 않는다. 이를 위해 `generate/summarize/translateMeaning/toKorean`에 `userId` 인자를 추가했다.
+  - 로그 점검: 이메일 발송 실패 로그가 수신자 이메일을 찍던 것을 예외 클래스 이름만 남기게 고쳤다.
+  - 조회는 SQL 문서만(관리자 API는 role 개념이 없어 제외). 가격은 SQL의 `\set` 값.
+  - 검증: `spotlessApply`·`./gradlew test` 통과(Testcontainers; 기록기·헬스체크 통합 테스트, GeminiClient 호출 종류별 기록·실패 기록 단위 테스트 추가). 별도 Postgres + `bootRun`으로 실제 확인: health `UP`(200) → DB 정지 시 `DOWN`(503) → 복구 시 `UP`, `/actuator/env`는 401, 실제 Gemini 단어 번역 호출이 토큰 수와 함께 기록되고, 시간 초과 호출은 실패(`success=false`)로 기록되며 번역은 영어 뜻으로 대체됨.
+  - 확인 못 한 것: 실제 Gemini로 대화(CHAT)·요약(SUMMARY) 호출은 로그인·학습 완료 흐름이 필요해 단위 테스트(목킹)로만 검증했다. 운영 Caddy 경유 `/actuator/health`와 UptimeRobot 알림은 배포 후 사용자가 확인해야 한다(Caddyfile은 문법만 확인 못 함, 변경은 path 한 줄 추가).
+  - 다음: 배포 후 UptimeRobot 등록, 며칠 쓴 뒤 `docs/monitoring.md`의 SQL로 호출량 확인.

@@ -114,7 +114,7 @@ public class ChatMemoryService {
       List<ChatMessage> target = older.subList(0, Math.min(older.size(), MAX_LINES_PER_SUMMARY));
 
       String previous = existing == null ? "" : existing.getSummary();
-      String newSummary = geminiClient.summarize(previous, toItems(target));
+      String newSummary = geminiClient.summarize(previous, toItems(target), userId);
       long newUpToId = target.get(target.size() - 1).getId();
       if (existing == null) {
         summaryRepository.save(ChatSummary.create(userId, residentId, newSummary, newUpToId));

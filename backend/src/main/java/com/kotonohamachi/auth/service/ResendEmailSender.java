@@ -53,7 +53,8 @@ public class ResendEmailSender implements EmailSender {
     try {
       resend.emails().send(params);
     } catch (ResendException e) {
-      log.error("이메일 발송 실패: {}", email, e);
+      // 수신자 이메일(개인정보)과 예외 메시지는 로그에 남기지 않는다. 원인 종류만 남긴다.
+      log.error("이메일 발송 실패: {}", e.getClass().getSimpleName());
       throw new ApiException(AuthErrorCode.EMAIL_SEND_FAILED);
     }
   }

@@ -126,7 +126,7 @@ class ChatMemoryServiceTest {
             .findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
                 eq(USER), eq(RESIDENT), eq(0L), any(OffsetDateTime.class)))
         .thenReturn(oldestFirst(1, 11));
-    when(geminiClient.summarize(anyString(), anyList())).thenReturn("요약");
+    when(geminiClient.summarize(anyString(), anyList(), any())).thenReturn("요약");
     ChatMemoryService service = service();
 
     service.summarizeIfNeeded(USER, RESIDENT);
@@ -161,7 +161,7 @@ class ChatMemoryServiceTest {
 
     service().summarizeIfNeeded(USER, RESIDENT);
 
-    verify(geminiClient, never()).summarize(anyString(), anyList());
+    verify(geminiClient, never()).summarize(anyString(), anyList(), any());
     verify(summaryRepository, never()).save(any());
   }
 
@@ -172,13 +172,13 @@ class ChatMemoryServiceTest {
             .findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
                 eq(USER), eq(RESIDENT), eq(0L), any(OffsetDateTime.class)))
         .thenReturn(oldestFirst(2, 11));
-    when(geminiClient.summarize(anyString(), anyList())).thenReturn("새 요약");
+    when(geminiClient.summarize(anyString(), anyList(), any())).thenReturn("새 요약");
 
     service().summarizeIfNeeded(USER, RESIDENT);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<ChatHistoryItem>> lines = ArgumentCaptor.forClass(List.class);
-    verify(geminiClient).summarize(org.mockito.ArgumentMatchers.eq(""), lines.capture());
+    verify(geminiClient).summarize(org.mockito.ArgumentMatchers.eq(""), lines.capture(), any());
     assertThat(lines.getValue()).hasSize(10);
     ArgumentCaptor<ChatSummary> saved = ArgumentCaptor.forClass(ChatSummary.class);
     verify(summaryRepository).save(saved.capture());
@@ -195,11 +195,11 @@ class ChatMemoryServiceTest {
             .findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
                 eq(USER), eq(RESIDENT), eq(21L), any(OffsetDateTime.class)))
         .thenReturn(oldestFirst(22, 51));
-    when(geminiClient.summarize(anyString(), anyList())).thenReturn("갱신 요약");
+    when(geminiClient.summarize(anyString(), anyList(), any())).thenReturn("갱신 요약");
 
     service().summarizeIfNeeded(USER, RESIDENT);
 
-    verify(geminiClient).summarize(org.mockito.ArgumentMatchers.eq("옛 요약"), anyList());
+    verify(geminiClient).summarize(org.mockito.ArgumentMatchers.eq("옛 요약"), anyList(), any());
     verify(summaryRepository).save(existing);
     assertThat(existing.getSummary()).isEqualTo("갱신 요약");
     assertThat(existing.getSummarizedUpToId()).isEqualTo(51L);
@@ -212,13 +212,13 @@ class ChatMemoryServiceTest {
             .findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
                 eq(USER), eq(RESIDENT), eq(0L), any(OffsetDateTime.class)))
         .thenReturn(oldestFirst(1, 150));
-    when(geminiClient.summarize(anyString(), anyList())).thenReturn("요약");
+    when(geminiClient.summarize(anyString(), anyList(), any())).thenReturn("요약");
 
     service().summarizeIfNeeded(USER, RESIDENT);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<ChatHistoryItem>> lines = ArgumentCaptor.forClass(List.class);
-    verify(geminiClient).summarize(anyString(), lines.capture());
+    verify(geminiClient).summarize(anyString(), lines.capture(), any());
     assertThat(lines.getValue()).hasSize(100);
     ArgumentCaptor<ChatSummary> saved = ArgumentCaptor.forClass(ChatSummary.class);
     verify(summaryRepository).save(saved.capture());
@@ -232,7 +232,7 @@ class ChatMemoryServiceTest {
             .findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
                 eq(USER), eq(RESIDENT), eq(0L), any(OffsetDateTime.class)))
         .thenReturn(oldestFirst(2, 21));
-    when(geminiClient.summarize(anyString(), anyList()))
+    when(geminiClient.summarize(anyString(), anyList(), any()))
         .thenThrow(new ApiException(ChatErrorCode.GENERATION_FAILED));
 
     service().summarizeIfNeeded(USER, RESIDENT);
@@ -249,7 +249,7 @@ class ChatMemoryServiceTest {
         .thenReturn(oldestFirst(1, 30));
     java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1);
     java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
-    when(geminiClient.summarize(anyString(), anyList())).thenAnswer(invocation -> {
+    when(geminiClient.summarize(anyString(), anyList(), any())).thenAnswer(invocation -> {
       started.countDown();
       release.await(5, java.util.concurrent.TimeUnit.SECONDS);
       return "요약";
@@ -263,7 +263,7 @@ class ChatMemoryServiceTest {
     release.countDown();
     first.join(5000);
 
-    verify(geminiClient, org.mockito.Mockito.times(1)).summarize(anyString(), anyList());
+    verify(geminiClient, org.mockito.Mockito.times(1)).summarize(anyString(), anyList(), any());
   }
 
   @Test
@@ -288,7 +288,7 @@ class ChatMemoryServiceTest {
     // 자정 경계에서 테스트가 겹치면 하루 차이가 날 수 있어 같은 날 0시이거나 그 다음 날 0시까지 허용한다.
     assertThat(before.getValue().toInstant())
         .isIn(expected.toInstant(), expected.plusDays(1).toInstant());
-    verify(geminiClient, never()).summarize(anyString(), anyList());
+    verify(geminiClient, never()).summarize(anyString(), anyList(), any());
   }
 
   @Test
@@ -299,13 +299,13 @@ class ChatMemoryServiceTest {
             .findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
                 eq(USER), eq(RESIDENT), eq(0L), any(OffsetDateTime.class)))
         .thenReturn(oldestFirst(1, 10));
-    when(geminiClient.summarize(anyString(), anyList())).thenReturn("요약");
+    when(geminiClient.summarize(anyString(), anyList(), any())).thenReturn("요약");
 
     service().summarizeIfNeeded(USER, RESIDENT);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<ChatHistoryItem>> lines = ArgumentCaptor.forClass(List.class);
-    verify(geminiClient).summarize(anyString(), lines.capture());
+    verify(geminiClient).summarize(anyString(), lines.capture(), any());
     assertThat(lines.getValue()).extracting(ChatHistoryItem::text).doesNotContain("m11");
     ArgumentCaptor<ChatSummary> saved = ArgumentCaptor.forClass(ChatSummary.class);
     verify(summaryRepository).save(saved.capture());
@@ -331,13 +331,13 @@ class ChatMemoryServiceTest {
             .findByUserIdAndResidentIdAndIdGreaterThanAndCreatedAtLessThanOrderByIdAsc(
                 eq(USER), eq(RESIDENT), eq(11L), any(OffsetDateTime.class)))
         .thenReturn(List.of());
-    when(geminiClient.summarize(anyString(), anyList())).thenReturn("요약");
+    when(geminiClient.summarize(anyString(), anyList(), any())).thenReturn("요약");
     ChatMemoryService service = service();
 
     service.summarizeIfNeeded(USER, RESIDENT);
     service.summarizeIfNeeded(USER, RESIDENT);
 
-    verify(geminiClient, org.mockito.Mockito.times(1)).summarize(anyString(), anyList());
+    verify(geminiClient, org.mockito.Mockito.times(1)).summarize(anyString(), anyList(), any());
     assertThat(stored.get().getSummarizedUpToId()).isEqualTo(11L);
   }
 }

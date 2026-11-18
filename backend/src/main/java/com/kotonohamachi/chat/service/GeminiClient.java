@@ -3,12 +3,15 @@ package com.kotonohamachi.chat.service;
 import com.google.genai.Client;
 import com.google.genai.types.Content;
 import com.google.genai.types.GenerateContentConfig;
+import com.google.genai.types.GenerateContentResponse;
+import com.google.genai.types.GenerateContentResponseUsageMetadata;
 import com.google.genai.types.HttpOptions;
 import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
 import com.google.genai.types.ThinkingConfig;
 import com.google.genai.types.ThinkingLevel;
 import com.google.genai.types.Type;
+import com.kotonohamachi.chat.AiCallType;
 import com.kotonohamachi.chat.ChatErrorCode;
 import com.kotonohamachi.chat.ChatSpeaker;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
@@ -80,17 +83,22 @@ public class GeminiClient {
   private final String model;
   // 키가 없어도 앱이 뜨도록 첫 호출 때 만든다.
   private volatile Client client;
+  private final AiUsageRecorder usageRecorder;
 
   /**
    * 생성자.
    *
    * @param apiKey Gemini API 키(비어 있으면 대화를 쓸 수 없다)
    * @param model 사용할 Gemini 모델 이름
+   * @param usageRecorder 호출 기록기(호출마다 종류·토큰 수·결과를 남긴다)
    */
   public GeminiClient(
-      @Value("${app.gemini.api-key}") String apiKey, @Value("${app.gemini.model}") String model) {
+      @Value("${app.gemini.api-key}") String apiKey,
+      @Value("${app.gemini.model}") String model,
+      AiUsageRecorder usageRecorder) {
     this.apiKey = apiKey;
     this.model = model;
+    this.usageRecorder = usageRecorder;
   }
 
   /**
@@ -99,11 +107,12 @@ public class GeminiClient {
    * @param systemPrompt 캐릭터 설정(과 요약 메모)이 담긴 시스템 프롬프트
    * @param recentLines 최근 대화(오래된 것이 먼저, 없으면 빈 목록)
    * @param userMessage 플레이어의 새 메시지(시스템 프롬프트와 분리해 보낸다)
+   * @param userId 대화하는 사용자 ID(사용량 기록용)
    * @return 일본어 대사와 한국어 번역
    * @throws ApiException 키가 설정되지 않았거나(503), Google 한도를 넘었거나(429), 대사 생성에 실패한 경우(502)
    */
   public ChatResponse generate(
-      String systemPrompt, List<ChatHistoryItem> recentLines, String userMessage) {
+      String systemPrompt, List<ChatHistoryItem> recentLines, String userMessage, Long userId) {
     Schema schema = Schema.builder()
         .type(Type.Known.OBJECT)
         .properties(Map.of(
@@ -121,7 +130,7 @@ public class GeminiClient {
         .build();
 
     List<Content> contents = buildContents(recentLines, userMessage);
-    return parseReply(call(contents, config));
+    return parseReply(call(contents, config, AiCallType.CHAT, userId));
   }
 
   /**
@@ -148,10 +157,11 @@ public class GeminiClient {
    *
    * @param previousSummary 기존 요약(없으면 빈 문자열)
    * @param lines 요약에 새로 합칠 대화(오래된 것이 먼저)
+   * @param userId 요약 대상 대화의 사용자 ID(사용량 기록용)
    * @return 갱신된 요약 메모({@value #MAX_SUMMARY_LENGTH}자 이내)
    * @throws ApiException 키가 설정되지 않았거나(503) 요약 생성에 실패한 경우(502)
    */
-  public String summarize(String previousSummary, List<ChatHistoryItem> lines) {
+  public String summarize(String previousSummary, List<ChatHistoryItem> lines, Long userId) {
     StringBuilder input = new StringBuilder("[기존 요약]\n");
     input.append(previousSummary.isBlank() ? "(없음)" : previousSummary).append("\n\n[새 대화]\n");
     for (ChatHistoryItem line : lines) {
@@ -169,7 +179,7 @@ public class GeminiClient {
     Content user =
         Content.builder().role("user").parts(Part.fromText(input.toString())).build();
 
-    String text = call(List.of(user), config);
+    String text = call(List.of(user), config, AiCallType.SUMMARY, userId);
     if (text == null || text.isBlank()) {
       log.error("Gemini 요약 응답에 본문이 없습니다.");
       throw new ApiException(ChatErrorCode.GENERATION_FAILED);
@@ -184,10 +194,11 @@ public class GeminiClient {
    * 사전의 영어 뜻을 한국어로 옮긴다. 뜻을 만들어 내는 것이 아니라 번역만 한다.
    *
    * @param word 사전에서 찾은 단어(표기·읽는 법·영어 뜻)
+   * @param userId 단어를 저장하는 사용자 ID(사용량 기록용)
    * @return 한국어 뜻({@value #MAX_MEANING_LENGTH}자 이내)
    * @throws ApiException 키가 없거나(503), 한도를 넘었거나(429), 번역에 실패한 경우(502)
    */
-  public String translateMeaning(DictionaryWord word) {
+  public String translateMeaning(DictionaryWord word, Long userId) {
     GenerateContentConfig config = GenerateContentConfig.builder()
         .systemInstruction(Content.fromParts(Part.fromText(TRANSLATE_PROMPT)))
         .maxOutputTokens(MAX_OUTPUT_TOKENS)
@@ -198,7 +209,7 @@ public class GeminiClient {
         "[단어] " + word.surfaceForm() + " (" + word.reading() + ")\n[영어 뜻] " + word.englishMeaning();
     Content user = Content.builder().role("user").parts(Part.fromText(input)).build();
 
-    String text = call(List.of(user), config);
+    String text = call(List.of(user), config, AiCallType.TRANSLATE, userId);
     if (text == null || text.isBlank()) {
       log.error("Gemini 번역 응답에 본문이 없습니다.");
       throw new ApiException(ChatErrorCode.GENERATION_FAILED);
@@ -209,16 +220,23 @@ public class GeminiClient {
         : meaning;
   }
 
-  /** Gemini를 한 번 호출해 응답 본문을 돌려준다. 키가 없거나 호출이 실패하면 ApiException을 던진다. */
-  private String call(List<Content> contents, GenerateContentConfig config) {
+  /**
+   * Gemini를 한 번 호출해 응답 본문을 돌려준다. 키가 없거나 호출이 실패하면 ApiException을 던진다. 호출 결과(성공·실패와 토큰 수)는
+   * 사용량 기록에 남긴다. 키가 없어 호출 자체를 하지 않은 경우는 남기지 않는다.
+   */
+  private String call(
+      List<Content> contents, GenerateContentConfig config, AiCallType type, Long userId) {
     if (apiKey == null || apiKey.isBlank()) {
       throw new ApiException(ChatErrorCode.UNAVAILABLE);
     }
+    GenerateContentResponse response;
     try {
-      return getClient().models.generateContent(model, contents, config).text();
+      response = fetch(contents, config);
     } catch (com.google.genai.errors.ApiException e) {
+      usageRecorder.record(userId, type, model, null, null, false, e.code());
       throw fromGoogleError(e.code());
     } catch (RuntimeException e) {
+      usageRecorder.record(userId, type, model, null, null, false, null);
       // 원인 종류(시간 초과, DNS, SSL 등)를 알 수 있게 클래스 이름만 남긴다. 메시지는 요청 정보가 섞일 수 있어 뺀다.
       Throwable cause = e.getCause();
       log.error(
@@ -227,6 +245,29 @@ public class GeminiClient {
           cause == null ? "없음" : cause.getClass().getName());
       throw new ApiException(ChatErrorCode.GENERATION_FAILED);
     }
+    GenerateContentResponseUsageMetadata usage = response.usageMetadata().orElse(null);
+    usageRecorder.record(
+        userId,
+        type,
+        model,
+        usage == null ? null : usage.promptTokenCount().orElse(null),
+        usage == null ? null : outputTokens(usage),
+        true,
+        null);
+    return response.text();
+  }
+
+  /** SDK로 실제 요청을 보낸다. 테스트에서 네트워크 없이 응답을 흉내 내려고 따로 뺐다. */
+  GenerateContentResponse fetch(List<Content> contents, GenerateContentConfig config) {
+    return getClient().models.generateContent(model, contents, config);
+  }
+
+  /** 출력 토큰 수. 추론 토큰도 출력 단가로 청구되므로 합친다. */
+  static Integer outputTokens(GenerateContentResponseUsageMetadata usage) {
+    if (usage.candidatesTokenCount().isEmpty() && usage.thoughtsTokenCount().isEmpty()) {
+      return null;
+    }
+    return usage.candidatesTokenCount().orElse(0) + usage.thoughtsTokenCount().orElse(0);
   }
 
   /**

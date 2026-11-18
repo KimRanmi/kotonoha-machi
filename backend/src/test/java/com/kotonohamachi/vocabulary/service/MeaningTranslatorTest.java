@@ -1,6 +1,8 @@
 package com.kotonohamachi.vocabulary.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -20,24 +22,24 @@ class MeaningTranslatorTest {
   @Test
   void 같은_단어는_Gemini를_한_번만_호출한다() {
     GeminiClient gemini = mock(GeminiClient.class);
-    when(gemini.translateMeaning(WORD)).thenReturn("칠기");
+    when(gemini.translateMeaning(eq(WORD), any())).thenReturn("칠기");
     MeaningTranslator translator = new MeaningTranslator(gemini);
 
-    assertThat(translator.toKorean(WORD)).isEqualTo("칠기");
-    assertThat(translator.toKorean(WORD)).isEqualTo("칠기");
+    assertThat(translator.toKorean(WORD, 1L)).isEqualTo("칠기");
+    assertThat(translator.toKorean(WORD, 1L)).isEqualTo("칠기");
 
-    verify(gemini, times(1)).translateMeaning(WORD);
+    verify(gemini, times(1)).translateMeaning(eq(WORD), any());
   }
 
   @Test
   void 번역이_실패하면_영어_뜻을_돌려주고_캐시하지_않는다() {
     GeminiClient gemini = mock(GeminiClient.class);
-    when(gemini.translateMeaning(WORD))
+    when(gemini.translateMeaning(eq(WORD), any()))
         .thenThrow(new ApiException(ChatErrorCode.DAILY_LIMIT_EXCEEDED))
         .thenReturn("칠기");
     MeaningTranslator translator = new MeaningTranslator(gemini);
 
-    assertThat(translator.toKorean(WORD)).isEqualTo("lacquerware");
-    assertThat(translator.toKorean(WORD)).isEqualTo("칠기");
+    assertThat(translator.toKorean(WORD, 1L)).isEqualTo("lacquerware");
+    assertThat(translator.toKorean(WORD, 1L)).isEqualTo("칠기");
   }
 }
