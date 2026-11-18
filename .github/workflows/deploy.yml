@@ -1,0 +1,50 @@
+# master에 머지돼 CI가 통과하면 GCP VM에 SSH로 접속해 운영 구성을 다시 빌드·실행한다(docs/deploy.md 참고).
+# 서드파티 액션 없이 ssh 명령만 쓴다. 접속 정보는 저장소 Secrets에만 둔다.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
+
+# 배포가 겹치지 않게 하나씩 실행한다(앞의 배포는 끝까지 마치고 다음을 기다린다).
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy to GCP VM
+    # master 푸시로 돈 CI가 성공했을 때만 배포한다(PR의 CI나 실패한 CI는 배포하지 않는다).
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: SSH 접속 준비
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: VM에서 최신 코드로 다시 빌드·실행
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" bash -se <<'REMOTE'
+          set -euo pipefail
+          cd ~/kotonoha-machi
+          git pull --ff-only
+          docker compose -f docker-compose.prod.yml up -d --build
+          # 빌드마다 남는 옛 이미지가 디스크(20GB)를 채우지 않게 정리한다.
+          docker image prune -f
+          docker compose -f docker-compose.prod.yml ps
+          REMOTE

@@ -60,6 +60,48 @@ docker compose -f docker-compose.prod.yml exec db psql -U kotonoha_machi -d koto
 
 로그에 `now at version v51`이, 쿼리 결과에 `51`이 나와야 한다(이후 마이그레이션이 늘면 그 번호).
 
+## 4-1. 자동 배포 설정 (GitHub Actions, 한 번만)
+
+master에 머지되고 CI가 통과하면 `.github/workflows/deploy.yml`이 VM에 SSH로 접속해 `git pull`과 `docker compose up -d --build`를 대신 실행한다(결정 문서 `0043`). 아래 설정을 해야 동작한다.
+
+**1) VM에서 배포 전용 SSH 키 만들기** (SSH 창에서 한 줄씩)
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/gha_deploy -N "" -C "github-actions-deploy"
+```
+
+```bash
+cat ~/.ssh/gha_deploy.pub >> ~/.ssh/authorized_keys
+```
+
+```bash
+cat ~/.ssh/gha_deploy
+```
+
+마지막 명령이 **개인 키**(`-----BEGIN OPENSSH PRIVATE KEY-----`부터 `-----END ...-----`까지 전부)를 출력한다. 줄 끝까지 통째로 복사해 둔다. 이 값은 비밀이라 채팅·문서에 붙이지 않는다. GitHub에 등록한 뒤에는 VM에서 지운다.
+
+```bash
+rm ~/.ssh/gha_deploy
+```
+
+**2) GitHub 저장소 Secrets 등록** (저장소 Settings → Secrets and variables → Actions → New repository secret)
+
+| 이름 | 값 |
+|---|---|
+| `DEPLOY_HOST` | VM 고정 외부 IP |
+| `DEPLOY_USER` | VM 사용자 이름(SSH 프롬프트의 `@` 앞) |
+| `DEPLOY_SSH_KEY` | 위 개인 키 전체 |
+
+**3) 동작 확인**
+- master에 머지하면 Actions 탭에 CI → Deploy 순서로 돈다. Deploy가 초록이면 VM에 반영된 것이다.
+- 수동으로 다시 돌리려면 Actions → Deploy가 아니라, CI를 다시 실행(Re-run)하거나 빈 커밋을 머지한다.
+- 접속이 거부되면(`Permission denied`) VM 인스턴스 → 수정 → SSH 키(메타데이터)에 공개 키(`gha_deploy.pub` 내용)를 추가해 본다. `authorized_keys` 직접 수정이 지워지는 환경이 있다.
+
+**주의**
+- 배포 중 빌드로 몇 분간 느려지고, 빌드가 실패하면 서비스가 멈출 수 있다(`docker compose ps`·`logs`로 확인).
+- `.env` 파일은 git에 없으므로 자동 배포로 바뀌지 않는다. 키를 바꾸면 VM에서 직접 고치고 `docker compose -f docker-compose.prod.yml up -d --force-recreate backend`를 실행한다.
+- 방화벽 22번 포트가 인터넷에 열려 있으니 비밀번호 로그인은 쓰지 않는다(GCP 기본은 키 로그인만).
+
 ## 5. DB 백업·복원
 
 백업(날짜별 파일):
