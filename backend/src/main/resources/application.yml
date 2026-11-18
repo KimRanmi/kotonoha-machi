@@ -24,6 +24,26 @@ spring:
   # 비어 있으면(아직 발급 전이면) 애플리케이션 전체가 부팅에 실패한다 — 코드로 등록하면 비어 있는 제공자를
   # 그냥 건너뛸 수 있다.
 
+# 헬스체크: /actuator/health(DB 연결 상태 포함) 하나만 외부에 연다. 나머지 엔드포인트는 만들지도 않고,
+# 상태 요약("UP"/"DOWN")만 보여 주며 DB 종류·디스크 용량 같은 세부 정보는 숨긴다.
+management:
+  endpoints:
+    access:
+      default: none
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      access: read-only
+      show-details: never
+      show-components: never
+  health:
+    # 메일 서버·디스크 등은 외부 서비스 사정이라 우리 서버 상태 판단에서 뺀다(DB 상태만 본다).
+    defaults:
+      enabled: false
+    db:
+      enabled: true
 server:
   port: ${SERVER_PORT:8080}
   # 리버스 프록시(Caddy) 뒤에서는 framework로 바꿔 X-Forwarded-* 헤더를 따른다(운영 compose가 설정).

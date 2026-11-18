@@ -300,7 +300,7 @@ class VocabularyControllerIntegrationTest {
   void 대화에서_고른_단어를_한국어_뜻으로_CHAT_출처로_저장하고_단어장에_보인다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     when(dictionaryClient.lookup("漆器")).thenReturn(Optional.of(SHIKKI));
-    when(geminiClient.translateMeaning(SHIKKI)).thenReturn("칠기, 옻칠 공예품");
+    when(geminiClient.translateMeaning(eq(SHIKKI), any())).thenReturn("칠기, 옻칠 공예품");
 
     saveChatWord(session, "漆器")
         .andExpect(status().isOk())
@@ -319,7 +319,7 @@ class VocabularyControllerIntegrationTest {
   void 이미_저장한_단어는_번역_호출_없이_이미_저장됨으로_응답한다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     when(dictionaryClient.lookup("囲炉裏")).thenReturn(Optional.of(IRORI));
-    when(geminiClient.translateMeaning(IRORI)).thenReturn("칠기");
+    when(geminiClient.translateMeaning(eq(IRORI), any())).thenReturn("칠기");
 
     saveChatWord(session, "囲炉裏").andExpect(status().isOk());
     saveChatWord(session, "囲炉裏")
@@ -327,7 +327,7 @@ class VocabularyControllerIntegrationTest {
         .andExpect(jsonPath("$.alreadySaved").value(true));
 
     assertThat(countRows(lastUserId(), "囲炉裏", "いろり")).isEqualTo(1);
-    verify(geminiClient, times(1)).translateMeaning(any());
+    verify(geminiClient, times(1)).translateMeaning(any(), any());
   }
 
   private static final DictionaryWord IRORI = new DictionaryWord("囲炉裏", "いろり", "hearth", null);
@@ -341,14 +341,14 @@ class VocabularyControllerIntegrationTest {
     saveChatWord(session, "ほげほげ").andExpect(status().isNotFound());
 
     assertThat(vocabularyCount(session)).isZero();
-    verify(geminiClient, never()).translateMeaning(any());
+    verify(geminiClient, never()).translateMeaning(any(), any());
   }
 
   @Test
   void 번역이_실패하면_영어_뜻을_그대로_저장한다() throws Exception {
     MockHttpSession session = newLoggedInSession();
     when(dictionaryClient.lookup("雪")).thenReturn(Optional.of(YUKI));
-    when(geminiClient.translateMeaning(YUKI))
+    when(geminiClient.translateMeaning(eq(YUKI), any()))
         .thenThrow(new com.kotonohamachi.common.ApiException(
             com.kotonohamachi.chat.ChatErrorCode.DAILY_LIMIT_EXCEEDED));
 

@@ -186,7 +186,8 @@ public class ChatService {
     reserveDailyQuota(userId);
     ChatResponse response;
     try {
-      response = geminiClient.generate(systemPrompt, context.recentLines(), normalizedMessage);
+      response =
+          geminiClient.generate(systemPrompt, context.recentLines(), normalizedMessage, userId);
     } catch (RuntimeException e) {
       releaseDailyQuota(userId);
       throw e;

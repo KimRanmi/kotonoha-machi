@@ -61,6 +61,9 @@ public class SecurityConfig {
             .authenticated()
             .requestMatchers("/api/auth/**", "/oauth2/**", "/login/oauth2/**")
             .permitAll()
+            // 외부 감시 서비스가 로그인 없이 서버 상태를 확인하는 헬스체크(application.yml에서 health만 노출)
+            .requestMatchers("/actuator/health", "/actuator/health/**")
+            .permitAll()
             .anyRequest()
             .authenticated())
         .exceptionHandling(exception ->

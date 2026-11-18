@@ -36,15 +36,16 @@ public class MeaningTranslator {
    * 사전 단어의 뜻을 한국어로 돌려준다.
    *
    * @param word 사전에서 찾은 단어
+   * @param userId 단어를 저장하는 사용자 ID(사용량 기록용)
    * @return 한국어 뜻. 번역에 실패하면 영어 뜻 그대로
    */
-  public String toKorean(DictionaryWord word) {
+  public String toKorean(DictionaryWord word, Long userId) {
     String cached = cache.get(word);
     if (cached != null) {
       return cached;
     }
     try {
-      String korean = geminiClient.translateMeaning(word);
+      String korean = geminiClient.translateMeaning(word, userId);
       if (cache.size() >= MAX_CACHE_SIZE) {
         cache.clear();
       }

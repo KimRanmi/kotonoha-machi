@@ -127,7 +127,7 @@ class ChatServiceTest {
         catchThrowableOfType(ApiException.class, () -> chatService.chat(1L, "r01", "こんにちは"));
 
     assertThat(error.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
-    verify(geminiClient, never()).generate(any(), any(), any());
+    verify(geminiClient, never()).generate(any(), any(), any(), any());
   }
 
   @Test
@@ -140,7 +140,7 @@ class ChatServiceTest {
       assertThat(response.translation()).isEqualTo("다시 말씀해주세요.");
       assertThat(response.friendshipGain()).isZero();
     }
-    verify(geminiClient, never()).generate(any(), any(), any());
+    verify(geminiClient, never()).generate(any(), any(), any(), any());
     verify(friendshipService, never()).recordChat(any(), any());
     verify(chatMessageRepository, never()).saveAll(any());
   }
@@ -164,7 +164,8 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
 
     assertThat(chatService.chat(1L, "r01", "あ".repeat(200)).reply()).isEqualTo("やあ");
   }
@@ -174,11 +175,12 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
 
     chatService.chat(1L, "r01", "  " + "あ".repeat(200) + "  ");
 
-    verify(geminiClient).generate(any(), any(), eq("あ".repeat(200)));
+    verify(geminiClient).generate(any(), any(), eq("あ".repeat(200)), any());
   }
 
   @Test
@@ -189,7 +191,7 @@ class ChatServiceTest {
         catchThrowableOfType(ApiException.class, () -> chatService.chat(1L, "r99", "こんにちは"));
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
-    verify(geminiClient, never()).generate(any(), any(), any());
+    verify(geminiClient, never()).generate(any(), any(), any(), any());
   }
 
   @Test
@@ -197,12 +199,13 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
 
     chatService.chat(1L, "r01", "こんにちは");
 
     ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
-    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"));
+    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"), any());
     assertThat(prompt.getValue())
         .contains("0~19:")
         .contains("20~49:")
@@ -216,12 +219,13 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
 
     chatService.chat(1L, "r01", "こんにちは");
 
     ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
-    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"));
+    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"), any());
     assertThat(prompt.getValue()).contains("플레이어와의 친밀도: 0 / 100");
   }
 
@@ -233,12 +237,13 @@ class ChatServiceTest {
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L))
         .thenReturn(Optional.of(friendship));
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
 
     ChatResultResponse response = chatService.chat(1L, "r01", "こんにちは");
 
     ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
-    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"));
+    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"), any());
     assertThat(prompt.getValue())
         .contains("이름: ミミ")
         .contains("성격 유형: ぶっきらぼう")
@@ -257,13 +262,14 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
 
     chatService.chat(1L, "r01", injection);
 
     ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<String> user = ArgumentCaptor.forClass(String.class);
-    verify(geminiClient).generate(prompt.capture(), any(), user.capture());
+    verify(geminiClient).generate(prompt.capture(), any(), user.capture(), any());
     assertThat(prompt.getValue()).doesNotContain("INJECTED_MARKER");
     assertThat(user.getValue()).isEqualTo(injection);
   }
@@ -271,12 +277,13 @@ class ChatServiceTest {
   private ArgumentCaptor<String> chatAndCapturePrompt(Resident resident) {
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
 
     chatService.chat(1L, "r01", "こんにちは");
 
     ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
-    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"));
+    verify(geminiClient).generate(prompt.capture(), any(), eq("こんにちは"), any());
     return prompt;
   }
 
@@ -422,7 +429,8 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
 
     chatService.chat(1L, "r01", " こんにちは ");
 
@@ -442,7 +450,8 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenThrow(new IllegalStateException("fail"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("fail"));
 
     catchThrowableOfType(IllegalStateException.class, () -> chatService.chat(1L, "r01", "やあ"));
 
@@ -581,7 +590,8 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
     when(friendshipService.recordChat(1L, resident)).thenReturn(new FriendshipChange(5, 5));
 
     ChatResultResponse response = chatService.chat(1L, "r01", "こんにちは");
@@ -594,7 +604,8 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenThrow(new RuntimeException("gemini down"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenThrow(new RuntimeException("gemini down"));
 
     catchThrowableOfType(RuntimeException.class, () -> chatService.chat(1L, "r01", "こんにちは"));
 
@@ -610,12 +621,13 @@ class ChatServiceTest {
         new ChatHistoryItem(ChatSpeaker.PLAYER, "はじめまして", null),
         new ChatHistoryItem(ChatSpeaker.RESIDENT, "やあ", "안녕"));
     when(memoryService.load(1L, 1L)).thenReturn(new ChatContext("플레이어 이름은 하나", recent));
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
 
     chatService.chat(1L, "r01", "こんにちは");
 
     ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
-    verify(geminiClient).generate(prompt.capture(), eq(recent), eq("こんにちは"));
+    verify(geminiClient).generate(prompt.capture(), eq(recent), eq("こんにちは"), any());
     assertThat(prompt.getValue()).contains("[Memory]").contains("플레이어 이름은 하나");
     verify(memoryService).summarizeIfNeeded(1L, 1L);
   }
@@ -632,7 +644,7 @@ class ChatServiceTest {
     Resident resident = resident();
     when(residentRepository.findBySlug("r01")).thenReturn(Optional.of(resident));
     when(friendshipRepository.findByUserIdAndResidentId(1L, 1L)).thenReturn(Optional.empty());
-    when(geminiClient.generate(any(), any(), any())).thenThrow(new RuntimeException("down"));
+    when(geminiClient.generate(any(), any(), any(), any())).thenThrow(new RuntimeException("down"));
 
     catchThrowableOfType(RuntimeException.class, () -> chatService.chat(1L, "r01", "やあ"));
 
@@ -649,7 +661,7 @@ class ChatServiceTest {
         .when(friendshipRepository.findByUserIdAndResidentId(any(), any()))
         .thenReturn(Optional.empty());
     lenient()
-        .when(geminiClient.generate(any(), any(), any()))
+        .when(geminiClient.generate(any(), any(), any(), any()))
         .thenReturn(new ChatResponse("やあ", "안녕"));
   }
 
@@ -672,7 +684,7 @@ class ChatServiceTest {
 
     assertThat(exception.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     assertThat(exception.getMessage()).contains("졸려요");
-    verify(geminiClient, times(ChatService.DAILY_CHAT_LIMIT)).generate(any(), any(), any());
+    verify(geminiClient, times(ChatService.DAILY_CHAT_LIMIT)).generate(any(), any(), any(), any());
     // 상한에 걸린 말은 기록·친밀도에도 반영되지 않는다.
     verify(friendshipService, times(ChatService.DAILY_CHAT_LIMIT)).recordChat(any(), any());
   }
@@ -681,7 +693,7 @@ class ChatServiceTest {
   void chat_Gemini가_실패하면_횟수를_돌려준다() {
     givenResidentAndReply();
     chatTimes(1L, ChatService.DAILY_CHAT_LIMIT - 1);
-    when(geminiClient.generate(any(), any(), any()))
+    when(geminiClient.generate(any(), any(), any(), any()))
         .thenThrow(new ApiException(com.kotonohamachi.chat.ChatErrorCode.GENERATION_FAILED))
         .thenReturn(new ChatResponse("やあ", "안녕"));
 
@@ -695,7 +707,7 @@ class ChatServiceTest {
   void chat_Google_한도_429로_실패해도_횟수를_돌려준다() {
     givenResidentAndReply();
     chatTimes(1L, ChatService.DAILY_CHAT_LIMIT - 1);
-    when(geminiClient.generate(any(), any(), any()))
+    when(geminiClient.generate(any(), any(), any(), any()))
         .thenThrow(new ApiException(com.kotonohamachi.chat.ChatErrorCode.DAILY_LIMIT_EXCEEDED))
         .thenReturn(new ChatResponse("やあ", "안녕"));
 

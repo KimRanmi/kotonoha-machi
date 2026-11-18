@@ -146,7 +146,7 @@ class ChatControllerIntegrationTest {
 
   @Test
   void 대화한_내용이_오래된_순으로_저장되고_조회된다() throws Exception {
-    when(geminiClient.generate(any(), any(), any()))
+    when(geminiClient.generate(any(), any(), any(), any()))
         .thenReturn(new ChatResponse("やあ", "안녕"), new ChatResponse("またね", "또 봐"));
     MockHttpSession session = signUpVerifyAndLogin();
 
@@ -169,7 +169,8 @@ class ChatControllerIntegrationTest {
 
   @Test
   void 다른_사용자의_대화는_조회되지_않는다() throws Exception {
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
     MockHttpSession alice = signUpVerifyAndLogin();
     MockHttpSession bob = signUpVerifyAndLogin();
 
@@ -195,7 +196,8 @@ class ChatControllerIntegrationTest {
 
   @Test
   void 날짜_목록은_오늘_대화를_제외하고_없는_주민은_404다() throws Exception {
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
     MockHttpSession session = signUpVerifyAndLogin();
     say(session, "こんにちは");
 
@@ -210,7 +212,8 @@ class ChatControllerIntegrationTest {
 
   @Test
   void 지난_날_대화는_날짜_목록과_날짜별_조회로_확인된다() throws Exception {
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
     MockHttpSession session = signUpVerifyAndLogin();
     say(session, "こんにちは");
     // 방금 저장한 두 줄을 이틀 전 낮으로 옮긴다.
@@ -266,7 +269,8 @@ class ChatControllerIntegrationTest {
 
   @Test
   void 대화하면_친밀도가_오르고_하루_한도에서_멈춘다() throws Exception {
-    when(geminiClient.generate(any(), any(), any())).thenReturn(new ChatResponse("やあ", "안녕"));
+    when(geminiClient.generate(any(), any(), any(), any()))
+        .thenReturn(new ChatResponse("やあ", "안녕"));
     MockHttpSession session = signUpVerifyAndLogin();
 
     // 첫 대화 +5, 이후 +1씩 5번(+5)으로 하루 한도 10에 닿고, 그 뒤로는 오르지 않는다.
@@ -285,7 +289,7 @@ class ChatControllerIntegrationTest {
 
   @Test
   void Gemini_한도로_429가_나면_졸려요_메시지로_응답한다() throws Exception {
-    when(geminiClient.generate(any(), any(), any()))
+    when(geminiClient.generate(any(), any(), any(), any()))
         .thenThrow(new ApiException(ChatErrorCode.DAILY_LIMIT_EXCEEDED));
     MockHttpSession session = signUpVerifyAndLogin();
 
