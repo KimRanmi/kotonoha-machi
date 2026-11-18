@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { login } from '../api/auth';
 import { ApiError, oauth2AuthorizationUrl } from '../api/client';
+import SocialIcon from '../components/SocialIcon';
 import styles from './AuthPage.module.css';
 
 function LoginPage() {
@@ -71,6 +72,7 @@ function LoginPage() {
             data-provider="google"
             href={oauth2AuthorizationUrl('google')}
           >
+            <SocialIcon provider="google" />
             Google로 계속하기
           </a>
           <a
@@ -78,6 +80,7 @@ function LoginPage() {
             data-provider="kakao"
             href={oauth2AuthorizationUrl('kakao')}
           >
+            <SocialIcon provider="kakao" />
             카카오로 계속하기
           </a>
           <a
@@ -85,6 +88,7 @@ function LoginPage() {
             data-provider="naver"
             href={oauth2AuthorizationUrl('naver')}
           >
+            <SocialIcon provider="naver" />
             네이버로 계속하기
           </a>
         </div>
