@@ -1153,3 +1153,10 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 검증: `spotlessApply`·`./gradlew test` 통과(Testcontainers; 기록기·헬스체크 통합 테스트, GeminiClient 호출 종류별 기록·실패 기록 단위 테스트 추가). 별도 Postgres + `bootRun`으로 실제 확인: health `UP`(200) → DB 정지 시 `DOWN`(503) → 복구 시 `UP`, `/actuator/env`는 401, 실제 Gemini 단어 번역 호출이 토큰 수와 함께 기록되고, 시간 초과 호출은 실패(`success=false`)로 기록되며 번역은 영어 뜻으로 대체됨.
   - 확인 못 한 것: 실제 Gemini로 대화(CHAT)·요약(SUMMARY) 호출은 로그인·학습 완료 흐름이 필요해 단위 테스트(목킹)로만 검증했다. 운영 Caddy 경유 `/actuator/health`와 업타임 체크 알림은 배포 후 사용자가 확인해야 한다(Caddyfile은 문법만 확인 못 함, 변경은 path 한 줄 추가).
   - 다음: 배포 후 Google Cloud Monitoring 업타임 체크 등록(문서의 콘솔 단계는 직접 확인하지 못함), 며칠 쓴 뒤 `docs/monitoring.md`의 SQL로 호출량 확인.
+
+## 2026-11-19 (완료한 학습 목록 표기 변경)
+
+- 완료한 학습 목록의 "학습 N - 다시 보기"를 "완료날짜 | N일차 학습 완료[레벨]"(예: `2026-11-18 | 3일차 학습 완료[N3, N2]`)로 바꿨다. 레벨이 여러 개면 쉬운 쪽(N5)부터 나열한다.
+  - 기존 목록 API에는 완료 날짜와 레벨이 없어 `GET /api/themes/completed`(`CompletedThemeResponse`: id, completedAt, levels)를 추가했다. 완료 시각은 완료 후 더 바뀌지 않는 진행 상태의 마지막 수정 시각을 썼고, 레벨은 테마의 한자·단어·표현 JLPT 레벨(예문은 레벨 데이터 없음)을 중복 없이 모은다. N일차는 완료한 순서의 번호다. 날짜는 한국 시간 기준이다.
+  - 검증: 백엔드 `spotlessApply`·`test`(서비스·통합 테스트 추가), 프런트 prettier·lint·build 통과, 코드 리뷰 통과.
+  - 확인 못 한 것: 실제 화면에서 표기 확인(프런트 테스트 체계 없음). 완료한 테마마다 레벨 쿼리가 3번 나가므로 이력이 아주 길어지면 한 번에 조회하도록 바꿀 수 있다.

@@ -16,6 +16,7 @@ import com.kotonohamachi.theme.ThemeReadingPassage;
 import com.kotonohamachi.theme.ThemeReadingQuestion;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
+import com.kotonohamachi.theme.dto.CompletedThemeResponse;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
 import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
 import com.kotonohamachi.theme.dto.ThemeReadingResponse;
@@ -213,6 +214,39 @@ class ThemeServiceTest {
     }
     ReflectionTestUtils.setField(progress, "updatedAt", completedAt);
     return progress;
+  }
+
+  @Test
+  void getCompletedThemes_완료한_테마만_완료한_순서대로_레벨은_중복_없이_쉬운_순으로_내려온다() {
+    OffsetDateTime now = OffsetDateTime.now();
+    ThemeProgress later = completedProgress(2L, now.minusDays(1));
+    ThemeProgress earlier = completedProgress(1L, now.minusDays(3));
+    Theme ongoingTheme = new Theme("진행 중");
+    ReflectionTestUtils.setField(ongoingTheme, "id", 3L);
+    ThemeProgress ongoing = new ThemeProgress(user(), ongoingTheme);
+    when(themeProgressRepository.findAllByUserId(1L)).thenReturn(List.of(later, ongoing, earlier));
+    Theme theme = new Theme("완료한 테마");
+    when(themeKanjiRepository.findAllByThemeIdOrderByDisplayOrder(1L))
+        .thenReturn(List.of(
+            new ThemeKanji(theme, "磁", "ジ", "", "자석", 1, 1),
+            new ThemeKanji(theme, "混", "コン", "", "혼잡", 2, 2),
+            new ThemeKanji(theme, "雑", "ザツ", "", "뒤섞임", 2, 3)));
+    when(themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(1L, ThemeStage.WORD))
+        .thenReturn(
+            List.of(new ThemeVocabulary(theme, ThemeStage.WORD, "注文", "ちゅうもん", "주문", 3, 1)));
+    when(themeVocabularyRepository.findAllByThemeIdAndStageOrderByDisplayOrder(
+            1L, ThemeStage.EXPRESSION))
+        .thenReturn(
+            List.of(new ThemeVocabulary(theme, ThemeStage.EXPRESSION, "どうも", "どうも", "감사", 3, 1)));
+
+    List<CompletedThemeResponse> responses = themeService.getCompletedThemes(1L);
+
+    assertThat(responses).hasSize(2);
+    assertThat(responses.get(0).id()).isEqualTo(1L);
+    assertThat(responses.get(0).completedAt()).isEqualTo(now.minusDays(3));
+    assertThat(responses.get(0).levels()).containsExactly(3, 2, 1);
+    assertThat(responses.get(1).id()).isEqualTo(2L);
+    assertThat(responses.get(1).levels()).isEmpty();
   }
 
   @Test
