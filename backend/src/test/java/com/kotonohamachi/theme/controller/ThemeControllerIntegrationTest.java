@@ -258,6 +258,43 @@ class ThemeControllerIntegrationTest {
   }
 
   @Test
+  void 완료한_학습_목록은_로그인하지_않으면_401을_반환한다() throws Exception {
+    mockMvc.perform(get("/api/themes/completed")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void 완료한_테마가_없으면_완료한_학습_목록은_비어_있다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+
+    mockMvc
+        .perform(get("/api/themes/completed").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
+  void 테마를_완료하면_완료한_학습_목록에_완료_시각과_레벨이_담긴다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    Long themeId = firstThemeId(session);
+    for (String stage :
+        new String[] {"KANJI", "WORD", "EXPRESSION", "EXAMPLE", "READING", "REVIEW"}) {
+      mockMvc
+          .perform(
+              post("/api/themes/" + themeId + "/stages/" + stage + "/complete").session(session))
+          .andExpect(status().isOk());
+    }
+
+    mockMvc
+        .perform(get("/api/themes/completed").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(themeId))
+        .andExpect(jsonPath("$[0].completedAt").isNotEmpty())
+        .andExpect(jsonPath("$[0].levels").isArray())
+        .andExpect(jsonPath("$[0].levels[0]").isNumber());
+  }
+
+  @Test
   void 단계_콘텐츠_조회는_로그인하지_않으면_401을_반환한다() throws Exception {
     mockMvc
         .perform(get("/api/themes/1/stages/KANJI/content"))

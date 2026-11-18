@@ -1,20 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../api/client';
-import { getThemes, type Theme } from '../api/theme';
+import { getCompletedThemes, type CompletedTheme } from '../api/theme';
 import styles from './CompletedThemesPage.module.css';
 
+/** 완료 시각을 한국 시간 기준 `YYYY-MM-DD`로 바꾼다. */
+function formatCompletedDate(completedAt: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(completedAt));
+}
+
 function CompletedThemesPage() {
-  const [themes, setThemes] = useState<Theme[] | null>(null);
+  const [themes, setThemes] = useState<CompletedTheme[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    getThemes()
+    getCompletedThemes()
       .then((fetchedThemes) => {
         if (!cancelled) {
-          setThemes(fetchedThemes.filter((theme) => theme.completed));
+          setThemes(fetchedThemes);
         }
       })
       .catch((error: unknown) => {
@@ -51,7 +56,10 @@ function CompletedThemesPage() {
             {themes.map((theme, index) => (
               <li key={theme.id}>
                 <Link to={`/town/themes/${theme.id}`} className={styles.item}>
-                  <span className={styles.itemTitle}>학습 {index + 1}</span>
+                  <span className={styles.itemTitle}>
+                    {formatCompletedDate(theme.completedAt)} | {index + 1}일차 학습 완료[
+                    {theme.levels.map((level) => `N${level}`).join(', ')}]
+                  </span>
                   <span className={styles.itemCta}>다시 보기 →</span>
                 </Link>
               </li>
