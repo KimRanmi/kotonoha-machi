@@ -22,7 +22,7 @@
   background-color: var(--color-surface);
   color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: 1rem;
+  font-size: 16px; /* iOS Safari 입력 확대 방지 */
 }
 .input:focus {
   outline: none;
