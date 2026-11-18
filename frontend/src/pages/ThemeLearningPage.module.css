@@ -130,6 +130,9 @@
   text-align: left;
 }
 .optionButton:hover:not(:disabled) {
+  background-color: var(
+    --color-bg
+  ); /* 전역 버튼 hover(진한 색)가 글자를 가리지 않게 밝은 배경으로 */
   border-color: var(--color-primary);
 }
 .optionButton:disabled {
@@ -258,9 +261,11 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  width: 100%;
 }
 
 .nextButton {
+  width: 100%; /* 카드와 같은 폭으로 맞춘다 */
   height: 48px;
   padding: 0 var(--space-6);
   display: inline-flex;

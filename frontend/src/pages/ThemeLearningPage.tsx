@@ -501,7 +501,7 @@ function ThemeLearningPage() {
                       className={styles.unknownButton}
                       onClick={handleShowReadingHint}
                     >
-                      分からない 🥺
+                      모르겠어요 🥺
                     </button>
                   )}
                   {isReadingHintShown && feedback !== 'correct' && (
