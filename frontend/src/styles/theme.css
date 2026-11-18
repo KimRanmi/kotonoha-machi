@@ -6,6 +6,7 @@
   --color-text-muted: #6b7a68;
   --color-primary: #4e8b5f;
   --color-primary-hover: #3d7350;
+  --color-on-primary: #ffffff; /* 주색 배경 위 글자색 */
   --color-border: #e0e8d5;
   --color-error: #c0392b;
   --color-success: #3f7d4f;
@@ -39,6 +40,7 @@
     --color-text-muted: #a3b4a0;
     --color-primary: #6fb383;
     --color-primary-hover: #86c598;
+    --color-on-primary: #10201a;
     --color-border: #2f3d31;
     --color-error: #e57373;
     --color-success: #6fbf86;

@@ -112,12 +112,13 @@
 }
 .lineMe {
   align-self: flex-end;
-  color: #fff;
+  color: var(--color-on-primary);
   background-color: var(--color-primary);
   border-bottom-right-radius: 6px;
 }
 .lineMe .translation {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--color-on-primary);
+  opacity: 0.8;
 }
 
 .form {
