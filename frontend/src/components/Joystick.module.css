@@ -6,7 +6,7 @@
 @media (pointer: coarse) {
   .base {
     position: fixed;
-    left: calc(var(--space-5) + env(safe-area-inset-left));
+    right: calc(var(--space-5) + env(safe-area-inset-right));
     bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
     z-index: 2;
     display: block;
