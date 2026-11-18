@@ -1098,3 +1098,9 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
 - 고침: `speechSynthesis.ts`가 재생용 `Audio`를 하나 재사용하고, 화면을 처음 누를 때(click/touchend) 무음을 한 번 재생해 잠금을 푼다(브라우저 음성도 빈 발화로 해제). 이후에는 같은 요소의 주소만 바꿔 재생한다. 새 라이브러리 없음.
   - 검증: 프런트 prettier·eslint(해당 파일)·tsc·build 통과.
   - 확인 못 한 것: 실제 iPhone Safari에서의 재생(배포 후 직접 확인 필요). 원인은 코드 읽기로 추정한 것이다.
+
+## 2026-11-18 (자동 배포 추가)
+
+- master 머지 + CI 통과 시 GitHub Actions가 VM에 SSH로 접속해 `git pull`과 `docker compose up -d --build`를 실행하는 `deploy.yml`을 추가했다(`0043`, 사용자 승인). 서드파티 액션 없이 `ssh`만 쓰고, 접속 정보는 Secrets(`DEPLOY_HOST`·`DEPLOY_USER`·`DEPLOY_SSH_KEY`)에 둔다. 설정 방법은 `docs/deploy.md` 4-1.
+  - 검증: 워크플로우 YAML 문법과 서버에서 실행될 스크립트 내용을 로컬에서 확인했다.
+  - 확인 못 한 것: 실제 Actions 실행(Secrets 등록과 VM 키 설정 후 첫 머지로 확인해야 한다).
