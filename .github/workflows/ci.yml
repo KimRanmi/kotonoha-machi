@@ -1,9 +1,8 @@
-# PR과 master 푸시마다 CLAUDE.md의 검증 명령어를 자동으로 돌린다.
+# master에 머지(푸시)될 때만 CLAUDE.md의 검증 명령어를 자동으로 돌린다. PR 커밋마다는 돌리지 않으므로 PR 전에 로컬에서 검증한다.
 # 백엔드(테스트는 Testcontainers라 runner의 Docker를 쓴다)와 프런트는 서로 독립이라 병렬로 실행한다.
 name: CI
 
 on:
-  pull_request:
   push:
     branches: [master]
 
