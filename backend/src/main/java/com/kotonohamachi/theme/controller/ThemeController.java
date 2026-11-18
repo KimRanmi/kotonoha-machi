@@ -2,6 +2,7 @@ package com.kotonohamachi.theme.controller;
 
 import com.kotonohamachi.auth.service.AuthPrincipal;
 import com.kotonohamachi.theme.ThemeStage;
+import com.kotonohamachi.theme.dto.CompletedThemeResponse;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
 import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
 import com.kotonohamachi.theme.dto.ThemeReadingResponse;
@@ -41,6 +42,18 @@ public class ThemeController {
   public List<ThemeResponse> getThemes(Authentication authentication) {
     User user = AuthPrincipal.resolve(authentication);
     return themeService.getThemes(user.getId());
+  }
+
+  /**
+   * 로그인한 사용자 자신이 완료한 테마를 완료한 순서대로 조회한다.
+   *
+   * @param authentication 현재 요청의 인증 정보
+   * @return 완료한 테마 목록(완료 시각, 레벨 포함)
+   */
+  @GetMapping("/api/themes/completed")
+  public List<CompletedThemeResponse> getCompletedThemes(Authentication authentication) {
+    User user = AuthPrincipal.resolve(authentication);
+    return themeService.getCompletedThemes(user.getId());
   }
 
   /**

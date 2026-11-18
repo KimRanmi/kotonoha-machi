@@ -55,6 +55,21 @@ export async function getThemes(): Promise<Theme[]> {
   return response.json();
 }
 
+/** 완료한 학습 목록에 나오는 학습 하나. 완료한 순서(오래된 것부터)로 내려온다. */
+export interface CompletedTheme {
+  id: number;
+  /** 완료한 시각(ISO 8601). */
+  completedAt: string;
+  /** 학습에 나오는 JLPT 레벨(5=N5 ~ 1=N1), 쉬운 레벨부터. */
+  levels: number[];
+}
+
+/** 로그인한 사용자가 완료한 학습을 완료한 순서대로 가져온다. */
+export async function getCompletedThemes(): Promise<CompletedTheme[]> {
+  const response = await apiFetch('/api/themes/completed');
+  return response.json();
+}
+
 /**
  * "오늘의 학습" 배너에 보여 줄 학습을 가져온다. 오늘(한국 시간) 안에 학습을 완료했으면 새 학습 대신 그
  * 완료한 학습(`completed: true`)을 돌려주고, 모든 학습을 끝냈으면 `null`이다.

@@ -10,6 +10,7 @@ import com.kotonohamachi.theme.ThemeReadingPassage;
 import com.kotonohamachi.theme.ThemeReadingQuestion;
 import com.kotonohamachi.theme.ThemeStage;
 import com.kotonohamachi.theme.ThemeVocabulary;
+import com.kotonohamachi.theme.dto.CompletedThemeResponse;
 import com.kotonohamachi.theme.dto.ThemeProgressResponse;
 import com.kotonohamachi.theme.dto.ThemeQuizItemResponse;
 import com.kotonohamachi.theme.dto.ThemeReadingQuestionResponse;
@@ -34,6 +35,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -113,6 +115,40 @@ public class ThemeService {
     return themes.stream()
         .map(theme -> toThemeResponse(theme, progressByThemeId.get(theme.getId())))
         .toList();
+  }
+
+  /**
+   * 로그인한 사용자가 완료한 테마를 완료한 순서(오래된 것부터)로 조회한다. 각 테마에는 완료 시각과, 테마의
+   * 한자·단어·표현에 나오는 JLPT 레벨이 함께 담긴다.
+   *
+   * @param userId 조회할 사용자 ID(로그인한 본인)
+   * @return 완료한 테마 목록
+   */
+  @Transactional(readOnly = true)
+  public List<CompletedThemeResponse> getCompletedThemes(Long userId) {
+    return themeProgressRepository.findAllByUserId(userId).stream()
+        .filter(ThemeProgress::isCompleted)
+        .sorted(Comparator.comparing(ThemeProgress::getUpdatedAt))
+        .map(progress -> {
+          Long themeId = progress.getTheme().getId();
+          return new CompletedThemeResponse(
+              themeId, progress.getUpdatedAt(), findContentLevels(themeId));
+        })
+        .toList();
+  }
+
+  /** 테마의 한자·단어·표현 JLPT 레벨을 중복 없이, 쉬운 레벨(숫자가 큰 쪽)부터 모은다. */
+  private List<Integer> findContentLevels(Long themeId) {
+    TreeSet<Integer> levels = new TreeSet<>(Comparator.reverseOrder());
+    themeKanjiRepository
+        .findAllByThemeIdOrderByDisplayOrder(themeId)
+        .forEach(kanji -> levels.add(kanji.getJlptLevel()));
+    for (ThemeStage stage : List.of(ThemeStage.WORD, ThemeStage.EXPRESSION)) {
+      themeVocabularyRepository
+          .findAllByThemeIdAndStageOrderByDisplayOrder(themeId, stage)
+          .forEach(vocabulary -> levels.add(vocabulary.getJlptLevel()));
+    }
+    return List.copyOf(levels);
   }
 
   /**
