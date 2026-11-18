@@ -151,8 +151,8 @@
   background-color: var(--color-primary-hover);
 }
 
-/* 터치 기기는 오른쪽 아래에 이동 조이스틱이 있으므로 대화 버튼을 왼쪽 아래로 비켜 준다. */
-@media (pointer: coarse) {
+/* 오른쪽 아래의 이동 조이스틱과 겹치지 않게, 터치 기기와 좁은 화면에서는 대화 버튼을 왼쪽 아래로 비켜 준다. */
+@media (pointer: coarse), (max-width: 600px) {
   .talkButton {
     left: var(--space-4);
     right: auto;
