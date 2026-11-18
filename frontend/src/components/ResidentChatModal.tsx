@@ -507,7 +507,7 @@ function ResidentChatModal({
                     onClick={isListening ? cancelSpeechRecognition : handleVoiceInput}
                     disabled={!speechSupported || isSending}
                   >
-                    {isListening ? '✕ 듣기 취소' : '🎤 말하기'}
+                    {isListening ? '✕ 듣기 취소' : '말하기'}
                   </button>
                   <button
                     type="submit"
