@@ -10,7 +10,7 @@
 - 대안: 직접 만든 `/api/health` 컨트롤러(의존성 없음, DB는 `SELECT 1`). 코드 몇 줄이면 되지만 DB 상태 판단을 직접 짜야 하고 "표준 방식" 설명이 어려워 Actuator를 택했다.
 - 노출 제한: `management.endpoints.access.default=none`으로 전부 끄고 health만 읽기 허용, `show-details/components=never`로 `UP`/`DOWN`만 보인다. 기본 헬스 지표(디스크·메일 등)는 끄고 DB만 켰다(외부 서비스 사정으로 오탐하지 않게).
 - `SecurityConfig`에서 `/actuator/health/**`만 `permitAll`, 그 외는 기존 규칙(인증 필요)이라 `/actuator/env` 등은 401. Caddy는 `/actuator/health`만 백엔드로 넘긴다.
-- 외부 감시는 UptimeRobot(무료) — 사용자가 직접 설정, 절차는 `docs/monitoring.md`.
+- 외부 감시는 Google Cloud Monitoring 업타임 체크(1분 간격, 아시아 지역 체크 가능, 새 가입 불필요) — 사용자가 직접 설정, 절차는 `docs/monitoring.md`. 후보였던 UptimeRobot(무료 5분 간격, 해외 체크 서버), Better Stack(약 3분), Healthchecks.io(핑 방식) 중 사용자가 고름.
 
 ## 결정 2: Gemini 호출을 `ai_usage` 테이블에 기록
 - 호출마다 종류(CHAT/SUMMARY/TRANSLATE)·모델·입출력 토큰(`usageMetadata`, 출력은 추론 토큰 포함)·성공 여부·실패 HTTP 상태·시각·사용자 ID. 프롬프트·대화 내용은 저장하지 않는다.

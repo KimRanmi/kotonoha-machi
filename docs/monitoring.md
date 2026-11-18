@@ -12,17 +12,19 @@ DB 연결이 끊기면 HTTP 503 `{"status":"DOWN"}`이 된다(서버는 떠 있�
 - 열려 있는 것은 이 경로 하나다. 세부 정보(DB 종류·디스크 등)와 다른 actuator 경로(`/actuator/env` 등)는 만들지도 않았고, Caddy도 `/actuator/health`만 백엔드로 넘긴다.
 - VM에서 직접 확인: `curl -i https://<DOMAIN>/actuator/health`
 
-### UptimeRobot으로 알림 받기 (무료, 직접 설정)
+### Google Cloud Monitoring 업타임 체크로 알림 받기 (직접 설정)
 
-1. https://uptimerobot.com 에 가입한다(무료 플랜: 모니터 50개, 5분 간격).
-2. 대시보드에서 **Add New Monitor**를 누른다.
-3. Monitor Type은 **HTTP(s)**, Friendly Name은 `kotonoha-machi`, URL은 `https://<DOMAIN>/actuator/health`로 쓴다.
-4. 확인 간격(Monitoring Interval)은 5분으로 둔다.
-5. **Alert Contacts To Notify**에서 알림 받을 이메일을 체크한다(가입 이메일이 기본으로 들어 있다). 모바일 앱을 깔면 푸시도 받을 수 있다.
-6. (선택) 본문에 `UP`이 있는지까지 보고 싶으면 Monitor Type을 **Keyword**로 고르고 Keyword를 `UP`, "Alert when keyword does not exist"로 설정한다. HTTP 상태 코드만으로도 DB 장애(503)는 잡히므로 필수는 아니다.
-7. **Create Monitor** 후 대시보드에 `Up`이 뜨는지 확인한다. 알림이 가는지 보려면 VM에서 `docker compose -f docker-compose.prod.yml stop backend`로 잠깐 멈췄다가 `start backend`로 되돌려 본다(5~10분 뒤 메일이 온다).
+배포한 GCP 프로젝트에서 설정한다(새 가입 불필요). 아래 화면 이름은 콘솔 개편으로 조금 다를 수 있고, 이 단계는 실제 콘솔에서 확인하지 못했다.
 
-참고: 같은 주소가 Caddy(HTTPS)까지 거치므로 도메인·인증서·프록시·백엔드·DB가 한 번에 감시된다. 배포(빌드 중 몇 분)나 재시작 때는 잠깐 Down 알림이 올 수 있다.
+1. GCP 콘솔에서 VM이 있는 프로젝트를 고르고 **Monitoring → Uptime checks**(업타임 체크)로 간다. 처음이면 Monitoring API 사용을 묻는다(허용).
+2. **Create Uptime Check**를 누른다.
+3. Protocol **HTTPS**, Resource Type **URL**, Hostname `<DOMAIN>`(https:// 없이), Path `/actuator/health`로 쓴다.
+4. Check frequency는 **1 minute**로 한다. Regions는 아시아 지역이 포함되게 고른다(전 지역 선택도 가능).
+5. Response Validation에서 응답 코드 **200**만 성공으로 보게 둔다(DB가 죽으면 503이라 실패로 잡힌다). 본문 검사를 하려면 "contains" `UP`을 추가한다.
+6. 다음 단계 **Alert & notification**에서 알림 정책을 만들고 알림 채널로 **Email**(내 이메일)을 추가한다. 폰 푸시를 원하면 Google Cloud 모바일 앱을 깔고 채널로 연결한다.
+7. 만든 뒤 체크 상태가 초록(통과)인지 본다. 알림이 가는지 보려면 VM에서 `docker compose -f docker-compose.prod.yml stop backend` 후 몇 분 기다렸다가 `start backend`로 되돌려 본다.
+
+참고: 도메인·인증서·프록시·백엔드·DB가 한 번에 감시된다. 배포(빌드 중 몇 분)나 재시작 때는 잠깐 알림이 올 수 있다. 무료 한도·요금은 가입 전 공식 가격 페이지에서 확인한다(업타임 체크 1개는 무료 한도 안이라고 알고 있으나 확인하지 못했다). 대안: UptimeRobot(무료 5분 간격), Better Stack(약 3분)도 같은 주소(`/actuator/health`)를 넣으면 된다.
 
 ## 2. 오류 확인 (VM에서)
 
