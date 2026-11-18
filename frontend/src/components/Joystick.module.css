@@ -8,7 +8,7 @@
   height: 112px;
   border-radius: 50%;
   background-color: rgba(255, 255, 255, 0.55);
-  border: 2px solid var(--color-border);
+  border: 2px solid rgba(78, 139, 95, 0.35); /* 연한 초록 테두리. 다크 모드의 어두운 테두리 색을 쓰지 않는다 */
   touch-action: none; /* 끄는 동안 페이지가 스크롤·확대되지 않게 */
   user-select: none;
   -webkit-user-select: none;
