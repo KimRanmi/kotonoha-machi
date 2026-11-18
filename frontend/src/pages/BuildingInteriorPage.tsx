@@ -4,6 +4,7 @@ import { ApiError } from '../api/client';
 import { getAvatarOptions, getProfile, type Avatar } from '../api/user';
 import { getVillageBuildings, type VillageBuilding } from '../api/village';
 import InteriorScene from '../components/InteriorScene';
+import Joystick from '../components/Joystick';
 import ResidentChatModal from '../components/ResidentChatModal';
 import { avatarFromProfile, buildAvatarPalette, type AvatarPalette } from '../lib/avatarPreview';
 import { getBuildingInterior } from '../lib/buildingInteriors';
@@ -120,6 +121,7 @@ function BuildingInteriorPage() {
           {nearResident.name}と話す (Enter)
         </button>
       )}
+      {!chatResident && <Joystick />}
       {chatResident && (
         <ResidentChatModal
           residentSlug={chatResident.slug}
