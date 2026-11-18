@@ -20,9 +20,12 @@ DB 연결이 끊기면 HTTP 503 `{"status":"DOWN"}`이 된다(서버는 떠 있�
 2. **Create Uptime Check**를 누른다.
 3. Protocol **HTTPS**, Resource Type **URL**, Hostname `<DOMAIN>`(https:// 없이), Path `/actuator/health`로 쓴다.
 4. Check frequency는 **1 minute**로 한다. Regions는 아시아 지역이 포함되게 고른다(전 지역 선택도 가능).
-5. Response Validation에서 응답 코드 **200**만 성공으로 보게 둔다(DB가 죽으면 503이라 실패로 잡힌다). 본문 검사를 하려면 "contains" `UP`을 추가한다.
+5. Response Validation에서 **Content matching을 켜고 필수로 설정한다**: Match Type `Contains`, Response Content `"status":"UP"`. 응답 코드는 2XX만 성공으로 둔다(DB가 죽으면 503이라 실패로 잡힌다).
+   - 이유: Caddy는 백엔드 목록에 없는 경로를 프런트 `index.html`로 200 응답한다. 코드만 보면 백엔드·헬스체크가 없거나 죽어도 초록으로 보이는 오탐이 난다(실제로 배포 전에 초록이 떴다). `"status":"UP"`은 백엔드 헬스체크 응답에만 있다.
 6. 다음 단계 **Alert & notification**에서 알림 정책을 만들고 알림 채널로 **Email**(내 이메일)을 추가한다. 폰 푸시를 원하면 Google Cloud 모바일 앱을 깔고 채널로 연결한다.
 7. 만든 뒤 체크 상태가 초록(통과)인지 본다. 알림이 가는지 보려면 VM에서 `docker compose -f docker-compose.prod.yml stop backend` 후 몇 분 기다렸다가 `start backend`로 되돌려 본다.
+
+프런트용 체크(선택): 백엔드는 정상인데 프런트 파일만 깨진 경우(흰 화면)는 위 체크가 못 잡는다. 필요하면 체크를 하나 더 만들고 Path만 `/`로 한다. 자동 배포가 빌드 실패 시 멈추므로 지금은 만들지 않아도 된다.
 
 참고: 도메인·인증서·프록시·백엔드·DB가 한 번에 감시된다. 배포(빌드 중 몇 분)나 재시작 때는 잠깐 알림이 올 수 있다. 무료 한도·요금은 가입 전 공식 가격 페이지에서 확인한다(업타임 체크 1개는 무료 한도 안이라고 알고 있으나 확인하지 못했다). 대안: UptimeRobot(무료 5분 간격), Better Stack(약 3분)도 같은 주소(`/actuator/health`)를 넣으면 된다.
 
@@ -39,6 +42,22 @@ docker compose -f docker-compose.prod.yml ps                               # 컨
 - 처리하지 못한 예외는 `GlobalExceptionHandler`가 `예상하지 못한 오류가 발생했습니다.` + 스택 트레이스로 `ERROR`에 남긴다. 사용자에게는 일반 오류 응답(500)만 나간다.
 - Gemini·TTS·메일 실패는 각각 `Gemini 호출 실패`, `Google TTS 호출 실패`, `이메일 발송 실패`로 남는다.
 - 로그가 쌓여 디스크가 차지 않게 docker 로그 로테이션(기본 json-file은 무제한)을 쓰고 싶다면 별도로 설정한다(아직 하지 않음).
+
+### 알림이 왔을 때 대응
+
+- 구조: 외부 요청은 모두 Caddy(`web` 컨테이너)를 먼저 거친다. `/api/*`·`/oauth2/*`·`/login/oauth2/*`·`/actuator/health`만 백엔드로 가고 나머지는 프런트 파일이다. 백엔드(8080)·DB는 외부에 포트가 열려 있지 않다.
+- 자동 복구: `web`·`backend`·`db` 모두 `restart: unless-stopped`라 프로세스가 죽으면 Docker가 다시 띄운다. 짧은 Down은 곧 초록으로 돌아온다(VM 재부팅 후에도 Docker가 자동 시작되어야 하며, 이는 VM에서 확인하지 못했다).
+- 계속 안 살아나면 VM에 SSH로 들어가 확인한다.
+
+```bash
+docker compose -f docker-compose.prod.yml ps                       # Restarting/Exited 컨테이너 확인
+docker compose -f docker-compose.prod.yml logs --tail 100 web      # Caddy 원인(DOMAIN 오류, 인증서 발급 실패, Caddyfile 문법)
+docker compose -f docker-compose.prod.yml logs --tail 100 backend  # 백엔드·DB 원인
+docker compose -f docker-compose.prod.yml up -d web                # 원인을 고친 뒤 다시 올리기
+```
+
+- Caddy가 죽으면 사이트 전체(프런트·백엔드)가 안 열려 체크 하나로 전체 장애처럼 보인다. Caddy 문제인지 백엔드 문제인지는 `ps`와 `logs`로 구분한다.
+- 방금 한 배포 때문이면 해당 변경을 되돌려 다시 배포한다. VM 자체가 꺼진 경우는 GCP 콘솔에서 VM을 시작한다.
 
 ### 로그에 민감한 정보가 남는지 점검한 결과
 
