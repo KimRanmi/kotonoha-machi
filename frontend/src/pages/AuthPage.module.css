@@ -1,9 +1,23 @@
+/* 로그인·가입 화면은 다크 모드여도 항상 흰 배경으로 보이게, 라이트 색 변수를 이 화면 안에서만 다시 지정한다. */
 .page {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-text: #243126;
+  --color-text-muted: #6b7a68;
+  --color-primary: #4e8b5f;
+  --color-primary-hover: #3d7350;
+  --color-border: #e0e8d5;
+  --color-error: #c0392b;
+  --color-success: #3f7d4f;
+  --shadow-md: 0 4px 16px rgba(36, 49, 38, 0.12);
+  color: var(--color-text);
+
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   padding: var(--space-5);
+  background-color: var(--color-bg);
 }
 
 .card {
