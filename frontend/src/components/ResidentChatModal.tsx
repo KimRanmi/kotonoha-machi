@@ -499,7 +499,7 @@ function ResidentChatModal({
             )}
             {lessonRequired !== null && !isLessonLocked && (
               <form className={styles.form} onSubmit={handleSubmit}>
-                <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
+                <JapaneseInput value={text} onChange={setText} />
                 <div className={styles.formActions}>
                   <button
                     type="button"
