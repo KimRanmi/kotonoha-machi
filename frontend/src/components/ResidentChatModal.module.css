@@ -3,10 +3,9 @@
   inset: 0;
   z-index: 10;
   display: flex;
-  align-items: center;
+  align-items: flex-end; /* 모바일: 화면 아래에서 올라오는 시트 */
   justify-content: center;
-  padding: var(--space-4);
-  background-color: rgba(59, 47, 42, 0.45);
+  background-color: rgba(36, 49, 38, 0.45);
 }
 
 .modal {
@@ -14,13 +13,26 @@
   flex-direction: column;
   gap: var(--space-3);
   width: 100%;
-  max-width: 420px;
-  max-height: 80vh;
+  max-width: 480px;
+  max-height: 90vh;
+  max-height: 90dvh;
   padding: var(--space-4);
-  border-radius: var(--radius-lg);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-radius: 24px 24px 0 0;
   background-color: var(--color-surface);
   color: var(--color-text);
   box-shadow: var(--shadow-md);
+}
+
+/* 넓은 화면: 가운데 팝업 */
+@media (min-width: 600px) {
+  .backdrop {
+    align-items: center;
+    padding: var(--space-4);
+  }
+  .modal {
+    border-radius: var(--radius-lg);
+  }
 }
 
 .header {
@@ -65,7 +77,14 @@
 }
 
 .closeButton {
-  padding: var(--space-1) var(--space-2);
+  width: var(--tap-size);
+  padding: 0;
+  color: var(--color-text-muted);
+  background-color: var(--color-bg);
+  border-radius: 999px;
+}
+.closeButton:hover:not(:disabled) {
+  background-color: var(--color-border);
 }
 
 .lines {
@@ -80,7 +99,49 @@
 }
 
 .line {
+  max-width: 82%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 18px;
   line-height: 1.5;
+  font-size: 1rem;
+}
+.lineResident {
+  align-self: flex-start;
+  background-color: var(--color-bg);
+  border-bottom-left-radius: 6px;
+}
+.lineMe {
+  align-self: flex-end;
+  color: var(--color-on-primary);
+  background-color: var(--color-primary);
+  border-bottom-right-radius: 6px;
+}
+.lineMe .translation {
+  color: var(--color-on-primary);
+  opacity: 0.8;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.form > div {
+  max-width: none;
+}
+.formActions {
+  display: flex;
+  gap: var(--space-2);
+}
+.voiceButton {
+  color: var(--color-text);
+  background-color: var(--color-bg);
+}
+.voiceButton:hover:not(:disabled) {
+  background-color: var(--color-border);
+}
+.sendButton {
+  flex: 1;
 }
 
 /* 하루 대화 상한에 걸렸을 때 주민이 졸려하는 안내. 오류 줄과 달리 부드러운 색으로 보인다. */
@@ -98,8 +159,14 @@
 }
 
 .pastButton {
-  padding: var(--space-1) var(--space-2);
-  font-size: 0.85rem;
+  padding: 0 var(--space-3);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  margin-right: var(--space-2);
+}
+.pastButton:hover:not(:disabled) {
+  background-color: var(--color-border);
 }
 
 .dayList {

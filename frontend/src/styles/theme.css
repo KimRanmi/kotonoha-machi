@@ -1,17 +1,21 @@
 /* 앱 전체에서 쓰는 디자인 토큰(색/폰트/간격/모양). 컴포넌트 CSS는 여기 정의한 변수만 쓴다. */
 :root {
-  --color-bg: #faf6f0;
+  --color-bg: #f2f6ec;
   --color-surface: #ffffff;
-  --color-text: #3b2f2a;
-  --color-text-muted: #8a7c73;
-  --color-primary: #c7652a;
-  --color-primary-hover: #a84f1d;
-  --color-border: #e4dcd3;
+  --color-text: #243126;
+  --color-text-muted: #6b7a68;
+  --color-primary: #4e8b5f;
+  --color-primary-hover: #3d7350;
+  --color-on-primary: #ffffff; /* 주색 배경 위 글자색 */
+  --color-border: #e0e8d5;
   --color-error: #c0392b;
   --color-success: #3f7d4f;
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+    Pretendard, -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Apple SD Gothic Neo',
+    'Malgun Gothic', system-ui, sans-serif;
+  --font-display: 'Zen Maru Gothic', var(--font-sans);
+  --tap-size: 44px;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -24,19 +28,20 @@
   --radius-md: 10px;
   --radius-lg: 16px;
 
-  --shadow-sm: 0 1px 3px rgba(59, 47, 42, 0.08);
-  --shadow-md: 0 4px 16px rgba(59, 47, 42, 0.1);
+  --shadow-sm: 0 1px 3px rgba(36, 49, 38, 0.08);
+  --shadow-md: 0 4px 16px rgba(36, 49, 38, 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #1f1b18;
-    --color-surface: #2a2420;
-    --color-text: #f0e9e2;
-    --color-text-muted: #b5a99d;
-    --color-primary: #e8824a;
-    --color-primary-hover: #f29660;
-    --color-border: #3d342c;
+    --color-bg: #161d17;
+    --color-surface: #1f2a21;
+    --color-text: #e9f1e6;
+    --color-text-muted: #a3b4a0;
+    --color-primary: #6fb383;
+    --color-primary-hover: #86c598;
+    --color-on-primary: #10201a;
+    --color-border: #2f3d31;
     --color-error: #e57373;
     --color-success: #6fbf86;
 

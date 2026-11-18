@@ -1,0 +1,14 @@
+.logo {
+  display: inline-flex;
+  flex: none; /* 헤더가 좁아져도 로고가 줄어들어 글자가 접히지 않게 한다 */
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.text {
+  font-size: 1.0625rem;
+}

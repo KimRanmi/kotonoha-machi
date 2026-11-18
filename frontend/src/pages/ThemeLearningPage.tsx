@@ -501,7 +501,7 @@ function ThemeLearningPage() {
                       className={styles.unknownButton}
                       onClick={handleShowReadingHint}
                     >
-                      分からない 🥺
+                      모르겠어요 🥺
                     </button>
                   )}
                   {isReadingHintShown && feedback !== 'correct' && (
@@ -527,7 +527,7 @@ function ThemeLearningPage() {
                     disabled={!speechSupported || isListening || feedback === 'correct'}
                     onClick={handleStartListening}
                   >
-                    {isListening ? '듣고 있어요…' : '🎤 말하기'}
+                    {isListening ? '듣고 있어요…' : '말하기'}
                   </button>
                   {isListening && (
                     <button

@@ -17,7 +17,7 @@
 .backLink {
   align-self: flex-start;
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .backLink:hover {
   color: var(--color-primary);
@@ -39,7 +39,7 @@
 .step {
   padding: var(--space-1) var(--space-4);
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--color-text-muted);
   background-color: var(--color-border);
@@ -100,7 +100,7 @@
 .levelBadge {
   padding: 0 var(--space-2);
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--color-surface);
   background-color: var(--color-primary);
@@ -130,6 +130,9 @@
   text-align: left;
 }
 .optionButton:hover:not(:disabled) {
+  background-color: var(
+    --color-bg
+  ); /* 전역 버튼 hover(진한 색)가 글자를 가리지 않게 밝은 배경으로 */
   border-color: var(--color-primary);
 }
 .optionButton:disabled {
@@ -179,7 +182,7 @@
   background-color: transparent;
   border: 1px solid var(--color-primary);
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 .unknownButton {
@@ -258,9 +261,11 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  width: 100%;
 }
 
 .nextButton {
+  width: 100%; /* 카드와 같은 폭으로 맞춘다 */
   height: 48px;
   padding: 0 var(--space-6);
   display: inline-flex;
@@ -313,7 +318,22 @@
 
 .sourceNote {
   margin: 12px 0 0;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   color: #6b7280;
   word-break: break-all;
+}
+
+/* 좁은 화면(모바일): 여백과 카드 안쪽 여백을 줄여 본문 폭을 확보한다. */
+@media (max-width: 480px) {
+  .page {
+    padding: var(--space-4);
+  }
+  .card {
+    padding: var(--space-4);
+  }
+  .backLink,
+  .step,
+  .completedNotice {
+    font-size: 0.875rem;
+  }
 }

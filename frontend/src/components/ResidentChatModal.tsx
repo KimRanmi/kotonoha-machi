@@ -451,8 +451,10 @@ function ResidentChatModal({
             {pastErrorMessage && <p role="alert">{pastErrorMessage}</p>}
             <ul className={styles.lines}>
               {dayLines.map((line, index) => (
-                <li key={index} className={styles.line}>
-                  <strong>{line.speaker === 'me' ? '나' : residentName}</strong>:{' '}
+                <li
+                  key={index}
+                  className={`${styles.line} ${line.speaker === 'me' ? styles.lineMe : styles.lineResident}`}
+                >
                   <span data-jp>{line.text}</span>
                   {line.translation && <div className={styles.translation}>{line.translation}</div>}
                 </li>
@@ -464,8 +466,10 @@ function ResidentChatModal({
           <>
             <ul className={styles.lines} aria-live="polite">
               {lines.map((line, index) => (
-                <li key={index} className={styles.line}>
-                  <strong>{line.speaker === 'me' ? '나' : residentName}</strong>:{' '}
+                <li
+                  key={index}
+                  className={`${styles.line} ${line.speaker === 'me' ? styles.lineMe : styles.lineResident}`}
+                >
                   <span data-jp>{line.text}</span>
                   {line.translation && <div className={styles.translation}>{line.translation}</div>}
                 </li>
@@ -494,21 +498,25 @@ function ResidentChatModal({
               </p>
             )}
             {lessonRequired !== null && !isLessonLocked && (
-              <form onSubmit={handleSubmit}>
-                <JapaneseInput value={text} onChange={setText} placeholder="romaji → かな" />
-                <button
-                  type="button"
-                  onClick={isListening ? cancelSpeechRecognition : handleVoiceInput}
-                  disabled={!speechSupported || isSending}
-                >
-                  {isListening ? '✕ 듣기 취소' : '🎤 말하기'}
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSending || !text.trim() || text.length > MAX_MESSAGE_LENGTH}
-                >
-                  {isSending ? '답장을 기다리는 중…' : '보내기'}
-                </button>
+              <form className={styles.form} onSubmit={handleSubmit}>
+                <JapaneseInput value={text} onChange={setText} />
+                <div className={styles.formActions}>
+                  <button
+                    type="button"
+                    className={styles.voiceButton}
+                    onClick={isListening ? cancelSpeechRecognition : handleVoiceInput}
+                    disabled={!speechSupported || isSending}
+                  >
+                    {isListening ? '✕ 듣기 취소' : '말하기'}
+                  </button>
+                  <button
+                    type="submit"
+                    className={styles.sendButton}
+                    disabled={isSending || !text.trim() || text.length > MAX_MESSAGE_LENGTH}
+                  >
+                    {isSending ? '답장을 기다리는 중…' : '보내기'}
+                  </button>
+                </div>
               </form>
             )}
           </>

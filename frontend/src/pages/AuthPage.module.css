@@ -1,9 +1,23 @@
+/* 로그인·가입 화면은 다크 모드여도 항상 흰 배경으로 보이게, 라이트 색 변수를 이 화면 안에서만 다시 지정한다. */
 .page {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-text: #243126;
+  --color-text-muted: #6b7a68;
+  --color-primary: #4e8b5f;
+  --color-primary-hover: #3d7350;
+  --color-border: #e0e8d5;
+  --color-error: #c0392b;
+  --color-success: #3f7d4f;
+  --shadow-md: 0 4px 16px rgba(36, 49, 38, 0.12);
+  color: var(--color-text);
+
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   padding: var(--space-5);
+  background-color: var(--color-bg);
 }
 
 .card {
@@ -15,11 +29,26 @@
   box-shadow: var(--shadow-md);
 }
 
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
+  font-size: 1.25rem;
+}
+
+.tagline {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
 .backLink {
   display: inline-block;
   margin-bottom: var(--space-4);
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .backLink:hover {
   color: var(--color-primary);
@@ -38,7 +67,7 @@
 .hint {
   display: block;
   margin-top: var(--space-1);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .hint[data-tone='muted'] {
   color: var(--color-text-muted);
@@ -90,7 +119,7 @@
   align-items: center;
   margin: var(--space-5) 0;
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .divider::before,
 .divider::after {
@@ -111,7 +140,11 @@
 
 .socialButton {
   box-sizing: border-box;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-size);
   width: 100%;
   padding: var(--space-2) var(--space-4);
   font-size: 1rem;
@@ -140,4 +173,14 @@
 .socialButton[data-provider='naver'] {
   color: #fff;
   background-color: #03c75a;
+}
+
+/* 좁은 화면(모바일): 바깥·카드 여백을 줄인다. */
+@media (max-width: 480px) {
+  .page {
+    padding: var(--space-3);
+  }
+  .card {
+    padding: var(--space-5) var(--space-4);
+  }
 }
