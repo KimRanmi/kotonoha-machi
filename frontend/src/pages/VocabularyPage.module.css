@@ -17,7 +17,7 @@
 .backLink {
   align-self: flex-start;
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .backLink:hover {
   color: var(--color-primary);
@@ -72,7 +72,7 @@
 }
 
 .reading {
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   color: var(--color-text-muted);
 }
 
@@ -83,6 +83,13 @@
 }
 
 .level {
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   color: var(--color-primary);
+}
+
+/* 좁은 화면(모바일): 바깥 여백을 줄여 본문 폭을 확보한다. */
+@media (max-width: 480px) {
+  .page {
+    padding: var(--space-4);
+  }
 }

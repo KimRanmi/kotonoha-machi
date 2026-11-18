@@ -19,7 +19,7 @@
   display: inline-block;
   margin-bottom: var(--space-4);
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .backLink:hover {
   color: var(--color-primary);
@@ -37,7 +37,7 @@
 .hint {
   display: block;
   margin-top: var(--space-1);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .hint[data-tone='muted'] {
   color: var(--color-text-muted);
@@ -99,7 +99,7 @@
 .axisLabel {
   flex: none;
   width: 70px;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   color: var(--color-text-muted);
 }
 
@@ -152,4 +152,14 @@
   font-size: 0.85rem;
   font-weight: 500;
   text-align: center;
+}
+
+/* 좁은 화면(모바일): 바깥·카드 여백을 줄인다. */
+@media (max-width: 480px) {
+  .page {
+    padding: var(--space-3);
+  }
+  .card {
+    padding: var(--space-5) var(--space-4);
+  }
 }

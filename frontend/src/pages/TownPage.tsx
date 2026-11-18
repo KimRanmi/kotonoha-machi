@@ -14,6 +14,7 @@ import {
 } from '../api/village';
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
+import Logo from '../components/Logo';
 import ResidentChatModal from '../components/ResidentChatModal';
 import VillageScene from '../components/VillageScene';
 import { useFriendships } from '../hooks/useFriendships';
@@ -42,11 +43,36 @@ function TownPage() {
   const [avatar, setAvatar] = useState<Avatar | null>(null);
   const [palette, setPalette] = useState<AvatarPalette | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // 헤더의 사람 버튼으로 여닫는 메뉴. 메뉴 밖을 누르거나 Esc를 누르면 닫힌다.
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [logoutErrorMessage, setLogoutErrorMessage] = useState<string | null>(null);
   const [todayTheme, setTodayTheme] = useState<Theme | null>(null);
   // 마지막 위치를 받아 오기 전에는 마을을 그리지 않는다. 그려 버리면 기본 위치에서 시작했다가 순간이동하게 된다.
   const [positionLoaded, setPositionLoaded] = useState(false);
   const [initialPosition, setInitialPosition] = useState<VillagePosition | null>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+    function handlePointerDown(event: PointerEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMenuOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,15 +242,15 @@ function TownPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <span className={styles.logo}>ことばのまち</span>
-        <div className={styles.headerActions}>
-          <Link to="/profile?tab=account" className={styles.nicknameLink}>
-            {nickname ? `${nickname} 님` : '프로필'}
-          </Link>
-          <Link
-            to="/profile?tab=character"
+        <Logo />
+        <div className={styles.menuWrap} ref={menuRef}>
+          <button
+            type="button"
             className={styles.avatarButton}
-            aria-label="캐릭터 설정"
+            aria-label="메뉴"
+            aria-haspopup="menu"
+            aria-expanded={isMenuOpen}
+            onClick={() => setIsMenuOpen((open) => !open)}
           >
             {avatar && palette ? (
               <AvatarPreview
@@ -234,53 +260,41 @@ function TownPage() {
                 className={styles.avatarThumb}
               />
             ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="8" r="3.4" stroke="currentColor" strokeWidth="1.6" />
                 <path d="M5 20c0-3.9 3.1-6 7-6s7 2.1 7 6" stroke="currentColor" strokeWidth="1.6" />
               </svg>
             )}
-          </Link>
-          <Link
-            to="/town/themes"
-            className={styles.iconButton}
-            aria-label="완료한 학습"
-            title="완료한 학습"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
-              <path
-                d="M8.5 12.3l2.4 2.4 4.6-5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </Link>
-          <Link to="/vocabulary" className={styles.iconButton} aria-label="학습 단어장">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M4 4h12a2 2 0 0 1 2 2v14l-8-3-8 3V6a2 2 0 0 1 2-2z"
-                stroke="currentColor"
-                strokeWidth="1.6"
-              />
-            </svg>
-          </Link>
-          <button
-            type="button"
-            className={styles.iconButton}
-            aria-label="주민 목록"
-            title="준비 중입니다"
-            disabled
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="8" r="3.4" stroke="currentColor" strokeWidth="1.6" />
-              <path d="M5 20c0-3.9 3.1-6 7-6s7 2.1 7 6" stroke="currentColor" strokeWidth="1.6" />
-            </svg>
           </button>
-          <button type="button" onClick={handleLogout} disabled={isLoggingOut}>
-            로그아웃
-          </button>
+          {isMenuOpen && (
+            <div className={styles.menu} role="menu">
+              <Link
+                to="/profile?tab=account"
+                className={`${styles.menuItem} ${styles.menuNickname}`}
+                role="menuitem"
+              >
+                {nickname ? `${nickname} 님` : '프로필'}
+              </Link>
+              <Link to="/profile?tab=character" className={styles.menuItem} role="menuitem">
+                캐릭터 설정
+              </Link>
+              <Link to="/town/themes" className={styles.menuItem} role="menuitem">
+                완료한 학습
+              </Link>
+              <Link to="/vocabulary" className={styles.menuItem} role="menuitem">
+                학습 단어장
+              </Link>
+              <button
+                type="button"
+                className={`${styles.menuItem} ${styles.menuLogout}`}
+                role="menuitem"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+              >
+                로그아웃
+              </button>
+            </div>
+          )}
         </div>
       </header>
       {todayTheme && (
