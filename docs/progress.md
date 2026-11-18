@@ -1091,3 +1091,10 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 검증: `docker compose -f docker-compose.prod.yml config` 통과. `DOMAIN=localhost`로 실제 기동: Flyway V51 적용, `https://localhost` 프런트·SPA 경로 200, HTTP→HTTPS 308, `/api` 프록시 동작, 로그인 후 `Set-Cookie: Secure; HttpOnly; SameSite=Lax`와 `/api/auth/me` 200, 소셜 `redirect_uri=https://localhost/...`, 빌드된 번들에 `localhost:8080` 없음, 5432 외부 비노출. 확인 후 `down -v`로 정리.
   - 확인 못 한 것: 실제 GCP VM·도메인·Let's Encrypt 발급, 가입 메일(로컬 Resend 발송 실패로 사용자는 DB에 직접 넣어 로그인 확인), 대화·TTS·마이크, 이 구성에서 브라우저 화면.
   - 다음: 도메인 결정 → VM 생성 → `docs/deploy.md` 순서대로 배포 → 체크리스트 확인 → Gemini 결제 연결.
+
+## 2026-11-18 (iPhone Safari에서 주민 목소리가 안 나는 문제)
+
+- 원인 추정: iOS Safari는 사용자가 화면을 누른 순간에 시작한 오디오만 소리를 허용한다. 서버 음성은 응답을 기다린 뒤 새 `Audio`로 재생해서, 그때는 이미 누른 순간이 지나 차단되고 브라우저 음성 대체도 같은 제한에 걸린다.
+- 고침: `speechSynthesis.ts`가 재생용 `Audio`를 하나 재사용하고, 화면을 처음 누를 때(click/touchend) 무음을 한 번 재생해 잠금을 푼다(브라우저 음성도 빈 발화로 해제). 이후에는 같은 요소의 주소만 바꿔 재생한다. 새 라이브러리 없음.
+  - 검증: 프런트 prettier·eslint(해당 파일)·tsc·build 통과.
+  - 확인 못 한 것: 실제 iPhone Safari에서의 재생(배포 후 직접 확인 필요). 원인은 코드 읽기로 추정한 것이다.
