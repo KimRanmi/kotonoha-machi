@@ -1,0 +1,36 @@
+/* 터치 기기(손가락)에서만 보이는 이동 조이스틱. 마우스만 있는 기기에서는 키보드로 움직인다. */
+.base {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .base {
+    position: fixed;
+    left: calc(var(--space-5) + env(safe-area-inset-left));
+    bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+    z-index: 2;
+    display: block;
+    width: 112px;
+    height: 112px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.55);
+    border: 2px solid var(--color-border);
+    touch-action: none; /* 끄는 동안 페이지가 스크롤·확대되지 않게 */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  .knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 48px;
+    height: 48px;
+    margin: -24px 0 0 -24px;
+    border-radius: 50%;
+    background-color: var(--color-primary);
+    opacity: 0.85;
+    pointer-events: none;
+  }
+}

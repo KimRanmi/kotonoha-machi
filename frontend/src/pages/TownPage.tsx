@@ -15,6 +15,7 @@ import {
 import { ApiError } from '../api/client';
 import AvatarPreview from '../components/AvatarPreview';
 import Logo from '../components/Logo';
+import Joystick from '../components/Joystick';
 import ResidentChatModal from '../components/ResidentChatModal';
 import VillageScene from '../components/VillageScene';
 import { useFriendships } from '../hooks/useFriendships';
@@ -330,6 +331,7 @@ function TownPage() {
           {nearResident.name}と話す (Enter)
         </button>
       )}
+      {!chatResident && <Joystick />}
       {chatResident && (
         <ResidentChatModal
           residentSlug={chatResident.slug}

@@ -16,6 +16,7 @@ import {
   disposeResidentModel,
   type ResidentModel,
 } from '../lib/sceneCommon';
+import { touchMove } from '../lib/touchMove';
 import { collidesWithBuildings, findDoorAt } from '../lib/villageBuildings';
 import { collidesWithResidents, placeResidents } from '../lib/villageResidents';
 import { collidesWithTrees, createVillageLayout } from '../lib/villageScenery';
@@ -262,6 +263,8 @@ function VillageScene({
         dx += KEY_DIRECTIONS[code][0];
         dz += KEY_DIRECTIONS[code][1];
       }
+      dx += touchMove.x; // 화면 조이스틱(터치 기기)
+      dz += touchMove.z;
       const length = Math.hypot(dx, dz);
       if (length > 0) {
         dx /= length;

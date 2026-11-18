@@ -25,6 +25,7 @@ import {
   disposeResidentModel,
   type ResidentModel,
 } from '../lib/sceneCommon';
+import { touchMove } from '../lib/touchMove';
 import { PLAYER_RADIUS } from '../lib/villageBuildings';
 import { RESIDENT_RADIUS, type VillageResident } from '../lib/villageResidents';
 import styles from './InteriorScene.module.css';
@@ -194,6 +195,8 @@ function InteriorScene({
         dx += KEY_DIRECTIONS[code][0];
         dz += KEY_DIRECTIONS[code][1];
       }
+      dx += touchMove.x; // 화면 조이스틱(터치 기기)
+      dz += touchMove.z;
       const length = Math.hypot(dx, dz);
       if (length > 0) {
         dx /= length;
