@@ -9,9 +9,21 @@
 		reverse_proxy backend:8080
 	}
 
+	# 빌드 결과물(/assets/*)은 파일명에 내용 해시가 들어 있다(index-XXXX.js).
+	# 있으면 1년 캐시, 없으면 index.html로 돌리지 않고 404를 준다.
+	# (배포 후 사라진 옛 해시 파일 요청에 HTML이 200으로 내려가면 브라우저가 "MIME type text/html" 오류로 흰 화면이 된다.)
+	handle /assets/* {
+		root * /srv
+		@exists file {path}
+		header @exists Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
 	# 나머지는 정적 파일. 없는 경로(React Router 화면)는 index.html로 돌려준다.
+	# no-cache = 캐시하되 매번 서버에 최신 여부를 확인한다(변경 없으면 304). 배포 직후 옛 index.html이 남지 않게 한다.
 	handle {
 		root * /srv
+		header Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
 	}

@@ -1198,3 +1198,10 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
 - 기능을 발견하기 어렵다는 점을 보완했다: 대화창 위에 "일본어를 드래그(또는 길게 눌러)하면 단어장에 저장할 수 있어요" 안내를 두고(닫으면 `localStorage`에 기억), 단어장 빈 화면에도 같은 안내를 덧붙였다.
   - 검증: prettier·`npm run lint`(경고 2건은 기존 ref 경고)·`npm run build` 통과.
   - 확인 못 한 것: 실제 휴대폰에서 길게 눌러 고르기. 터치 선택 시 브라우저 기본 메뉴(복사 등)와 저장 버튼이 겹치는지, iOS/Android별 `selectionchange` 동작은 실기기 확인이 필요하다.
+
+## 2026-11-19 (배포 직후 흰 화면 방지: 캐시 헤더)
+
+- 원인: Caddy가 없는 경로를 전부 `index.html`로 돌려줘서, 옛 `index.html`을 캐시한 브라우저가 배포로 사라진 `/assets/index-옛해시.js`를 요청하면 HTML이 200으로 내려가 흰 화면이 됐다(`/`에는 Cache-Control도 없었다).
+- `frontend/Caddyfile`: `/assets/*`는 폴백 없이 파일이 없으면 404, 있으면 `public, max-age=31536000, immutable`(빌드 파일명에 해시가 있음을 확인). 나머지(`/`, SPA 경로, favicon 등)는 `no-cache`(etag로 재확인, 변경 없으면 304). 프록시 경로·gzip·`DOMAIN`은 그대로. `docs/deploy.md` 문제 해결에 흰 화면 시 강력 새로고침 안내를 추가했다.
+- 검증: 운영 Dockerfile로 이미지를 빌드해 `DOMAIN=localhost`로 띄우고 `curl -k -I` 확인 — `/`·`/login`·`/town` 200 + no-cache, 실제 `/assets/*.js`는 text/javascript + immutable(css도 동일), 없는 `/assets/*.js`는 404, `/actuator/health`는 프록시(스텁 백엔드)로 200. `docker compose -f docker-compose.prod.yml config`는 임시 빈 `backend/.env`와 환경변수로 통과.
+- 확인 못 한 것: 실제 백엔드와 붙인 로그인 쿠키·`/oauth2/authorization/google` 302(이번엔 스텁 백엔드만 사용, 프록시 경로 규칙은 코드 변경이 없고 `/api/*`가 백엔드로 넘어가는 것만 확인). 운영 서버 실제 동작은 머지·자동 배포 후 확인 필요.
