@@ -41,6 +41,12 @@ public class GeminiClient {
   /** 요약 메모 길이 상한(글자 수). 프롬프트에서 줄여 달라고 하고, 넘치면 코드에서 자른다. */
   static final int MAX_SUMMARY_LENGTH = 600;
 
+  /** Gemini 응답의 reply에 한글이 섞였을 때 시스템 프롬프트 끝에 덧붙이는 강한 재지시. */
+  private static final String JAPANESE_ONLY_REMINDER = "\n\n[Reminder]\n"
+      + "바로 앞 응답의 reply에 한글이 섞였습니다. reply는 히라가나·가타카나·한자만 쓴 일본어 대사여야 하며,"
+      + " 한글은 한 글자도 넣지 않습니다.\n"
+      + "한국어는 translation에만 씁니다. 이번에는 두 키를 가진 JSON만 출력합니다.";
+
   // 대화 내용 안의 지시문이 요약에 섞여 이후 대화를 조종하지 못하게 "사실만 기록"하게 한다.
   private static final String SUMMARY_PROMPT =
       """
@@ -102,7 +108,8 @@ public class GeminiClient {
   }
 
   /**
-   * 시스템 프롬프트, 최근 대화, 사용자 메시지로 주민의 대사(일본어)와 한국어 번역을 받는다.
+   * 시스템 프롬프트, 최근 대화, 사용자 메시지로 주민의 대사(일본어)와 한국어 번역을 받는다. reply에 한글이 섞여 오면 강한
+   * 재지시를 붙여 한 번 더 요청한다.
    *
    * @param systemPrompt 캐릭터 설정(과 요약 메모)이 담긴 시스템 프롬프트
    * @param recentLines 최근 대화(오래된 것이 먼저, 없으면 빈 목록)
@@ -113,24 +120,75 @@ public class GeminiClient {
    */
   public ChatResponse generate(
       String systemPrompt, List<ChatHistoryItem> recentLines, String userMessage, Long userId) {
-    Schema schema = Schema.builder()
-        .type(Type.Known.OBJECT)
-        .properties(Map.of(
-            "reply", Schema.builder().type(Type.Known.STRING).build(),
-            "translation", Schema.builder().type(Type.Known.STRING).build()))
-        .required("reply", "translation")
-        .build();
-    GenerateContentConfig config = GenerateContentConfig.builder()
+    List<Content> contents = buildContents(recentLines, userMessage);
+    ChatResponse reply =
+        parseReply(call(contents, chatConfig(systemPrompt), AiCallType.CHAT, userId));
+    if (!containsHangul(reply.reply())) {
+      return reply;
+    }
+    // 주민이 일본어 대사 자리에 한국어를 써 보내는 일이 있다. 한 번만 더 강하게 지시해 다시 받는다.
+    log.warn("Gemini 응답의 reply에 한글이 섞여 한 번 더 요청합니다.");
+    ChatResponse retried = parseReply(
+        call(contents, chatConfig(systemPrompt + JAPANESE_ONLY_REMINDER), AiCallType.CHAT, userId));
+    if (containsHangul(retried.reply())) {
+      // 재시도에도 한글이 남아도 대화를 끊지는 않는다. 플레이어 이름처럼 한글로만 적히는 고유명사가 섞일 수 있어 실패로
+      // 보지 않고, 일본어 대사 자리에 한국어가 보이는 경우를 찾을 수 있게 경고만 남긴다.
+      log.warn("재시도에도 reply에 한글이 섞여 있습니다. 받은 대사를 그대로 쓴다.");
+    }
+    return retried;
+  }
+
+  /**
+   * 대사 응답을 받을 때 쓰는 설정. 재시도 때 시스템 프롬프트만 바꿔 다시 만들 수 있게 따로 빼 두었다.
+   *
+   * @param systemPrompt 캐릭터 설정이 담긴 시스템 프롬프트
+   * @return 두 키(reply·translation)를 강제하는 JSON 스키마를 붙인 설정
+   */
+  private static GenerateContentConfig chatConfig(String systemPrompt) {
+    return GenerateContentConfig.builder()
         .systemInstruction(Content.fromParts(Part.fromText(systemPrompt)))
         .responseMimeType("application/json")
         .maxOutputTokens(MAX_OUTPUT_TOKENS)
         .thinkingConfig(MINIMAL_THINKING)
-        .responseSchema(schema)
+        .responseSchema(replySchema())
         .httpOptions(HttpOptions.builder().timeout(TIMEOUT_MILLIS).build())
         .build();
+  }
 
-    List<Content> contents = buildContents(recentLines, userMessage);
-    return parseReply(call(contents, config, AiCallType.CHAT, userId));
+  /**
+   * 대사 응답 스키마. reply는 일본어 대사, translation은 그 한국어 번역이라고 필드 설명으로 못박는다(둘을 바꿔 쓰는 일을
+   * 줄인다).
+   */
+  static Schema replySchema() {
+    return Schema.builder()
+        .type(Type.Known.OBJECT)
+        .properties(Map.of(
+            "reply",
+            Schema.builder()
+                .type(Type.Known.STRING)
+                .description("반드시 일본어로만 작성한 주민의 대사 (한글·한국어 절대 사용 금지)")
+                .build(),
+            "translation",
+            Schema.builder()
+                .type(Type.Known.STRING)
+                .description("reply(일본어 대사)의 자연스러운 한국어 번역")
+                .build()))
+        .required("reply", "translation")
+        .build();
+  }
+
+  /** 대사에 한글(완성형 음절·자모·호환 자모)이 한 글자라도 섞였는지 본다. */
+  static boolean containsHangul(String text) {
+    if (text == null) {
+      return false;
+    }
+    return text.codePoints().anyMatch(GeminiClient::isHangul);
+  }
+
+  private static boolean isHangul(int codePoint) {
+    return (codePoint >= 0xAC00 && codePoint <= 0xD7A3) // 완성형 음절(가~힣)
+        || (codePoint >= 0x1100 && codePoint <= 0x11FF) // 한글 자모
+        || (codePoint >= 0x3130 && codePoint <= 0x318F); // 호환 자모(ㄱ~㆏)
   }
 
   /**
