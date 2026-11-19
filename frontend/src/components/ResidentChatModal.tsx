@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
@@ -37,6 +37,9 @@ function toChatLine(item: ChatHistoryItem): ChatLine {
 /** 대화창이 보여 주는 화면: 오늘 대화 / 지난 대화 날짜 목록 / 고른 날의 대화. */
 type View = 'today' | 'days' | 'day';
 
+/** 단어 저장 안내를 닫았다고 기억해 두는 localStorage 키. */
+const SAVE_HINT_DISMISSED_KEY = 'chatSaveHintDismissed';
+
 interface ResidentChatModalProps {
   residentSlug: string;
   residentName: string;
@@ -67,8 +70,19 @@ function ResidentChatModal({
   // 오늘의 학습을 끝내기 전이라 서버가 대화를 막았을 때(403)의 안내.
   const [lessonRequiredMessage, setLessonRequiredMessage] = useState<string | null>(null);
   // 말풍선에서 드래그해 고른 단어와, "단어장에 저장" 버튼을 띄울 화면 좌표.
-  const [pick, setPick] = useState<{ word: string; left: number; top: number } | null>(null);
+  const [pick, setPick] = useState<{
+    word: string;
+    rect: { left: number; right: number; top: number; bottom: number };
+  } | null>(null);
   const [isSavingWord, setIsSavingWord] = useState(false);
+  // 처음 쓰는 사람에게 "드래그하면 단어장에 저장된다"를 알리는 안내. 닫으면 기억해 다시 띄우지 않는다.
+  const [showSaveHint, setShowSaveHint] = useState(() => {
+    try {
+      return localStorage.getItem(SAVE_HINT_DISMISSED_KEY) !== '1';
+    } catch {
+      return true;
+    }
+  });
   const [wordNotice, setWordNotice] = useState<{ message: string; isError: boolean } | null>(null);
   const navigate = useNavigate();
   // 오늘의 학습을 끝냈는지 확인한 결과. 확인 전(null)에는 입력창을 숨기고, 확인에 실패하면 서버(403)가 막는다.
@@ -94,7 +108,12 @@ function ResidentChatModal({
     clearError: clearSpeechError,
   } = useSpeechRecognition();
   // 전송 중복은 state가 아니라 ref로 막는다(음성 인식 콜백이 오래된 state를 들고 있을 수 있다).
+  const modalRef = useRef<HTMLElement>(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   const isSendingRef = useRef(false);
+  // 저장 버튼을 누르는 동안 터치로 선택이 잠깐 풀려도 버튼이 사라지지 않게 하는 표시.
+  const isTouchingSaveButtonRef = useRef(false);
+  const handleSelectionEndRef = useRef<() => void>(() => {});
   const isMountedRef = useRef(true);
   // 지난 대화 화면의 요청 번호. 응답이 뒤바뀌어 도착해도 가장 최근 요청의 응답만 반영한다.
   const pastRequestRef = useRef(0);
@@ -296,7 +315,7 @@ function ResidentChatModal({
     }
   };
 
-  /** 마우스를 뗄 때, 말풍선의 일본어 글자를 드래그해 골랐다면 저장 버튼을 그 아래에 띄운다. */
+  /** 마우스를 뗄 때, 말풍선의 일본어 글자를 드래그해 골랐다면 저장 버튼을 그 근처에 띄운다. */
   const handleSelectionEnd = () => {
     const selection = window.getSelection();
     const word = selection?.toString().trim() ?? '';
@@ -315,8 +334,62 @@ function ResidentChatModal({
       return;
     }
     const rect = range.getBoundingClientRect();
-    setPick({ word, left: rect.left + rect.width / 2, top: rect.bottom + 6 });
+    setPick({
+      word,
+      rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+    });
   };
+
+  handleSelectionEndRef.current = handleSelectionEnd;
+
+  // 모바일은 길게 눌러 고르면 마우스 이벤트가 오지 않으므로, 선택이 바뀔 때마다(잠깐 멈추면) 같은 처리를 한다.
+  useEffect(() => {
+    let timer: number | undefined;
+    const onSelectionChange = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const isEmpty = (window.getSelection()?.toString().trim() ?? '') === '';
+        if (isEmpty && isTouchingSaveButtonRef.current) {
+          return;
+        }
+        handleSelectionEndRef.current();
+      }, 250);
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('selectionchange', onSelectionChange);
+    };
+  }, []);
+
+  const dismissSaveHint = () => {
+    setShowSaveHint(false);
+    try {
+      localStorage.setItem(SAVE_HINT_DISMISSED_KEY, '1');
+    } catch {
+      // 저장소를 못 써도 이번 화면에서만 닫히면 된다.
+    }
+  };
+
+  // 저장 버튼을 선택 영역 바로 위에 놓는다(번역 줄을 가리지 않게). 위가 모달 밖이면 아래에 놓고,
+  // 좌우는 모달·화면 안쪽으로 보정한다. 버튼 크기를 재야 해서 그리기 전에 직접 좌표를 넣는다.
+  useLayoutEffect(() => {
+    const button = saveButtonRef.current;
+    const modal = modalRef.current;
+    if (!pick || !button || !modal) {
+      return;
+    }
+    const margin = 8;
+    const bounds = modal.getBoundingClientRect();
+    const minLeft = Math.max(bounds.left, 0) + margin;
+    const maxLeft = Math.min(bounds.right, window.innerWidth) - margin - button.offsetWidth;
+    const centered = (pick.rect.left + pick.rect.right) / 2 - button.offsetWidth / 2;
+    const left = Math.max(minLeft, Math.min(centered, maxLeft));
+    const above = pick.rect.top - button.offsetHeight - 6;
+    const top = above >= Math.max(bounds.top, 0) + margin ? above : pick.rect.bottom + 6;
+    button.style.left = `${left}px`;
+    button.style.top = `${top}px`;
+  }, [pick, isSavingWord]);
 
   /** 고른 단어를 단어장에 저장하고 결과를 안내한다. */
   const handleSaveWord = async () => {
@@ -375,6 +448,7 @@ function ResidentChatModal({
   return (
     <div className={styles.backdrop} onClick={onClose}>
       <section
+        ref={modalRef}
         className={styles.modal}
         role="dialog"
         aria-modal="true"
@@ -419,6 +493,19 @@ function ResidentChatModal({
             ✕
           </button>
         </header>
+        {showSaveHint && view !== 'days' && (
+          <p className={styles.saveHint}>
+            <span>💡 일본어를 드래그(또는 길게 눌러)하면 단어장에 저장할 수 있어요</span>
+            <button
+              type="button"
+              className={styles.saveHintClose}
+              onClick={dismissSaveHint}
+              aria-label="안내 닫기"
+            >
+              ✕
+            </button>
+          </p>
+        )}
         {view === 'days' && (
           <>
             {isPastLoading && <p>지난 대화를 불러오는 중…</p>}
@@ -525,10 +612,16 @@ function ResidentChatModal({
         {pick && (
           <button
             type="button"
+            ref={saveButtonRef}
             className={styles.saveWordButton}
-            style={{ left: pick.left, top: pick.top }}
             // 버튼을 눌러도 드래그로 고른 선택이 풀리지 않게 한다.
             onMouseDown={(event) => event.preventDefault()}
+            onPointerDown={() => {
+              isTouchingSaveButtonRef.current = true;
+              window.setTimeout(() => {
+                isTouchingSaveButtonRef.current = false;
+              }, 600);
+            }}
             onClick={() => void handleSaveWord()}
             disabled={isSavingWord}
           >

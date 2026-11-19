@@ -11,9 +11,24 @@ export interface VocabularyEntry {
   savedAt: string;
 }
 
-/** 로그인한 사용자 본인의 단어장을 최근 저장한 순서로 가져온다. */
-export async function getVocabulary(): Promise<VocabularyEntry[]> {
-  const response = await apiFetch('/api/vocabulary');
+/** 단어장 레벨 탭. `OTHER`는 N4·N5와 레벨을 모르는 단어다. */
+export type VocabularyLevel = 'N1' | 'N2' | 'N3' | 'OTHER';
+
+/** 단어장 한 페이지 분량. `page`는 0부터 시작한다. */
+export interface VocabularyPageResult {
+  items: VocabularyEntry[];
+  page: number;
+  totalPages: number;
+  totalElements: number;
+}
+
+/** 로그인한 사용자 본인의 단어장을 레벨별로 최근 저장한 순서대로 한 페이지 가져온다. */
+export async function getVocabulary(
+  level: VocabularyLevel,
+  page: number,
+): Promise<VocabularyPageResult> {
+  const params = new URLSearchParams({ level, page: String(page) });
+  const response = await apiFetch(`/api/vocabulary?${params}`);
   return response.json();
 }
 

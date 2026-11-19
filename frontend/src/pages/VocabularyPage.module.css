@@ -87,6 +87,43 @@
   color: var(--color-primary);
 }
 
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.tab,
+.tabActive,
+.pageButton,
+.pageButtonActive {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tabActive,
+.pageButtonActive {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.pageButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* 좁은 화면(모바일): 바깥 여백을 줄여 본문 폭을 확보한다. */
 @media (max-width: 480px) {
   .page {

@@ -137,7 +137,7 @@ class VocabularyControllerIntegrationTest {
         .andReturn()
         .getResponse()
         .getContentAsString();
-    return JsonPath.<List<Object>>read(body, "$").size();
+    return JsonPath.<List<Object>>read(body, "$.items").size();
   }
 
   private int countRows(Long userId, String surfaceForm, String reading) {
@@ -183,7 +183,7 @@ class VocabularyControllerIntegrationTest {
     mockMvc
         .perform(get("/api/vocabulary").session(session))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$").isEmpty());
+        .andExpect(jsonPath("$.items").isEmpty());
   }
 
   @Test
@@ -202,11 +202,46 @@ class VocabularyControllerIntegrationTest {
     mockMvc
         .perform(get("/api/vocabulary").session(session))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].source").value("THEME"))
-        .andExpect(jsonPath("$[0].surfaceForm").isNotEmpty())
-        .andExpect(jsonPath("$[0].reading").isNotEmpty())
-        .andExpect(jsonPath("$[0].meaning").isNotEmpty())
-        .andExpect(jsonPath("$[0].savedAt").isNotEmpty());
+        .andExpect(jsonPath("$.items[0].source").value("THEME"))
+        .andExpect(jsonPath("$.items[0].surfaceForm").isNotEmpty())
+        .andExpect(jsonPath("$.items[0].reading").isNotEmpty())
+        .andExpect(jsonPath("$.items[0].meaning").isNotEmpty())
+        .andExpect(jsonPath("$.items[0].savedAt").isNotEmpty());
+  }
+
+  @Test
+  void 단어장은_레벨_탭과_페이지_크기에_맞춰_나눠_내려온다() throws Exception {
+    MockHttpSession session = newLoggedInSession();
+    Long themeId = firstThemeId(session);
+    complete(session, themeId, "KANJI");
+    complete(session, themeId, "WORD");
+    complete(session, themeId, "EXPRESSION");
+    // 시드 기준 첫 테마의 단어 3개 + 표현 2개 = 5개.
+    mockMvc
+        .perform(get("/api/vocabulary").param("size", "2").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(2))
+        .andExpect(jsonPath("$.totalElements").value(5))
+        .andExpect(jsonPath("$.totalPages").value(3))
+        .andExpect(jsonPath("$.page").value(0));
+    mockMvc
+        .perform(get("/api/vocabulary").param("size", "2").param("page", "2").session(session))
+        .andExpect(jsonPath("$.items.length()").value(1));
+    // 레벨 탭 세 개와 그외의 합은 전체와 같다.
+    int sum = 0;
+    for (String level : List.of("N1", "N2", "N3", "OTHER")) {
+      String body = mockMvc
+          .perform(get("/api/vocabulary").param("level", level).session(session))
+          .andExpect(status().isOk())
+          .andReturn()
+          .getResponse()
+          .getContentAsString();
+      sum += JsonPath.<Number>read(body, "$.totalElements").intValue();
+    }
+    assertThat(sum).isEqualTo(5);
+    mockMvc
+        .perform(get("/api/vocabulary").param("level", "N9").session(session))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -273,7 +308,7 @@ class VocabularyControllerIntegrationTest {
     mockMvc
         .perform(get("/api/vocabulary").session(other))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$").isEmpty());
+        .andExpect(jsonPath("$.items").isEmpty());
   }
 
   private static final DictionaryWord SHIKKI =
@@ -311,8 +346,8 @@ class VocabularyControllerIntegrationTest {
 
     mockMvc
         .perform(get("/api/vocabulary").session(session))
-        .andExpect(jsonPath("$[0].surfaceForm").value("漆器"))
-        .andExpect(jsonPath("$[0].meaning").value("칠기, 옻칠 공예품"));
+        .andExpect(jsonPath("$.items[0].surfaceForm").value("漆器"))
+        .andExpect(jsonPath("$.items[0].meaning").value("칠기, 옻칠 공예품"));
   }
 
   @Test
