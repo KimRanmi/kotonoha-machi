@@ -43,7 +43,7 @@ public class VocabularyController {
       Authentication authentication,
       @RequestParam(required = false) VocabularyLevel level,
       @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "20") int size) {
+      @RequestParam(defaultValue = "10") int size) {
     User user = AuthPrincipal.resolve(authentication);
     return vocabularyService.getVocabulary(user.getId(), level, page, size);
   }

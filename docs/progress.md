@@ -1180,7 +1180,7 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
 ## 2026-11-19 (단어장 레벨 탭·페이징)
 
 - 단어장이 전체 단어를 한 번에 내려주던 것을 **레벨 탭(N1·N2·N3·그 외) + 탭 안 번호 버튼 페이징**으로 바꿨다. "그 외"는 N4·N5와 레벨을 모르는 단어다.
-  - 백엔드: `GET /api/vocabulary?level=N1|N2|N3|OTHER&page=0&size=20`. `level`을 생략하면 전체, 잘못된 값은 400이다. 응답은 `{items, page, totalPages, totalElements}`이고 `size`는 1~50으로 맞춘다. 정렬은 기존처럼 최근 저장 순(`savedAt`, `id` 내림차순). 새 클래스는 `VocabularyLevel`(enum)과 `VocabularyPageResponse`.
+  - 백엔드: `GET /api/vocabulary?level=N1|N2|N3|OTHER&page=0&size=10`. `level`을 생략하면 전체, 잘못된 값은 400이다. 응답은 `{items, page, totalPages, totalElements}`이고 `size`는 1~50으로 맞춘다. 정렬은 기존처럼 최근 저장 순(`savedAt`, `id` 내림차순). 새 클래스는 `VocabularyLevel`(enum)과 `VocabularyPageResponse`.
   - 프런트: `VocabularyPage`에 레벨 탭과 `‹ 1 2 3 ›` 번호 버튼을 추가했다. 탭을 바꾸면 1페이지로 돌아가고, 페이지가 1개뿐이면 번호 버튼은 숨긴다.
   - 검증: 백엔드 `spotlessApply`·`test` 통과(레벨·페이지 크기·잘못된 레벨 테스트 추가), 프런트 prettier·`npm run lint`(경고 2건은 기존 ref 경고)·`npm run build` 통과.
   - 확인 못 한 것: 브라우저에서 탭·페이지 버튼을 눌러 보는 화면 확인(프런트 테스트 체계 없음).
