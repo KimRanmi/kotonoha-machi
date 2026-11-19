@@ -41,6 +41,14 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     },
   });
 
+  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+    // 세션이 끊겼다(만료·서버 재시작 등). 인증 API(로그인 실패 등)는 각자 처리하므로 제외한다.
+    // 전체 페이지를 이동시켜 이전 사용자의 화면 상태를 남기지 않는다.
+    if (window.location.pathname !== '/login') {
+      window.location.assign('/login');
+    }
+  }
+
   if (!response.ok) {
     throw new ApiError(response.status, await extractErrorMessage(response));
   }
