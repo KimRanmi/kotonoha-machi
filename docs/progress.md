@@ -1176,3 +1176,11 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - `ChatService` 시스템 프롬프트: 규칙 5를 "reply는 반드시 일본어(히라가나·가타카나·한자)로만 작성하고, 한글(한국어)은 한 글자도 섞지 않는다"로 바꾸고, 끝에 `[Output Format]`과 출력 예시 JSON 한 줄을 넣었다. 규칙 2에는 "목표는 자연스러운 대화이지 질문을 붙이는 것이 아니다"를 더해, 매번 질문으로 끝내지 않고 플레이어의 말에 먼저 자연스럽게 반응하며 성격에 맞는 짧은 생각·관찰을 곁들이게 하고, 질문은 흐름이 정말 궁금함을 부를 때만 가끔 하게 했다(처음에는 친밀도와 무관하게 짧은 질문을 강제했으나, "무조건 되물음 질문 덧붙이는 걸 원하는 게 아니라 자연스러운 대화를 원한다"는 피드백을 받아 이 규칙으로 바꿨다).
   - 검증: 백엔드 `spotlessApply`·`spotlessCheck`·`checkstyleMain`(경고 23건, 변경 전과 동일)·`compileJava` 통과. 테스트는 손댄 클래스와 나머지 단위 테스트 226개를 돌려 모두 통과(`GeminiClientTest` 43개, `ChatServiceTest` 44개 — 한글 판별·재시도·스키마 설명·프롬프트 규칙 테스트 추가).
   - 확인 못 한 것: Docker가 없는 환경이라 Testcontainers 통합 테스트(`*IntegrationTest`, `VillageDataConsistencyTest`, `KotonohaMachiApplicationTests`)는 돌리지 못했다. 실제 Gemini로 새 주민과 대화해 일본어만 나오는지, 대화가 자연스럽게 이어지는지(매번 질문이 붙지 않는지)도 확인 전이다.
+
+## 2026-11-19 (단어장 레벨 탭·페이징)
+
+- 단어장이 전체 단어를 한 번에 내려주던 것을 **레벨 탭(N1·N2·N3·그 외) + 탭 안 번호 버튼 페이징**으로 바꿨다. "그 외"는 N4·N5와 레벨을 모르는 단어다.
+  - 백엔드: `GET /api/vocabulary?level=N1|N2|N3|OTHER&page=0&size=20`. `level`을 생략하면 전체, 잘못된 값은 400이다. 응답은 `{items, page, totalPages, totalElements}`이고 `size`는 1~50으로 맞춘다. 정렬은 기존처럼 최근 저장 순(`savedAt`, `id` 내림차순). 새 클래스는 `VocabularyLevel`(enum)과 `VocabularyPageResponse`.
+  - 프런트: `VocabularyPage`에 레벨 탭과 `‹ 1 2 3 ›` 번호 버튼을 추가했다. 탭을 바꾸면 1페이지로 돌아가고, 페이지가 1개뿐이면 번호 버튼은 숨긴다.
+  - 검증: 백엔드 `spotlessApply`·`test` 통과(레벨·페이지 크기·잘못된 레벨 테스트 추가), 프런트 prettier·`npm run lint`(경고 2건은 기존 ref 경고)·`npm run build` 통과.
+  - 확인 못 한 것: 브라우저에서 탭·페이지 버튼을 눌러 보는 화면 확인(프런트 테스트 체계 없음).

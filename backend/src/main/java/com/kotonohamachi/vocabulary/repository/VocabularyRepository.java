@@ -6,7 +6,11 @@ import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** 사용자별 단어장 데이터에 접근한다. */
 public interface VocabularyRepository extends JpaRepository<VocabularyEntry, Long> {
@@ -33,12 +37,35 @@ public interface VocabularyRepository extends JpaRepository<VocabularyEntry, Lon
       Long userId, String surfaceForm, String reading);
 
   /**
-   * 사용자의 단어장 전체를 최근 저장한 순서로 조회한다.
+   * 사용자의 단어장 한 페이지를 조회한다. 정렬은 pageable로 정한다.
    *
    * @param userId 단어장 주인 ID
-   * @return 최근 저장 순으로 정렬된 단어장 목록
+   * @param pageable 페이지 번호·크기·정렬
+   * @return 단어장 페이지
    */
-  List<VocabularyEntry> findAllByUserIdOrderBySavedAtDescIdDesc(Long userId);
+  Page<VocabularyEntry> findAllByUserId(Long userId, Pageable pageable);
+
+  /**
+   * 사용자의 단어장에서 JLPT 레벨이 일치하는 단어의 한 페이지를 조회한다.
+   *
+   * @param userId 단어장 주인 ID
+   * @param jlptLevel JLPT 레벨(3=N3 등)
+   * @param pageable 페이지 번호·크기·정렬
+   * @return 단어장 페이지
+   */
+  Page<VocabularyEntry> findAllByUserIdAndJlptLevel(
+      Long userId, Integer jlptLevel, Pageable pageable);
+
+  /**
+   * 사용자의 단어장에서 N1~N3가 아닌 단어(N4·N5, 레벨 모름)의 한 페이지를 조회한다.
+   *
+   * @param userId 단어장 주인 ID
+   * @param pageable 페이지 번호·크기·정렬
+   * @return 단어장 페이지
+   */
+  @Query("select e from VocabularyEntry e where e.user.id = :userId"
+      + " and (e.jlptLevel is null or e.jlptLevel > 3)")
+  Page<VocabularyEntry> findOtherLevels(@Param("userId") Long userId, Pageable pageable);
 
   /**
    * 사용자가 주어진 시각 이후에 특정 경로로 저장한 단어 수를 센다. 대화 단어 저장의 하루 상한 확인에 쓴다.

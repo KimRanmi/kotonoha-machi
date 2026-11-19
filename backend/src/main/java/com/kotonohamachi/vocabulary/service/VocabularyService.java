@@ -8,9 +8,11 @@ import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.vocabulary.VocabularyEntry;
 import com.kotonohamachi.vocabulary.VocabularyErrorCode;
+import com.kotonohamachi.vocabulary.VocabularyLevel;
 import com.kotonohamachi.vocabulary.VocabularySource;
 import com.kotonohamachi.vocabulary.dto.ChatWordResponse;
 import com.kotonohamachi.vocabulary.dto.DictionaryWord;
+import com.kotonohamachi.vocabulary.dto.VocabularyPageResponse;
 import com.kotonohamachi.vocabulary.dto.VocabularyResponse;
 import com.kotonohamachi.vocabulary.repository.VocabularyRepository;
 import java.time.LocalDate;
@@ -23,6 +25,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class VocabularyService {
 
   private static final int MAX_WORD_LENGTH = 30;
+  /** 단어장 한 페이지에 담을 수 있는 최대 단어 수. */
+  static final int MAX_PAGE_SIZE = 50;
   /** 하루에 대화로 새로 저장할 수 있는 단어 수. 번역(Gemini 무료 한도)과 사전 호출이 바닥나지 않게 막는다. */
   static final int DAILY_CHAT_WORD_LIMIT = 30;
 
@@ -189,16 +197,32 @@ public class VocabularyService {
   }
 
   /**
-   * 사용자의 단어장을 최근 저장한 순서로 조회한다.
+   * 사용자의 단어장을 최근 저장한 순서로 한 페이지 조회한다.
    *
    * @param userId 단어장 주인 ID(로그인한 본인)
-   * @return 단어장 목록
+   * @param level 레벨 탭(없으면 전체)
+   * @param page 페이지 번호(0부터, 음수면 0)
+   * @param size 페이지 크기(1~{@value #MAX_PAGE_SIZE}로 맞춘다)
+   * @return 단어장 한 페이지
    */
   @Transactional(readOnly = true)
-  public List<VocabularyResponse> getVocabulary(Long userId) {
-    return vocabularyRepository.findAllByUserIdOrderBySavedAtDescIdDesc(userId).stream()
-        .map(VocabularyResponse::from)
-        .toList();
+  public VocabularyPageResponse getVocabulary(
+      Long userId, VocabularyLevel level, int page, int size) {
+    Pageable pageable = PageRequest.of(
+        Math.max(page, 0),
+        Math.min(Math.max(size, 1), MAX_PAGE_SIZE),
+        Sort.by(Sort.Direction.DESC, "savedAt", "id"));
+    Page<VocabularyEntry> entries;
+    if (level == null) {
+      entries = vocabularyRepository.findAllByUserId(userId, pageable);
+    } else if (level == VocabularyLevel.OTHER) {
+      entries = vocabularyRepository.findOtherLevels(userId, pageable);
+    } else {
+      // N1 -> 1, N2 -> 2, N3 -> 3 (enum 선언 순서가 레벨 번호와 같다)
+      entries =
+          vocabularyRepository.findAllByUserIdAndJlptLevel(userId, level.ordinal() + 1, pageable);
+    }
+    return VocabularyPageResponse.from(entries);
   }
 
   /** 단어장에서 같은 단어를 가리는 기준: 표기와 읽는 법이 모두 같아야 같은 단어다. */
