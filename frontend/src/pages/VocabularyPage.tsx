@@ -85,7 +85,10 @@ function VocabularyPage() {
         ) : result === null ? (
           <p className={styles.message}>불러오는 중입니다…</p>
         ) : result.items.length === 0 ? (
-          <p className={styles.message}>이 레벨에 저장한 단어가 없어요.</p>
+          <p className={styles.message}>
+            이 레벨에 저장한 단어가 없어요. 대화 중 일본어를 드래그(또는 길게 눌러)하면 단어장에
+            쌓여요.
+          </p>
         ) : (
           <ul className={styles.list}>
             {result.items.map((entry) => (
