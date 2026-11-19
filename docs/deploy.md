@@ -140,3 +140,4 @@ gunzip -c backup-YYYY-MM-DD.sql.gz | docker compose -f docker-compose.prod.yml e
 - 인증서가 안 나온다: DNS A 레코드가 VM IP인지, 80·443 방화벽이 열렸는지, `logs web` 확인.
 - 가입 메일이 안 온다: Resend 도메인 인증 전에는 본인 계정 이메일로만 발송된다(`logs backend`에서 발송 실패 확인).
 - 백엔드가 계속 재시작한다: `logs backend` 확인(DB 비밀번호 불일치는 `DB_PASSWORD`를 바꾼 경우다. 기존 볼륨은 처음 만든 비밀번호를 유지한다).
+- 배포 직후 옛 탭에서 흰 화면이 난다(콘솔에 "Failed to load module script ... MIME type of text/html"): 강력 새로고침(Cmd/Ctrl+Shift+R). 옛 `index.html`을 캐시한 탭이 배포로 사라진 옛 해시 JS를 요청해서 생긴다. `frontend/Caddyfile`이 이를 막는다: `index.html`·SPA 경로는 `Cache-Control: no-cache`(매번 최신 확인), `/assets/*`는 있으면 `immutable` 1년 캐시(파일명에 내용 해시가 있다), 없으면 index.html 대신 404(HTML이 200으로 오지 않게).
