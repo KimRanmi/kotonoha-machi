@@ -1184,3 +1184,10 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 프런트: `VocabularyPage`에 레벨 탭과 `‹ 1 2 3 ›` 번호 버튼을 추가했다. 탭을 바꾸면 1페이지로 돌아가고, 페이지가 1개뿐이면 번호 버튼은 숨긴다.
   - 검증: 백엔드 `spotlessApply`·`test` 통과(레벨·페이지 크기·잘못된 레벨 테스트 추가), 프런트 prettier·`npm run lint`(경고 2건은 기존 ref 경고)·`npm run build` 통과.
   - 확인 못 한 것: 브라우저에서 탭·페이지 버튼을 눌러 보는 화면 확인(프런트 테스트 체계 없음).
+
+## 2026-11-19 (단어장 출처 문구 정정·단어 저장 버튼 위치)
+
+- 단어장 하단 출처 문구를 실제 데이터 경로에 맞게 고쳤다: 읽는 법·영어 뜻은 JMdict 기반 jisho.org, JLPT 레벨은 JMdict가 아니라 jisho.org가 붙인 JLPT 태그, 한국어 뜻은 Gemini 번역(실패 시 영어 뜻 그대로 저장), 오류 가능성. `docs/decisions/0041-chat-word-save.md`의 같은 표현도 맞췄다. 루트 `README.md`는 origin/master에 없어 건드리지 않았다.
+- 대화창 "단어장에 저장" 버튼을 선택 영역 바로 위(공간이 없으면 아래)에 두고 좌우를 모달·화면 안쪽으로 보정하도록 `ResidentChatModal`을 고쳤다. 닫힌 PR #57의 브랜치 `fix/vocab-source-note-and-save-button`의 변경을 가져왔다. 드래그→버튼→저장 API→결과 메시지 동작은 그대로다.
+  - 검증: prettier·`npm run lint`(경고 2건은 기존 ref 경고)·`npm run build` 통과.
+  - 확인 못 한 것: 실제 화면(데스크톱·375px 모바일)에서 버튼 위치. 채팅 모달은 3D 마을에서 주민에게 다가가야 열리고 대사가 Gemini에 의존해 이번에는 열어 보지 못했다.

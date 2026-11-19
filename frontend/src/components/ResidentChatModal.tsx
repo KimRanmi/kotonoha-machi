@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
@@ -67,7 +67,10 @@ function ResidentChatModal({
   // 오늘의 학습을 끝내기 전이라 서버가 대화를 막았을 때(403)의 안내.
   const [lessonRequiredMessage, setLessonRequiredMessage] = useState<string | null>(null);
   // 말풍선에서 드래그해 고른 단어와, "단어장에 저장" 버튼을 띄울 화면 좌표.
-  const [pick, setPick] = useState<{ word: string; left: number; top: number } | null>(null);
+  const [pick, setPick] = useState<{
+    word: string;
+    rect: { left: number; right: number; top: number; bottom: number };
+  } | null>(null);
   const [isSavingWord, setIsSavingWord] = useState(false);
   const [wordNotice, setWordNotice] = useState<{ message: string; isError: boolean } | null>(null);
   const navigate = useNavigate();
@@ -94,6 +97,8 @@ function ResidentChatModal({
     clearError: clearSpeechError,
   } = useSpeechRecognition();
   // 전송 중복은 state가 아니라 ref로 막는다(음성 인식 콜백이 오래된 state를 들고 있을 수 있다).
+  const modalRef = useRef<HTMLElement>(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   const isSendingRef = useRef(false);
   const isMountedRef = useRef(true);
   // 지난 대화 화면의 요청 번호. 응답이 뒤바뀌어 도착해도 가장 최근 요청의 응답만 반영한다.
@@ -296,7 +301,7 @@ function ResidentChatModal({
     }
   };
 
-  /** 마우스를 뗄 때, 말풍선의 일본어 글자를 드래그해 골랐다면 저장 버튼을 그 아래에 띄운다. */
+  /** 마우스를 뗄 때, 말풍선의 일본어 글자를 드래그해 골랐다면 저장 버튼을 그 근처에 띄운다. */
   const handleSelectionEnd = () => {
     const selection = window.getSelection();
     const word = selection?.toString().trim() ?? '';
@@ -315,8 +320,31 @@ function ResidentChatModal({
       return;
     }
     const rect = range.getBoundingClientRect();
-    setPick({ word, left: rect.left + rect.width / 2, top: rect.bottom + 6 });
+    setPick({
+      word,
+      rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+    });
   };
+
+  // 저장 버튼을 선택 영역 바로 위에 놓는다(번역 줄을 가리지 않게). 위가 모달 밖이면 아래에 놓고,
+  // 좌우는 모달·화면 안쪽으로 보정한다. 버튼 크기를 재야 해서 그리기 전에 직접 좌표를 넣는다.
+  useLayoutEffect(() => {
+    const button = saveButtonRef.current;
+    const modal = modalRef.current;
+    if (!pick || !button || !modal) {
+      return;
+    }
+    const margin = 8;
+    const bounds = modal.getBoundingClientRect();
+    const minLeft = Math.max(bounds.left, 0) + margin;
+    const maxLeft = Math.min(bounds.right, window.innerWidth) - margin - button.offsetWidth;
+    const centered = (pick.rect.left + pick.rect.right) / 2 - button.offsetWidth / 2;
+    const left = Math.max(minLeft, Math.min(centered, maxLeft));
+    const above = pick.rect.top - button.offsetHeight - 6;
+    const top = above >= Math.max(bounds.top, 0) + margin ? above : pick.rect.bottom + 6;
+    button.style.left = `${left}px`;
+    button.style.top = `${top}px`;
+  }, [pick, isSavingWord]);
 
   /** 고른 단어를 단어장에 저장하고 결과를 안내한다. */
   const handleSaveWord = async () => {
@@ -375,6 +403,7 @@ function ResidentChatModal({
   return (
     <div className={styles.backdrop} onClick={onClose}>
       <section
+        ref={modalRef}
         className={styles.modal}
         role="dialog"
         aria-modal="true"
@@ -525,8 +554,8 @@ function ResidentChatModal({
         {pick && (
           <button
             type="button"
+            ref={saveButtonRef}
             className={styles.saveWordButton}
-            style={{ left: pick.left, top: pick.top }}
             // 버튼을 눌러도 드래그로 고른 선택이 풀리지 않게 한다.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => void handleSaveWord()}

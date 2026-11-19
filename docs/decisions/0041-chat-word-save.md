@@ -21,4 +21,4 @@
 ## 알려진 한계
 
 - jisho.org는 비공식 API라 속도 제한·중단 가능성이 있다. 실패하면 502 "사전을 불러오지 못했어요"로 안내한다.
-- 번역 캐시는 서버 재시작 시 사라진다. 출처 표기(JMdict, CC BY-SA 4.0)를 단어장 화면에 둔다.
+- 번역 캐시는 서버 재시작 시 사라진다. 출처 표기를 단어장 화면에 둔다: 읽는 법·영어 뜻은 JMdict(CC BY-SA 4.0) 기반 jisho.org, JLPT 레벨은 JMdict가 아니라 jisho.org가 붙인 JLPT 태그(jisho.org/about에 Jonathan Waller의 JLPT Resources 기준이라고 적혀 있다), 한국어 뜻은 Gemini 번역이며 번역 실패 시 영어 뜻이 그대로 저장된다는 점과 오류 가능성을 함께 적는다.
