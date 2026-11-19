@@ -240,13 +240,15 @@ class ChatServiceTest {
   }
 
   @Test
-  void chat_친밀도가_낮아도_짧은_질문을_덧붙이라는_규칙이_프롬프트에_들어간다() {
+  void chat_매번_질문을_붙이지_말고_자연스럽게_대화하라는_규칙이_프롬프트에_들어간다() {
     String prompt = chatAndCapturePrompt(resident()).getValue();
 
     assertThat(prompt)
-        .contains("대답만 하고 끝내지 않는다")
-        .contains("친밀도가 낮아도(0~49)")
-        .contains("수줍음과 거리감은 그대로 지키면서");
+        .contains("목표는 자연스러운 대화이지 질문을 붙이는 것이 아니다")
+        .contains("매번 질문이나 되물음으로 끝내면 로봇처럼 느껴지므로 그렇게 하지 않는다")
+        .contains("플레이어의 말에 먼저 자연스럽게 반응하고")
+        .contains("질문 없이 끝나는 편이 자연스러우면 그대로 끝낸다")
+        .doesNotContain("대답만 하고 끝내지 않는다");
   }
 
   @Test
