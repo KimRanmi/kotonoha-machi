@@ -230,6 +230,26 @@ class ChatServiceTest {
   }
 
   @Test
+  void chat_프롬프트에_일본어_대사와_한국어_번역_규칙과_출력_예시가_들어간다() {
+    String prompt = chatAndCapturePrompt(resident()).getValue();
+
+    assertThat(prompt)
+        .contains("reply는 반드시 일본어(히라가나·가타카나·한자)로만 작성하고, 한글(한국어)은 한 글자도 섞지 않는다")
+        .contains("translation에는 reply의 한국어 번역을 항상 넣는다")
+        .contains("출력 예시: {\"reply\": \"おや、いい天気じゃな。\", \"translation\": \"어허, 날씨가 좋구먼.\"}");
+  }
+
+  @Test
+  void chat_친밀도가_낮아도_짧은_질문을_덧붙이라는_규칙이_프롬프트에_들어간다() {
+    String prompt = chatAndCapturePrompt(resident()).getValue();
+
+    assertThat(prompt)
+        .contains("대답만 하고 끝내지 않는다")
+        .contains("친밀도가 낮아도(0~49)")
+        .contains("수줍음과 거리감은 그대로 지키면서");
+  }
+
+  @Test
   void chat_친밀도와_주민_설정이_프롬프트에_치환된다() {
     ResidentFriendship friendship = mock(ResidentFriendship.class);
     when(friendship.getLevel()).thenReturn(73);

@@ -6,13 +6,16 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import com.google.genai.types.Content;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
+import com.google.genai.types.Schema;
 import com.kotonohamachi.chat.AiCallType;
 import com.kotonohamachi.chat.ChatSpeaker;
 import com.kotonohamachi.chat.dto.ChatHistoryItem;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.vocabulary.dto.DictionaryWord;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -49,6 +52,37 @@ class GeminiClientTest {
     ChatResponse result = GeminiClient.parseReply("{\"reply\":\"こんにちは\",\"translation\":\"안녕\"}");
 
     assertThat(result).isEqualTo(new ChatResponse("こんにちは", "안녕"));
+  }
+
+  @Test
+  void replySchema_reply는_일본어_translation은_한국어라고_설명한다() {
+    Schema schema = GeminiClient.replySchema();
+
+    assertThat(schema.properties().orElseThrow()).containsKeys("reply", "translation");
+    assertThat(schema.properties().orElseThrow().get("reply").description().orElse(""))
+        .contains("일본어로만")
+        .contains("한글");
+    assertThat(
+            schema.properties().orElseThrow().get("translation").description().orElse(""))
+        .contains("한국어 번역");
+    assertThat(schema.required().orElseThrow()).contains("reply", "translation");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"おや、いい天気じゃな。", "こんにちは！カフェはどこですか？", "はじめまして、ミミと申します", ""})
+  void containsHangul_일본어나_빈_문자열은_false다(String text) {
+    assertThat(GeminiClient.containsHangul(text)).isFalse();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"어허, 날씨가 좋구먼.", "おや、いい天気じゃな。 어허", "ㄱ", "안녕하세요"})
+  void containsHangul_한글이_섞이면_true다(String text) {
+    assertThat(GeminiClient.containsHangul(text)).isTrue();
+  }
+
+  @Test
+  void containsHangul_null이면_false다() {
+    assertThat(GeminiClient.containsHangul(null)).isFalse();
   }
 
   @ParameterizedTest
@@ -166,9 +200,40 @@ class GeminiClientTest {
     };
   }
 
+  /** 호출마다 준비한 응답을 차례로 돌려주고, 넘겨받은 설정을 모아 두는 클라이언트. */
+  private GeminiClient scripted(List<String> bodies, List<GenerateContentConfig> configs) {
+    AtomicInteger calls = new AtomicInteger();
+    return new GeminiClient("key", "test-model", usageRecorder) {
+      @Override
+      GenerateContentResponse fetch(List<Content> contents, GenerateContentConfig config) {
+        configs.add(config);
+        int index = Math.min(calls.getAndIncrement(), bodies.size() - 1);
+        return GenerateContentResponse.fromJson(bodies.get(index));
+      }
+    };
+  }
+
+  /** reply·translation을 담은 Gemini 응답 본문. */
+  private static String replyBody(String reply, String translation) {
+    return OK_JSON.formatted(
+        "{\\\"reply\\\":\\\"" + reply + "\\\",\\\"translation\\\":\\\"" + translation + "\\\"}");
+  }
+
+  /** 설정에 담긴 시스템 프롬프트 본문. */
+  private static String systemInstruction(GenerateContentConfig config) {
+    return config
+        .systemInstruction()
+        .orElseThrow()
+        .parts()
+        .orElseThrow()
+        .get(0)
+        .text()
+        .orElse("");
+  }
+
   @Test
   void generate_성공하면_토큰_수와_함께_CHAT으로_기록한다() {
-    String json = OK_JSON.formatted("{\\\"reply\\\":\\\"やあ\\\",\\\"translation\\\":\\\"안녕\\\"}");
+    String json = replyBody("やあ", "안녕");
 
     ChatResponse result = fake(json, null).generate("system", List.of(), "こんにちは", 7L);
 
@@ -176,6 +241,48 @@ class GeminiClientTest {
     // 출력 토큰 = 본문 20 + 추론 5
     org.mockito.Mockito.verify(usageRecorder)
         .record(7L, AiCallType.CHAT, "test-model", 100, 25, true, null);
+  }
+
+  @Test
+  void generate_reply에_한글이_섞이면_재지시를_붙여_한_번_다시_요청한다() {
+    List<GenerateContentConfig> configs = new ArrayList<>();
+    GeminiClient client = scripted(
+        List.of(
+            replyBody("어허, 날씨가 좋구먼.", "어허, 날씨가 좋구먼."), replyBody("おや、いい天気じゃな。", "어허, 날씨가 좋구먼.")),
+        configs);
+
+    ChatResponse result = client.generate("system", List.of(), "こんにちは", 7L);
+
+    assertThat(result).isEqualTo(new ChatResponse("おや、いい天気じゃな。", "어허, 날씨가 좋구먼."));
+    assertThat(configs).hasSize(2);
+    assertThat(systemInstruction(configs.get(0))).isEqualTo("system");
+    assertThat(systemInstruction(configs.get(1))).contains("한글이 섞였습니다");
+    org.mockito.Mockito.verify(usageRecorder, org.mockito.Mockito.times(2))
+        .record(7L, AiCallType.CHAT, "test-model", 100, 25, true, null);
+  }
+
+  @Test
+  void generate_재시도에도_한글이_섞이면_받은_대사를_그대로_돌려준다() {
+    List<GenerateContentConfig> configs = new ArrayList<>();
+    GeminiClient client = scripted(
+        List.of(replyBody("어허, 날씨가 좋구먼.", "어허, 날씨가 좋구먼."), replyBody("그래, 좋구먼.", "그래, 좋구먼.")),
+        configs);
+
+    ChatResponse result = client.generate("system", List.of(), "こんにちは", 7L);
+
+    // 대화를 끊지 않고 재시도 응답을 그대로 쓴다(경고 로그만 남긴다).
+    assertThat(result).isEqualTo(new ChatResponse("그래, 좋구먼.", "그래, 좋구먼."));
+    assertThat(configs).hasSize(2);
+  }
+
+  @Test
+  void generate_reply가_일본어면_한_번만_요청한다() {
+    List<GenerateContentConfig> configs = new ArrayList<>();
+    GeminiClient client = scripted(List.of(replyBody("やあ", "안녕")), configs);
+
+    client.generate("system", List.of(), "こんにちは", 7L);
+
+    assertThat(configs).hasSize(1);
   }
 
   @Test
