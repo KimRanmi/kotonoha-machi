@@ -199,11 +199,11 @@
   white-space: nowrap;
 }
 
-/* 드래그로 고른 단어 아래에 뜨는 저장 버튼. 화면 좌표(fixed)로 놓고, 가운데 맞춤한다. */
+/* 드래그로 고른 단어 근처에 뜨는 저장 버튼. 좌표(fixed)는 컴포넌트가 계산해 넣는다. */
 .saveWordButton {
   position: fixed;
   z-index: 20;
-  transform: translateX(-50%);
+  white-space: nowrap;
   padding: var(--space-1) var(--space-3);
   border: none;
   border-radius: var(--radius-lg);

@@ -63,8 +63,10 @@ function VocabularyPage() {
           </ul>
         )}
         <p className={styles.message}>
-          대화에서 저장한 단어의 읽는 법·JLPT·영어 뜻은 JMdict(CC BY-SA 4.0, jisho.org 제공)에서
-          가져오며, 한국어 뜻은 영어 뜻을 AI로 번역한 것입니다.
+          대화에서 저장한 단어의 읽는 법·영어 뜻은 JMdict(CC BY-SA 4.0)를 기반으로 하는
+          jisho.org에서 조회하고, JLPT 레벨은 jisho.org가 붙인 JLPT 태그(Jonathan Waller의 JLPT
+          Resources 기준)를 따릅니다. 한국어 뜻은 영어 뜻을 AI(Gemini)로 번역한 것이며, 번역하지
+          못한 경우 영어 뜻이 그대로 저장됩니다. 사전·번역에는 오류가 있을 수 있습니다.
         </p>
       </div>
     </main>

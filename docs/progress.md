@@ -1176,3 +1176,10 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - `ChatService` 시스템 프롬프트: 규칙 5를 "reply는 반드시 일본어(히라가나·가타카나·한자)로만 작성하고, 한글(한국어)은 한 글자도 섞지 않는다"로 바꾸고, 끝에 `[Output Format]`과 출력 예시 JSON 한 줄을 넣었다. 규칙 2에는 "목표는 자연스러운 대화이지 질문을 붙이는 것이 아니다"를 더해, 매번 질문으로 끝내지 않고 플레이어의 말에 먼저 자연스럽게 반응하며 성격에 맞는 짧은 생각·관찰을 곁들이게 하고, 질문은 흐름이 정말 궁금함을 부를 때만 가끔 하게 했다(처음에는 친밀도와 무관하게 짧은 질문을 강제했으나, "무조건 되물음 질문 덧붙이는 걸 원하는 게 아니라 자연스러운 대화를 원한다"는 피드백을 받아 이 규칙으로 바꿨다).
   - 검증: 백엔드 `spotlessApply`·`spotlessCheck`·`checkstyleMain`(경고 23건, 변경 전과 동일)·`compileJava` 통과. 테스트는 손댄 클래스와 나머지 단위 테스트 226개를 돌려 모두 통과(`GeminiClientTest` 43개, `ChatServiceTest` 44개 — 한글 판별·재시도·스키마 설명·프롬프트 규칙 테스트 추가).
   - 확인 못 한 것: Docker가 없는 환경이라 Testcontainers 통합 테스트(`*IntegrationTest`, `VillageDataConsistencyTest`, `KotonohaMachiApplicationTests`)는 돌리지 못했다. 실제 Gemini로 새 주민과 대화해 일본어만 나오는지, 대화가 자연스럽게 이어지는지(매번 질문이 붙지 않는지)도 확인 전이다.
+
+## 2026-11-19 (대화 단어 저장 마무리: 출처 문구·저장 버튼 위치)
+
+- 단어장 하단 출처 문구를 코드(`DictionaryClient`, `MeaningTranslator`)와 jisho.org/about에 맞게 고쳤다: 읽는 법·영어 뜻은 JMdict(CC BY-SA 4.0) 기반 jisho.org에서 조회, JLPT 레벨은 JMdict가 아니라 jisho.org의 JLPT 태그(about 페이지상 Jonathan Waller의 JLPT Resources 기준), 한국어 뜻은 Gemini 번역이며 번역 실패 시 영어 뜻이 그대로 저장됨, 오류 가능성. `docs/decisions/0041-chat-word-save.md`도 맞췄다. 루트 `README.md`는 origin/master에 아직 없어 건드리지 않았다(README 머지 후 같은 문구로 정정 필요).
+- "단어장에 저장" 버튼: 선택 영역 바로 아래(번역 줄을 가림)·가운데 맞춤(모달 밖으로 나감)이던 것을, 선택 영역 바로 위에 두고(모달 위쪽에 공간이 없으면 아래) 좌우를 모달·화면 안쪽으로 보정하도록 바꿨다(`ResidentChatModal`의 `useLayoutEffect`로 버튼 크기를 재서 좌표 계산). 동작(드래그→저장 API→결과 메시지)은 그대로.
+- 검증: prettier·`npm run lint`(경고 2건은 기존)·`npm run build` 통과.
+- 확인 못 한 것: 백엔드 없이 대화창을 띄우지 못해 데스크톱·375px 폭에서 버튼 위치를 실제 화면으로 확인하지 못했다(코드 점검만). 배포 후 수동 확인 필요.
