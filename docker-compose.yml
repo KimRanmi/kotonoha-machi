@@ -21,7 +21,7 @@ services:
 
   backend:
     build: ./backend
-    # 이메일/소셜 로그인 키 등은 backend/.env에서 읽는다. 파일이 없어도 기동은 된다.
+    # 소셜 로그인 키 등은 backend/.env에서 읽는다. 파일이 없어도 기동은 된다.
     env_file:
       - path: ./backend/.env
         required: false

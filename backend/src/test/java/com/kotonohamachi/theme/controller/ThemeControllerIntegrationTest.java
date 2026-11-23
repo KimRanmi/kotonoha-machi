@@ -26,8 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /**
  * 테마 목록 조회({@code GET /api/themes})와 단계 완료 처리({@code POST
  * /api/themes/{id}/stages/{stage}/complete})를 실제 Postgres(Testcontainers)와 Spring Security 필터
- * 체인까지 띄워 검증한다. 회원가입 → 이메일 인증 → 로그인으로 세션을 만드는 방식은 {@code
- * ProfileControllerIntegrationTest}와 같다. 테마는 {@code V6__create_theme_tables.sql}이 시드한 데이터를
+ * 체인까지 띄워 검증한다. 로그인한 세션은 {@code TestSessions}로 만든다. 테마는 {@code V6__create_theme_tables.sql}이 시드한 데이터를
  * 그대로 쓴다.
  */
 @Testcontainers

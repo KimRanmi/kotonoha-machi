@@ -124,7 +124,7 @@ gunzip -c backup-YYYY-MM-DD.sql.gz | docker compose -f docker-compose.prod.yml e
 `https://내도메인`에서 확인한다. (마이크는 HTTPS에서만 동작한다.)
 
 - [ ] HTTP로 접속하면 HTTPS로 넘어가고 인증서 경고가 없다
-- [ ] 가입(인증 메일 도착) → 로그인 → 새로고침해도 로그인 유지(쿠키 `Secure`)
+- [ ] 소셜 로그인 → 새로고침해도 로그인 유지(쿠키 `Secure`)
 - [ ] 마을 3D 화면, 건물 입장
 - [ ] 오늘의 학습: 지문·문제 표시, 완료 처리
 - [ ] 학습을 끝낸 뒤 주민과 대화(Gemini 응답, 한국어 번역)

@@ -67,7 +67,7 @@ class ProfileControllerIntegrationTest {
   }
 
   /** 주어진 이메일·닉네임의 소셜 가입 계정을 저장하고, 그 계정으로 로그인한 세션을 돌려준다. */
-  private MockHttpSession signUpVerifyAndLogin(String email, String nickname) {
+  private MockHttpSession loginAs(String email, String nickname) {
     return TestSessions.sessionFor(
         userRepository.save(User.createFromSocialLogin(email, nickname)));
   }
@@ -81,7 +81,7 @@ class ProfileControllerIntegrationTest {
   void me는_로그인한_사용자_자신의_프로필을_반환한다() throws Exception {
     String email = uniqueEmail();
     String nickname = uniqueNickname();
-    MockHttpSession session = signUpVerifyAndLogin(email, nickname);
+    MockHttpSession session = loginAs(email, nickname);
 
     mockMvc
         .perform(get("/api/users/me").session(session))
@@ -102,7 +102,7 @@ class ProfileControllerIntegrationTest {
 
   @Test
   void 닉네임을_변경하면_변경된_값이_응답과_조회에_반영된다() throws Exception {
-    MockHttpSession session = signUpVerifyAndLogin(uniqueEmail(), uniqueNickname());
+    MockHttpSession session = loginAs(uniqueEmail(), uniqueNickname());
     String newNickname = uniqueNickname();
 
     mockMvc
@@ -122,8 +122,8 @@ class ProfileControllerIntegrationTest {
   @Test
   void 다른_사용자가_이미_쓰는_닉네임으로_변경하면_409를_반환한다() throws Exception {
     String takenNickname = uniqueNickname();
-    signUpVerifyAndLogin(uniqueEmail(), takenNickname);
-    MockHttpSession session = signUpVerifyAndLogin(uniqueEmail(), uniqueNickname());
+    loginAs(uniqueEmail(), takenNickname);
+    MockHttpSession session = loginAs(uniqueEmail(), uniqueNickname());
 
     mockMvc
         .perform(patch("/api/users/me/nickname")
@@ -137,7 +137,7 @@ class ProfileControllerIntegrationTest {
   @Test
   void 본인의_현재_닉네임과_같은_값으로_요청하면_에러_없이_성공한다() throws Exception {
     String nickname = uniqueNickname();
-    MockHttpSession session = signUpVerifyAndLogin(uniqueEmail(), nickname);
+    MockHttpSession session = loginAs(uniqueEmail(), nickname);
 
     mockMvc
         .perform(patch("/api/users/me/nickname")
@@ -150,7 +150,7 @@ class ProfileControllerIntegrationTest {
 
   @Test
   void 닉네임이_공백이면_400을_반환한다() throws Exception {
-    MockHttpSession session = signUpVerifyAndLogin(uniqueEmail(), uniqueNickname());
+    MockHttpSession session = loginAs(uniqueEmail(), uniqueNickname());
 
     mockMvc
         .perform(patch("/api/users/me/nickname")
@@ -162,7 +162,7 @@ class ProfileControllerIntegrationTest {
 
   @Test
   void 닉네임이_20자를_넘으면_400을_반환한다() throws Exception {
-    MockHttpSession session = signUpVerifyAndLogin(uniqueEmail(), uniqueNickname());
+    MockHttpSession session = loginAs(uniqueEmail(), uniqueNickname());
     String tooLongNickname = "a".repeat(21);
 
     mockMvc

@@ -36,7 +36,7 @@ class ChatMessageRepositoryIntegrationTest {
   private long newUser() {
     String key = UUID.randomUUID().toString().substring(0, 8);
     return jdbc.queryForObject(
-        "INSERT INTO users (email, password_hash, nickname, status) VALUES (?, 'x', ?, 'ACTIVE') RETURNING id",
+        "INSERT INTO users (email, nickname, status) VALUES (?, ?, 'ACTIVE') RETURNING id",
         Long.class,
         key + "@test.com",
         "n-" + key);
