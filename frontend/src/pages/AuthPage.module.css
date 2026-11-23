@@ -7,6 +7,7 @@
   --color-primary: #4e8b5f;
   --color-primary-hover: #3d7350;
   --color-border: #e0e8d5;
+  --color-error: #c0392b;
   --shadow-md: 0 4px 16px rgba(36, 49, 38, 0.12);
   color: var(--color-text);
 
@@ -39,6 +40,12 @@
 .tagline {
   margin: 0;
   color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.error {
+  margin: 0 0 var(--space-3);
+  color: var(--color-error);
   font-size: 0.875rem;
 }
 

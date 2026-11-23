@@ -1214,5 +1214,6 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 테스트: 가입·인증·비밀번호 테스트를 지우고, 통합 테스트의 로그인 세션을 `TestSessions`(소셜 로그인 성공 시와 같은 인증 정보를 세션에 직접 넣음)로 바꿨다.
   - 문서: `docs/requirements.md`, `docs/deploy.md`(`RESEND_*` 항목 삭제), `0005`(폐기 표시) 등을 맞췄다.
   - 검증: 프런트 prettier·`npm run lint`(경고 2건은 기존 ref 경고)·`npm run build` 통과. 백엔드 `spotlessApply`·`test` 통과(Testcontainers 통합 테스트 포함).
+  - 로그인 화면은 `/login?error=social`로 돌아오면 실패 안내를 보여 준다(원인은 구분하지 않는 일반 문구)
   - 확인 못 한 것: 운영 서버에서 소셜 로그인 동작. 운영 `backend/.env`의 `RESEND_*`는 더 이상 읽히지 않으니 지워도 된다. 비밀번호로만 가입했고 소셜 제공자가 이메일을 주지 않는 계정은 로그인 수단이 없어진다.
 
