@@ -13,18 +13,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import com.kotonohamachi.auth.service.EmailSender;
+import com.kotonohamachi.TestSessions;
 import com.kotonohamachi.chat.service.GeminiClient;
+import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import com.kotonohamachi.vocabulary.service.DictionaryClient;
 import jakarta.servlet.Filter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -56,8 +55,8 @@ class VocabularyControllerIntegrationTest {
   @Autowired
   private WebApplicationContext webApplicationContext;
 
-  @MockitoBean
-  private EmailSender emailSender;
+  @Autowired
+  private UserRepository userRepository;
 
   @MockitoBean
   private DictionaryClient dictionaryClient;
@@ -79,41 +78,10 @@ class VocabularyControllerIntegrationTest {
         .build();
   }
 
-  private MockHttpSession newLoggedInSession() throws Exception {
-    String email = "user-" + UUID.randomUUID() + "@test.com";
-    lastEmail = email;
-    String password = "password123";
-    String nickname = "nick-" + UUID.randomUUID().toString().substring(0, 8);
-
-    mockMvc
-        .perform(
-            post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content("""
-                {"email":"%s","password":"%s","nickname":"%s"}
-                """.formatted(
-                    email, password, nickname)))
-        .andExpect(status().isCreated());
-
-    ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(emailSender).sendVerificationCode(eq(email), codeCaptor.capture());
-
-    mockMvc
-        .perform(post("/api/auth/verify-email")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("""
-                {"email":"%s","code":"%s"}
-                """.formatted(email, codeCaptor.getValue())))
-        .andExpect(status().isNoContent());
-
-    return (MockHttpSession) mockMvc
-        .perform(
-            post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
-                {"email":"%s","password":"%s"}
-                """.formatted(
-                    email, password)))
-        .andExpect(status().isOk())
-        .andReturn()
-        .getRequest()
-        .getSession();
+  private MockHttpSession newLoggedInSession() {
+    var user = TestSessions.newUser(userRepository);
+    lastEmail = user.getEmail();
+    return TestSessions.sessionFor(user);
   }
 
   private Long firstThemeId(MockHttpSession session) throws Exception {

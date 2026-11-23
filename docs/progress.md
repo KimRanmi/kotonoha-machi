@@ -1205,3 +1205,14 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
 - `frontend/Caddyfile`: `/assets/*`는 폴백 없이 파일이 없으면 404, 있으면 `public, max-age=31536000, immutable`(빌드 파일명에 해시가 있음을 확인). 나머지(`/`, SPA 경로, favicon 등)는 `no-cache`(etag로 재확인, 변경 없으면 304). 프록시 경로·gzip·`DOMAIN`은 그대로. `docs/deploy.md` 문제 해결에 흰 화면 시 강력 새로고침 안내를 추가했다.
 - 검증: 운영 Dockerfile로 이미지를 빌드해 `DOMAIN=localhost`로 띄우고 `curl -k -I` 확인 — `/`·`/login`·`/town` 200 + no-cache, 실제 `/assets/*.js`는 text/javascript + immutable(css도 동일), 없는 `/assets/*.js`는 404, `/actuator/health`는 프록시(스텁 백엔드)로 200. `docker compose -f docker-compose.prod.yml config`는 임시 빈 `backend/.env`와 환경변수로 통과.
 - 확인 못 한 것: 실제 백엔드와 붙인 로그인 쿠키·`/oauth2/authorization/google` 302(이번엔 스텁 백엔드만 사용, 프록시 경로 규칙은 코드 변경이 없고 `/api/*`가 백엔드로 넘어가는 것만 확인). 운영 서버 실제 동작은 머지·자동 배포 후 확인 필요.
+
+## 2026-11-23 (이메일 가입·비밀번호 제거, 소셜 로그인만)
+
+- 도메인 없이 배포해 Resend로 메일을 보낼 수 없어서, 이메일 회원가입과 그에 딸린 기능을 모두 없애고 소셜 로그인(구글·카카오·네이버)만 남겼다. 결정 기록: `docs/decisions/0046-social-login-only.md`.
+  - 백엔드: 가입·이메일 인증·재전송·닉네임 확인·비밀번호 로그인·재설정·변경과 Resend 발송기·의존성·설정 키를 제거했다. `AuthService`는 탈퇴만 남고 `DELETE /api/auth/me`는 비밀번호 확인 없이 본문 없이 호출한다. `ProfileResponse`에서 `hasPassword`를 뺐다. `User` 엔티티는 비밀번호·인증 코드·로그인 잠금 필드를 더 이상 매핑하지 않는다. DB 컬럼은 새 마이그레이션 없이 그대로 둔다.
+  - 프런트: 가입/재설정 화면과 라우트, 로그인 폼, 프로필의 비밀번호 변경과 탈퇴 비밀번호 확인을 제거했다. 로그인 화면은 소셜 버튼만 있다.
+  - 테스트: 가입·인증·비밀번호 테스트를 지우고, 통합 테스트의 로그인 세션을 `TestSessions`(소셜 로그인 성공 시와 같은 인증 정보를 세션에 직접 넣음)로 바꿨다.
+  - 문서: `docs/requirements.md`, `docs/deploy.md`(`RESEND_*` 항목 삭제), `0005`(폐기 표시) 등을 맞췄다.
+  - 검증: 프런트 prettier·`npm run lint`(경고 2건은 기존 ref 경고)·`npm run build` 통과. 백엔드 `spotlessApply`·`test` 통과(Testcontainers 통합 테스트 포함).
+  - 확인 못 한 것: 운영 서버에서 소셜 로그인 동작. 운영 `backend/.env`의 `RESEND_*`는 더 이상 읽히지 않으니 지워도 된다. 비밀번호로만 가입했고 소셜 제공자가 이메일을 주지 않는 계정은 로그인 수단이 없어진다.
+

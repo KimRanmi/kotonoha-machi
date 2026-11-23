@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  changePassword,
   getAvatarOptions,
   getProfile,
   updateAvatar,
@@ -29,7 +28,6 @@ function ProfilePage() {
   const activeSection: Section = searchParams.get('tab') === 'account' ? 'account' : 'character';
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
-  const [hasPassword, setHasPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,13 +43,6 @@ function ProfilePage() {
   const [isAvatarSubmitting, setIsAvatarSubmitting] = useState(false);
   const [avatarErrorMessage, setAvatarErrorMessage] = useState<string | null>(null);
 
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
-  const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null);
-  const [passwordSuccessMessage, setPasswordSuccessMessage] = useState<string | null>(null);
-
-  const [withdrawCurrentPassword, setWithdrawCurrentPassword] = useState('');
   const [isWithdrawConfirming, setIsWithdrawConfirming] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawErrorMessage, setWithdrawErrorMessage] = useState<string | null>(null);
@@ -64,7 +55,6 @@ function ProfilePage() {
         if (!cancelled) {
           setEmail(profile.email);
           setNickname(profile.nickname);
-          setHasPassword(profile.hasPassword);
           setAvatar(avatarFromProfile(profile));
           setAvatarOptions(options);
         }
@@ -128,27 +118,6 @@ function ProfilePage() {
     }
   }
 
-  async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPasswordErrorMessage(null);
-    setPasswordSuccessMessage(null);
-    setIsPasswordSubmitting(true);
-
-    try {
-      await changePassword(currentPassword, newPassword);
-      setCurrentPassword('');
-      setNewPassword('');
-      setHasPassword(true);
-      setPasswordSuccessMessage('비밀번호를 변경했습니다.');
-    } catch (error) {
-      setPasswordErrorMessage(
-        error instanceof ApiError ? error.message : '비밀번호 변경에 실패했습니다.',
-      );
-    } finally {
-      setIsPasswordSubmitting(false);
-    }
-  }
-
   async function handleWithdrawSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -161,7 +130,7 @@ function ProfilePage() {
     setIsWithdrawing(true);
 
     try {
-      await withdraw(withdrawCurrentPassword);
+      await withdraw();
       navigate('/login');
     } catch (error) {
       setWithdrawErrorMessage(
@@ -348,71 +317,8 @@ function ProfilePage() {
               </button>
             </form>
 
-            <h2 className={styles.sectionTitle}>비밀번호 변경</h2>
-            <form onSubmit={handlePasswordSubmit}>
-              {!hasPassword && (
-                <span className={styles.hint} data-tone="muted">
-                  소셜 로그인으로 가입한 계정이라 바로 설정할 수 있습니다.
-                </span>
-              )}
-              {hasPassword && (
-                <div className={styles.field}>
-                  <label htmlFor="currentPassword">현재 비밀번호</label>
-                  <input
-                    id="currentPassword"
-                    type="password"
-                    value={currentPassword}
-                    onChange={(event) => setCurrentPassword(event.target.value)}
-                    minLength={8}
-                    maxLength={100}
-                    required
-                  />
-                </div>
-              )}
-              <div className={styles.field}>
-                <label htmlFor="newPassword">새 비밀번호</label>
-                <input
-                  id="newPassword"
-                  type="password"
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  minLength={8}
-                  maxLength={100}
-                  required
-                />
-              </div>
-              {passwordErrorMessage && (
-                <p className={styles.error} role="alert">
-                  {passwordErrorMessage}
-                </p>
-              )}
-              {passwordSuccessMessage && <p className={styles.success}>{passwordSuccessMessage}</p>}
-              <button type="submit" className={styles.submit} disabled={isPasswordSubmitting}>
-                비밀번호 변경
-              </button>
-            </form>
-
             <h2 className={styles.sectionTitle}>회원 탈퇴</h2>
             <form onSubmit={handleWithdrawSubmit}>
-              {!hasPassword && (
-                <span className={styles.hint} data-tone="muted">
-                  소셜 로그인으로 가입한 계정이라 비밀번호 확인 없이 탈퇴됩니다.
-                </span>
-              )}
-              {hasPassword && (
-                <div className={styles.field}>
-                  <label htmlFor="withdrawCurrentPassword">현재 비밀번호 확인</label>
-                  <input
-                    id="withdrawCurrentPassword"
-                    type="password"
-                    value={withdrawCurrentPassword}
-                    onChange={(event) => setWithdrawCurrentPassword(event.target.value)}
-                    minLength={8}
-                    maxLength={100}
-                    required
-                  />
-                </div>
-              )}
               {isWithdrawConfirming && (
                 <span className={styles.hint} data-tone="error">
                   정말 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.

@@ -13,7 +13,6 @@ import com.kotonohamachi.user.AvatarSkinColor;
  * @param id 사용자 ID
  * @param email 이메일
  * @param nickname 닉네임
- * @param hasPassword 비밀번호 로그인 수단이 있는지 여부(소셜 로그인만으로 가입한 계정은 false)
  * @param avatarSkinColor 피부색
  * @param avatarHairColor 머리색
  * @param avatarHairStyle 헤어스타일
@@ -25,7 +24,6 @@ public record ProfileResponse(
     Long id,
     String email,
     String nickname,
-    boolean hasPassword,
     AvatarSkinColor avatarSkinColor,
     AvatarHairColor avatarHairColor,
     AvatarHairStyle avatarHairStyle,

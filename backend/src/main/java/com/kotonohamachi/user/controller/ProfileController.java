@@ -3,20 +3,18 @@ package com.kotonohamachi.user.controller;
 import com.kotonohamachi.auth.service.AuthPrincipal;
 import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.dto.AvatarOptionsResponse;
-import com.kotonohamachi.user.dto.ChangePasswordRequest;
 import com.kotonohamachi.user.dto.ProfileResponse;
 import com.kotonohamachi.user.dto.UpdateAvatarRequest;
 import com.kotonohamachi.user.dto.UpdateNicknameRequest;
 import com.kotonohamachi.user.service.ProfileService;
 import jakarta.validation.Valid;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 로그인한 사용자 자신의 프로필(이메일, 닉네임) 조회/수정, 비밀번호 변경, 캐릭터 꾸미기 조회/변경 API. */
+/** 로그인한 사용자 자신의 프로필(이메일, 닉네임) 조회/수정, 캐릭터 꾸미기 조회/변경 API. */
 @RestController
 public class ProfileController {
 
@@ -56,22 +54,6 @@ public class ProfileController {
       Authentication authentication, @Valid @RequestBody UpdateNicknameRequest request) {
     User user = AuthPrincipal.resolve(authentication);
     return profileService.updateNickname(user.getId(), request.nickname());
-  }
-
-  /**
-   * 로그인한 사용자 자신의 비밀번호를 바꾼다. 이미 비밀번호가 있는 계정은 현재 비밀번호가 맞아야 하고, 소셜
-   * 로그인만으로 가입해 비밀번호가 없는 계정은 확인 없이 새 비밀번호를 설정한다.
-   *
-   * @param authentication 현재 요청의 인증 정보
-   * @param request 비밀번호 변경 요청 본문
-   * @return 응답 본문 없이 204 No Content
-   */
-  @PatchMapping("/api/users/me/password")
-  public ResponseEntity<Void> changePassword(
-      Authentication authentication, @Valid @RequestBody ChangePasswordRequest request) {
-    User user = AuthPrincipal.resolve(authentication);
-    profileService.changePassword(user.getId(), request.currentPassword(), request.newPassword());
-    return ResponseEntity.noContent().build();
   }
 
   /**

@@ -1,25 +1,20 @@
 package com.kotonohamachi.theme.controller;
 
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import com.kotonohamachi.auth.service.EmailSender;
+import com.kotonohamachi.TestSessions;
+import com.kotonohamachi.user.repository.UserRepository;
 import jakarta.servlet.Filter;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -46,8 +41,8 @@ class ThemeControllerIntegrationTest {
   @Autowired
   private WebApplicationContext webApplicationContext;
 
-  @MockitoBean
-  private EmailSender emailSender;
+  @Autowired
+  private UserRepository userRepository;
 
   private MockMvc mockMvc;
 
@@ -58,62 +53,8 @@ class ThemeControllerIntegrationTest {
         .build();
   }
 
-  private static String uniqueEmail() {
-    return "user-" + UUID.randomUUID() + "@test.com";
-  }
-
-  private static String uniqueNickname() {
-    return "nick-" + UUID.randomUUID().toString().substring(0, 8);
-  }
-
-  private static String signupJson(String email, String password, String nickname) {
-    return """
-        {"email":"%s","password":"%s","nickname":"%s"}
-        """.formatted(email, password, nickname);
-  }
-
-  private static String loginJson(String email, String password) {
-    return """
-        {"email":"%s","password":"%s"}
-        """.formatted(email, password);
-  }
-
-  private static String verifyEmailJson(String email, String code) {
-    return """
-        {"email":"%s","code":"%s"}
-        """.formatted(email, code);
-  }
-
-  /** 새 계정을 만들고 이메일 인증까지 끝낸 뒤 로그인해서, 로그인한 상태의 세션을 돌려준다. */
-  private MockHttpSession signUpVerifyAndLogin(String email, String password, String nickname)
-      throws Exception {
-    mockMvc
-        .perform(post("/api/auth/signup")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(signupJson(email, password, nickname)))
-        .andExpect(status().isCreated());
-
-    ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(emailSender).sendVerificationCode(eq(email), codeCaptor.capture());
-
-    mockMvc
-        .perform(post("/api/auth/verify-email")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(verifyEmailJson(email, codeCaptor.getValue())))
-        .andExpect(status().isNoContent());
-
-    return (MockHttpSession) mockMvc
-        .perform(post("/api/auth/login")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(loginJson(email, password)))
-        .andExpect(status().isOk())
-        .andReturn()
-        .getRequest()
-        .getSession();
-  }
-
-  private MockHttpSession newLoggedInSession() throws Exception {
-    return signUpVerifyAndLogin(uniqueEmail(), "password123", uniqueNickname());
+  private MockHttpSession newLoggedInSession() {
+    return TestSessions.loggedInSession(userRepository);
   }
 
   /** 시드된 첫 번째 테마의 ID를 조회한다. */

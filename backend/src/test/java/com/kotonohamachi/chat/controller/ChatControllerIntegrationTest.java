@@ -1,25 +1,22 @@
 package com.kotonohamachi.chat.controller;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.kotonohamachi.auth.service.EmailSender;
+import com.kotonohamachi.TestSessions;
 import com.kotonohamachi.chat.ChatErrorCode;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.chat.service.GeminiClient;
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.theme.service.ThemeService;
+import com.kotonohamachi.user.repository.UserRepository;
 import jakarta.servlet.Filter;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -48,8 +45,8 @@ class ChatControllerIntegrationTest {
   @Autowired
   private WebApplicationContext webApplicationContext;
 
-  @MockitoBean
-  private EmailSender emailSender;
+  @Autowired
+  private UserRepository userRepository;
 
   @MockitoBean
   private GeminiClient geminiClient;
@@ -71,38 +68,8 @@ class ChatControllerIntegrationTest {
         .build();
   }
 
-  /** 새 계정을 만들고 이메일 인증까지 끝낸 뒤 로그인해서, 로그인한 상태의 세션을 돌려준다. */
-  private MockHttpSession signUpVerifyAndLogin() throws Exception {
-    String email = "user-" + UUID.randomUUID() + "@test.com";
-    String nickname = "nick-" + UUID.randomUUID().toString().substring(0, 8);
-    mockMvc
-        .perform(
-            post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content("""
-                {"email":"%s","password":"password123","nickname":"%s"}
-                """.formatted(
-                    email, nickname)))
-        .andExpect(status().isCreated());
-
-    ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(emailSender).sendVerificationCode(eq(email), codeCaptor.capture());
-    mockMvc
-        .perform(post("/api/auth/verify-email")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("""
-                {"email":"%s","code":"%s"}
-                """.formatted(email, codeCaptor.getValue())))
-        .andExpect(status().isNoContent());
-
-    return (MockHttpSession) mockMvc
-        .perform(
-            post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
-                {"email":"%s","password":"password123"}
-                """.formatted(
-                    email)))
-        .andExpect(status().isOk())
-        .andReturn()
-        .getRequest()
-        .getSession();
+  private MockHttpSession signUpVerifyAndLogin() {
+    return TestSessions.loggedInSession(userRepository);
   }
 
   private void say(MockHttpSession session, String message) throws Exception {

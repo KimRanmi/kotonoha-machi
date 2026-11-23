@@ -24,7 +24,6 @@ import com.kotonohamachi.vocabulary.VocabularyErrorCode;
 import com.kotonohamachi.vocabulary.VocabularySource;
 import com.kotonohamachi.vocabulary.dto.DictionaryWord;
 import com.kotonohamachi.vocabulary.repository.VocabularyRepository;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -63,7 +62,7 @@ class VocabularyServiceTest {
   private VocabularyService vocabularyService;
 
   private static User user() {
-    return new User("a@test.com", "hash", "nick", "123456", OffsetDateTime.now().plusMinutes(10));
+    return User.createFromSocialLogin("a@test.com", "nick");
   }
 
   private static ThemeVocabulary word(ThemeStage stage, String surface, String reading, int order) {
