@@ -90,7 +90,7 @@ class ThemeServiceTest {
   }
 
   private static User user() {
-    return new User("a@test.com", "hash", "nick", "123456", OffsetDateTime.now().plusMinutes(10));
+    return User.createFromSocialLogin("a@test.com", "nick");
   }
 
   @Test

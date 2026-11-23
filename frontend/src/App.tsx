@@ -2,10 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import BuildingInteriorPage from './pages/BuildingInteriorPage';
 import CompletedThemesPage from './pages/CompletedThemesPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
-import SignupPage from './pages/SignupPage';
 import ThemeLearningPage from './pages/ThemeLearningPage';
 import TownPage from './pages/TownPage';
 import VocabularyPage from './pages/VocabularyPage';
@@ -15,8 +13,6 @@ function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route path="/password-reset" element={<ForgotPasswordPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/town" element={<TownPage />} />

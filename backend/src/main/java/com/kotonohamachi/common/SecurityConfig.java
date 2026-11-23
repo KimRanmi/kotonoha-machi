@@ -7,13 +7,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
@@ -44,7 +40,7 @@ public class SecurityConfig {
   }
 
   /**
-   * 인증/인가 규칙을 정의하는 보안 필터 체인을 구성한다. {@code /api/auth/**}(회원가입, 로그인, 이메일 인증, 로그아웃)는 로그인 없이 접근할 수 있지만, 그중 {@code /api/auth/me}(현재 로그인된 사용자 조회)는 예외로 로그인이 필요하다. 소셜 로그인 경로({@code /oauth2/**}, {@code /login/oauth2/**})도 로그인 없이 접근할 수 있다. 그 외 모든 요청은 로그인(세션)이 필요하다.
+   * 인증/인가 규칙을 정의하는 보안 필터 체인을 구성한다. {@code /api/auth/**}(로그아웃 등)는 로그인 없이 접근할 수 있지만, 그중 {@code /api/auth/me}(현재 로그인된 사용자 조회·탈퇴)는 예외로 로그인이 필요하다. 소셜 로그인 경로({@code /oauth2/**}, {@code /login/oauth2/**})도 로그인 없이 접근할 수 있다. 그 외 모든 요청은 로그인(세션)이 필요하다.
    *
    * @param http HttpSecurity 빌더
    * @return 구성된 보안 필터 체인
@@ -110,28 +106,5 @@ public class SecurityConfig {
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);
     return source;
-  }
-
-  /**
-   * 비밀번호를 BCrypt로 해싱하는 인코더를 등록한다.
-   *
-   * @return BCrypt 비밀번호 인코더
-   */
-  @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-  }
-
-  /**
-   * 로그인 시 이메일/비밀번호를 검증하는 데 쓰는 인증 매니저를 등록한다.
-   *
-   * @param configuration Spring Security가 구성해 둔 인증 설정
-   * @return 인증 매니저
-   * @throws Exception 인증 매니저를 가져오는 중 오류가 발생하면
-   */
-  @Bean
-  public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration)
-      throws Exception {
-    return configuration.getAuthenticationManager();
   }
 }

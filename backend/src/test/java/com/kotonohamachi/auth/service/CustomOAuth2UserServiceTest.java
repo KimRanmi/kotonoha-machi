@@ -14,7 +14,6 @@ import com.kotonohamachi.user.User;
 import com.kotonohamachi.user.repository.SocialAccountRepository;
 import com.kotonohamachi.user.repository.UserRepository;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -91,8 +90,7 @@ class CustomOAuth2UserServiceTest {
 
   @Test
   void 이미_연결된_소셜_계정이면_기존_계정을_그대로_쓰고_새로_만들지_않는다() {
-    User existingUser =
-        new User("a@test.com", "hash", "nick", "000000", OffsetDateTime.now().plusMinutes(10));
+    User existingUser = User.createFromSocialLogin("a@test.com", "nick");
     SocialAccount existingLink =
         new SocialAccount(existingUser, SocialProvider.GOOGLE, "google-123");
     OAuth2User googleUser = new DefaultOAuth2User(
@@ -111,8 +109,7 @@ class CustomOAuth2UserServiceTest {
 
   @Test
   void 같은_이메일의_기존_계정이_있으면_새로_만들지_않고_자동으로_연결한다() {
-    User existingUser =
-        new User("a@test.com", "hash", "nick", "000000", OffsetDateTime.now().plusMinutes(10));
+    User existingUser = User.createFromSocialLogin("a@test.com", "nick");
     OAuth2User googleUser = new DefaultOAuth2User(
         List.of(), Map.of("sub", "google-123", "email", "a@test.com", "name", "테스트"), "sub");
     when(delegate.loadUser(any())).thenReturn(googleUser);
@@ -200,8 +197,7 @@ class CustomOAuth2UserServiceTest {
 
   @Test
   void 탈퇴한_계정으로_연결된_소셜_로그인을_시도하면_예외를_던진다() {
-    User withdrawnUser =
-        new User("a@test.com", "hash", "nick", "000000", OffsetDateTime.now().plusMinutes(10));
+    User withdrawnUser = User.createFromSocialLogin("a@test.com", "nick");
     withdrawnUser.withdraw();
     SocialAccount existingLink =
         new SocialAccount(withdrawnUser, SocialProvider.GOOGLE, "google-123");
@@ -218,8 +214,7 @@ class CustomOAuth2UserServiceTest {
 
   @Test
   void 탈퇴한_계정과_같은_이메일로_처음_소셜_연결을_시도하면_연결을_저장하지_않고_즉시_예외를_던진다() {
-    User withdrawnUser =
-        new User("a@test.com", "hash", "nick", "000000", OffsetDateTime.now().plusMinutes(10));
+    User withdrawnUser = User.createFromSocialLogin("a@test.com", "nick");
     withdrawnUser.withdraw();
     OAuth2User googleUser = new DefaultOAuth2User(
         List.of(), Map.of("sub", "google-123", "email", "a@test.com", "name", "테스트"), "sub");

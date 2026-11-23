@@ -61,10 +61,6 @@ server:
 app:
   # 세션 쿠키를 주고받는 프런트엔드 오리진. CORS 허용 대상으로 쓴다.
   frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
-  email:
-    resend-api-key: ${RESEND_API_KEY:}
-    # 도메인 인증 전까지는 Resend 공용 테스트 도메인(본인 계정 이메일로만 발송 가능)을 쓴다.
-    from-address: ${EMAIL_FROM_ADDRESS:onboarding@resend.dev}
   tts:
     # Google Cloud Text-to-Speech API 키. 비어 있으면 음성 합성을 쓸 수 없다(503) — 프런트엔드는 브라우저
     # 기본 음성으로 대신한다.

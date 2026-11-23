@@ -22,7 +22,7 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    # 이메일·소셜 로그인·Gemini·TTS 키는 backend/.env에서 읽는다.
+    # 소셜 로그인·Gemini·TTS 키는 backend/.env에서 읽는다.
     env_file:
       - ./backend/.env
     # environment가 env_file보다 우선하므로 .env에 개발용 값이 남아 있어도 운영 값이 이긴다.

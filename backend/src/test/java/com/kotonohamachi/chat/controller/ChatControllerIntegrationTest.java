@@ -1,25 +1,22 @@
 package com.kotonohamachi.chat.controller;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.kotonohamachi.auth.service.EmailSender;
+import com.kotonohamachi.TestSessions;
 import com.kotonohamachi.chat.ChatErrorCode;
 import com.kotonohamachi.chat.dto.ChatResponse;
 import com.kotonohamachi.chat.service.GeminiClient;
 import com.kotonohamachi.common.ApiException;
 import com.kotonohamachi.theme.service.ThemeService;
+import com.kotonohamachi.user.repository.UserRepository;
 import jakarta.servlet.Filter;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -48,8 +45,8 @@ class ChatControllerIntegrationTest {
   @Autowired
   private WebApplicationContext webApplicationContext;
 
-  @MockitoBean
-  private EmailSender emailSender;
+  @Autowired
+  private UserRepository userRepository;
 
   @MockitoBean
   private GeminiClient geminiClient;
@@ -71,40 +68,6 @@ class ChatControllerIntegrationTest {
         .build();
   }
 
-  /** 새 계정을 만들고 이메일 인증까지 끝낸 뒤 로그인해서, 로그인한 상태의 세션을 돌려준다. */
-  private MockHttpSession signUpVerifyAndLogin() throws Exception {
-    String email = "user-" + UUID.randomUUID() + "@test.com";
-    String nickname = "nick-" + UUID.randomUUID().toString().substring(0, 8);
-    mockMvc
-        .perform(
-            post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content("""
-                {"email":"%s","password":"password123","nickname":"%s"}
-                """.formatted(
-                    email, nickname)))
-        .andExpect(status().isCreated());
-
-    ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(emailSender).sendVerificationCode(eq(email), codeCaptor.capture());
-    mockMvc
-        .perform(post("/api/auth/verify-email")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("""
-                {"email":"%s","code":"%s"}
-                """.formatted(email, codeCaptor.getValue())))
-        .andExpect(status().isNoContent());
-
-    return (MockHttpSession) mockMvc
-        .perform(
-            post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
-                {"email":"%s","password":"password123"}
-                """.formatted(
-                    email)))
-        .andExpect(status().isOk())
-        .andReturn()
-        .getRequest()
-        .getSession();
-  }
-
   private void say(MockHttpSession session, String message) throws Exception {
     mockMvc
         .perform(post("/api/residents/r01/chat")
@@ -118,7 +81,7 @@ class ChatControllerIntegrationTest {
 
   @Test
   void 오늘_학습을_끝내지_않으면_대화는_403을_반환한다() throws Exception {
-    MockHttpSession session = signUpVerifyAndLogin();
+    MockHttpSession session = TestSessions.loggedInSession(userRepository);
     when(themeService.canChatToday(any())).thenReturn(false);
 
     mockMvc
@@ -137,7 +100,7 @@ class ChatControllerIntegrationTest {
 
   @Test
   void 기록_조회는_없는_주민이면_404를_반환한다() throws Exception {
-    MockHttpSession session = signUpVerifyAndLogin();
+    MockHttpSession session = TestSessions.loggedInSession(userRepository);
 
     mockMvc
         .perform(get("/api/residents/r99/chat").session(session))
@@ -148,7 +111,7 @@ class ChatControllerIntegrationTest {
   void 대화한_내용이_오래된_순으로_저장되고_조회된다() throws Exception {
     when(geminiClient.generate(any(), any(), any(), any()))
         .thenReturn(new ChatResponse("やあ", "안녕"), new ChatResponse("またね", "또 봐"));
-    MockHttpSession session = signUpVerifyAndLogin();
+    MockHttpSession session = TestSessions.loggedInSession(userRepository);
 
     say(session, "こんにちは");
     say(session, "さようなら");
@@ -171,8 +134,8 @@ class ChatControllerIntegrationTest {
   void 다른_사용자의_대화는_조회되지_않는다() throws Exception {
     when(geminiClient.generate(any(), any(), any(), any()))
         .thenReturn(new ChatResponse("やあ", "안녕"));
-    MockHttpSession alice = signUpVerifyAndLogin();
-    MockHttpSession bob = signUpVerifyAndLogin();
+    MockHttpSession alice = TestSessions.loggedInSession(userRepository);
+    MockHttpSession bob = TestSessions.loggedInSession(userRepository);
 
     say(alice, "こんにちは");
 
@@ -198,7 +161,7 @@ class ChatControllerIntegrationTest {
   void 날짜_목록은_오늘_대화를_제외하고_없는_주민은_404다() throws Exception {
     when(geminiClient.generate(any(), any(), any(), any()))
         .thenReturn(new ChatResponse("やあ", "안녕"));
-    MockHttpSession session = signUpVerifyAndLogin();
+    MockHttpSession session = TestSessions.loggedInSession(userRepository);
     say(session, "こんにちは");
 
     mockMvc
@@ -214,7 +177,7 @@ class ChatControllerIntegrationTest {
   void 지난_날_대화는_날짜_목록과_날짜별_조회로_확인된다() throws Exception {
     when(geminiClient.generate(any(), any(), any(), any()))
         .thenReturn(new ChatResponse("やあ", "안녕"));
-    MockHttpSession session = signUpVerifyAndLogin();
+    MockHttpSession session = TestSessions.loggedInSession(userRepository);
     say(session, "こんにちは");
     // 방금 저장한 두 줄을 이틀 전 낮으로 옮긴다.
     jdbc.update("UPDATE chat_message SET created_at = now() - interval '2 days'");
@@ -244,7 +207,7 @@ class ChatControllerIntegrationTest {
 
   @Test
   void 날짜별_기록_조회는_잘못된_날짜_형식이면_400을_반환한다() throws Exception {
-    MockHttpSession session = signUpVerifyAndLogin();
+    MockHttpSession session = TestSessions.loggedInSession(userRepository);
 
     mockMvc
         .perform(get("/api/residents/r01/chat/days/not-a-date").session(session))
@@ -256,7 +219,7 @@ class ChatControllerIntegrationTest {
 
   @Test
   void 날짜별_기록_조회는_대화가_없는_날이면_빈_목록이고_없는_주민은_404다() throws Exception {
-    MockHttpSession session = signUpVerifyAndLogin();
+    MockHttpSession session = TestSessions.loggedInSession(userRepository);
 
     mockMvc
         .perform(get("/api/residents/r01/chat/days/2020-01-01").session(session))
@@ -271,7 +234,7 @@ class ChatControllerIntegrationTest {
   void 대화하면_친밀도가_오르고_하루_한도에서_멈춘다() throws Exception {
     when(geminiClient.generate(any(), any(), any(), any()))
         .thenReturn(new ChatResponse("やあ", "안녕"));
-    MockHttpSession session = signUpVerifyAndLogin();
+    MockHttpSession session = TestSessions.loggedInSession(userRepository);
 
     // 첫 대화 +5, 이후 +1씩 5번(+5)으로 하루 한도 10에 닿고, 그 뒤로는 오르지 않는다.
     expectChat(session, 5, 5);
@@ -291,7 +254,7 @@ class ChatControllerIntegrationTest {
   void Gemini_한도로_429가_나면_졸려요_메시지로_응답한다() throws Exception {
     when(geminiClient.generate(any(), any(), any(), any()))
         .thenThrow(new ApiException(ChatErrorCode.DAILY_LIMIT_EXCEEDED));
-    MockHttpSession session = signUpVerifyAndLogin();
+    MockHttpSession session = TestSessions.loggedInSession(userRepository);
 
     mockMvc
         .perform(post("/api/residents/r01/chat")

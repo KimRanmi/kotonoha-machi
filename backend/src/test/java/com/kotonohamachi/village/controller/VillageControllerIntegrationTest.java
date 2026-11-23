@@ -1,27 +1,22 @@
 package com.kotonohamachi.village.controller;
 
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.kotonohamachi.auth.service.EmailSender;
+import com.kotonohamachi.TestSessions;
+import com.kotonohamachi.user.repository.UserRepository;
 import com.kotonohamachi.village.VillageMap;
 import jakarta.servlet.Filter;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -42,10 +37,10 @@ class VillageControllerIntegrationTest {
   private WebApplicationContext webApplicationContext;
 
   @Autowired
-  private JdbcTemplate jdbcTemplate;
+  private UserRepository userRepository;
 
-  @MockitoBean
-  private EmailSender emailSender;
+  @Autowired
+  private JdbcTemplate jdbcTemplate;
 
   private MockMvc mockMvc;
 
@@ -56,35 +51,8 @@ class VillageControllerIntegrationTest {
         .build();
   }
 
-  private MockHttpSession newLoggedInSession() throws Exception {
-    String email = "user-" + UUID.randomUUID() + "@test.com";
-    String nickname = "nick-" + UUID.randomUUID().toString().substring(0, 8);
-    mockMvc
-        .perform(
-            post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content("""
-                {"email":"%s","password":"password123","nickname":"%s"}
-                """.formatted(
-                    email, nickname)))
-        .andExpect(status().isCreated());
-    ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
-    verify(emailSender).sendVerificationCode(eq(email), code.capture());
-    mockMvc
-        .perform(post("/api/auth/verify-email")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("""
-                {"email":"%s","code":"%s"}
-                """.formatted(email, code.getValue())))
-        .andExpect(status().isNoContent());
-    return (MockHttpSession) mockMvc
-        .perform(
-            post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
-                {"email":"%s","password":"password123"}
-                """.formatted(
-                    email)))
-        .andExpect(status().isOk())
-        .andReturn()
-        .getRequest()
-        .getSession();
+  private MockHttpSession newLoggedInSession() {
+    return TestSessions.loggedInSession(userRepository);
   }
 
   @Test

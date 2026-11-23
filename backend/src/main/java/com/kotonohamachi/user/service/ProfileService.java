@@ -1,7 +1,6 @@
 package com.kotonohamachi.user.service;
 
 import com.kotonohamachi.common.ApiException;
-import com.kotonohamachi.common.PasswordVerifier;
 import com.kotonohamachi.user.AvatarClothesColor;
 import com.kotonohamachi.user.AvatarClothesStyle;
 import com.kotonohamachi.user.AvatarColor;
@@ -17,7 +16,6 @@ import com.kotonohamachi.user.dto.ProfileResponse;
 import com.kotonohamachi.user.repository.UserRepository;
 import java.util.Arrays;
 import java.util.List;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,17 +28,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProfileService {
 
   private final UserRepository userRepository;
-  private final PasswordEncoder passwordEncoder;
 
   /**
    * 생성자.
    *
    * @param userRepository 사용자 저장소
-   * @param passwordEncoder 비밀번호 해싱/검증기
    */
-  public ProfileService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+  public ProfileService(UserRepository userRepository) {
     this.userRepository = userRepository;
-    this.passwordEncoder = passwordEncoder;
   }
 
   /**
@@ -73,26 +68,6 @@ public class ProfileService {
 
     user.changeNickname(nickname);
     return toProfileResponse(user);
-  }
-
-  /**
-   * 로그인한 본인의 비밀번호를 바꾼다. 이미 비밀번호가 있는 계정은 현재 비밀번호가 맞는지 먼저 확인하고,
-   * 소셜 로그인만으로 가입해 비밀번호가 없는 계정은 확인 없이 새 비밀번호를 설정한다.
-   *
-   * @param userId 비밀번호를 바꿀 사용자 ID(로그인한 본인)
-   * @param currentPassword 현재 비밀번호(비밀번호가 없는 계정은 비워서 보낼 수 있다)
-   * @param newPassword 새로 설정할 비밀번호
-   */
-  @Transactional
-  public void changePassword(Long userId, String currentPassword, String newPassword) {
-    User user = findUserOrThrow(userId);
-
-    if (user.getPasswordHash() != null
-        && !PasswordVerifier.matches(passwordEncoder, user.getPasswordHash(), currentPassword)) {
-      throw new ApiException(UserErrorCode.CURRENT_PASSWORD_MISMATCH);
-    }
-
-    user.changePassword(passwordEncoder.encode(newPassword));
   }
 
   /**
@@ -153,7 +128,6 @@ public class ProfileService {
         user.getId(),
         user.getEmail(),
         user.getNickname(),
-        user.getPasswordHash() != null,
         user.getAvatarSkinColor(),
         user.getAvatarHairColor(),
         user.getAvatarHairStyle(),

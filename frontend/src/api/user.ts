@@ -44,7 +44,6 @@ export interface Profile {
   id: number;
   email: string;
   nickname: string;
-  hasPassword: boolean;
   avatarSkinColor: AvatarSkinColor;
   avatarHairColor: AvatarHairColor;
   avatarHairStyle: AvatarHairStyle;
@@ -68,27 +67,9 @@ export async function updateNickname(nickname: string): Promise<Profile> {
   return response.json();
 }
 
-/**
- * 로그인한 사용자 자신의 비밀번호를 바꾼다. 이미 비밀번호가 있는 계정은 현재 비밀번호가 틀리면 `ApiError`를
- * 던진다. 비밀번호가 없는(소셜 로그인만으로 가입한) 계정은 `currentPassword`를 빈 문자열로 보내면 된다.
- */
-export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  await apiFetch('/api/users/me/password', {
-    method: 'PATCH',
-    body: JSON.stringify({ currentPassword, newPassword }),
-  });
-}
-
-/**
- * 로그인한 사용자 자신을 탈퇴 처리한다(소프트 삭제). 이미 비밀번호가 있는 계정은 현재 비밀번호가
- * 틀리면 `ApiError`를 던진다. 비밀번호가 없는(소셜 로그인만으로 가입한) 계정은 `currentPassword`를
- * 빈 문자열로 보내면 된다.
- */
-export async function withdraw(currentPassword: string): Promise<void> {
-  await apiFetch('/api/auth/me', {
-    method: 'DELETE',
-    body: JSON.stringify({ currentPassword }),
-  });
+/** 로그인한 사용자 자신을 탈퇴 처리한다(소프트 삭제). */
+export async function withdraw(): Promise<void> {
+  await apiFetch('/api/auth/me', { method: 'DELETE' });
 }
 
 /** 캐릭터 꾸미기 화면에서 고를 수 있는 축별 선택지 전체 목록을 가져온다. */
