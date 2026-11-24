@@ -1,6 +1,6 @@
 import styles from './Logo.module.css';
 
-/** 말풍선 안에 「こ」가 든 로고 + 「ことばのまち」 글자. 한 줄로 유지된다. */
+/** 말풍선 안에 「こ」가 든 로고 + 「ことのはまち」 글자. 한 줄로 유지된다. */
 function Logo() {
   return (
     <span className={styles.logo}>
@@ -19,7 +19,7 @@ function Logo() {
           こ
         </text>
       </svg>
-      <span className={styles.text}>ことばのまち</span>
+      <span className={styles.text}>ことのはまち</span>
     </span>
   );
 }
