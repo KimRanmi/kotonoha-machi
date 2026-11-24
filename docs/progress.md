@@ -1223,3 +1223,9 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 배포 주소는 접속해 확인했다(HTTP 200, `/actuator/health`가 `UP`).
   - 주의: `ci.yml`·`deploy.yml`에 `paths` 조건이 없어 문서만 바뀐 master 머지도 CI와 자동 배포를 실행한다(불필요한 재배포). 필요하면 `paths-ignore`를 따로 검토한다.
   - 확인 못 한 것: 예문 출처(Tatoeba CC BY)는 결정 문서 기록을 따랐고 원본에서 다시 확인하지 않았다. 시연 영상은 아직 없다.
+
+## 2026-11-24 (서비스 이름 표기 통일)
+
+- 서비스 이름을 `ことのはまち (Kotonoha Machi)`로 통일했다. 저장소·패키지(`com.kotonohamachi`)는 kotonoha-machi인데 README·화면은 `ことばのまち`(Kotoba no Machi)라 서로 달랐다. 바꾼 곳: `README.md`, `frontend/index.html`(탭 제목·og 이름), `Logo.tsx`(화면 로고), `docs/requirements.md` 제목.
+- 검증: 프런트 prettier·`npm run lint`(경고 2건은 기존 ref 경고)·`npm run build` 통과. 백엔드는 변경 없음.
+- 남은 것: `.claude/agents/notion-logger.md`는 Notion 페이지 이름(`ことばのまち v2 개발 노트`)을 검색어로 쓰므로 그대로 뒀다. Notion 페이지 제목을 바꿀 때 같이 고친다.
