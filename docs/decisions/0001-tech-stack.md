@@ -60,9 +60,3 @@ v1은 Next.js(프론트) + Spring Boot(백엔드) + PostgreSQL로 "바이브코�
 - Java 25는 2025-09-16 GA된 LTS로 2030년까지 지원된다.
 - Spring Boot 4.0은 Spring Framework 7.0.5+, Jakarta EE 11 / Servlet 6.1, Gradle
   8.14+(또는 9.x) / Maven 3.6.3+를 요구한다.
-
-## 확인되지 않은 점 (실제 세팅 시 재확인)
-
-- Flyway 11.x + Spring Boot 4.x + JDK 25 조합에서 2025년 10월에 보고된 설정 프로퍼티
-  인식 문제가 현재(2026-10) 해결되었는지는 공식 소스로 확인하지 못했다. 백엔드를 실제로
-  세팅할 때 최신 패치 버전으로 재현 테스트를 거친다.

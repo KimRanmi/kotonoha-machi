@@ -14,7 +14,7 @@ DB 연결이 끊기면 HTTP 503 `{"status":"DOWN"}`이 된다(서버는 떠 있�
 
 ### Google Cloud Monitoring 업타임 체크로 알림 받기 (직접 설정)
 
-배포한 GCP 프로젝트에서 설정한다(새 가입 불필요). 아래 화면 이름은 콘솔 개편으로 조금 다를 수 있고, 이 단계는 실제 콘솔에서 확인하지 못했다.
+배포한 GCP 프로젝트에서 설정한다(새 가입 불필요). 아래 화면 이름은 콘솔 개편으로 조금 다를 수 있다.
 
 1. GCP 콘솔에서 VM이 있는 프로젝트를 고르고 **Monitoring → Uptime checks**(업타임 체크)로 간다. 처음이면 Monitoring API 사용을 묻는다(허용).
 2. **Create Uptime Check**를 누른다.
@@ -24,7 +24,7 @@ DB 연결이 끊기면 HTTP 503 `{"status":"DOWN"}`이 된다(서버는 떠 있�
 6. 다음 단계 **Alert & notification**에서 알림 정책을 만들고 알림 채널로 **Email**(내 이메일)을 추가한다. 폰 푸시를 원하면 Google Cloud 모바일 앱을 깔고 채널로 연결한다.
 7. 만든 뒤 체크 상태가 초록(통과)인지 본다. 알림이 가는지 보려면 VM에서 `docker compose -f docker-compose.prod.yml stop backend` 후 몇 분 기다렸다가 `start backend`로 되돌려 본다.
 
-참고: 도메인·인증서·프록시·백엔드·DB가 한 번에 감시된다. 배포(빌드 중 몇 분)나 재시작 때는 잠깐 알림이 올 수 있다. 무료 한도·요금은 가입 전 공식 가격 페이지에서 확인한다(업타임 체크 1개는 무료 한도 안이라고 알고 있으나 확인하지 못했다). 대안: UptimeRobot(무료 5분 간격), Better Stack(약 3분)도 같은 주소(`/actuator/health`)를 넣으면 된다.
+참고: 도메인·인증서·프록시·백엔드·DB가 한 번에 감시된다. 배포(빌드 중 몇 분)나 재시작 때는 잠깐 알림이 올 수 있다. 무료 한도·요금은 가입 전 공식 가격 페이지에서 확인한다. 대안: UptimeRobot(무료 5분 간격), Better Stack(약 3분)도 같은 주소(`/actuator/health`)를 넣으면 된다.
 
 ## 2. 오류 확인 (VM에서)
 

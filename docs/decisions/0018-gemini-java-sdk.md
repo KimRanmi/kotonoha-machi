@@ -27,4 +27,3 @@ SDK 호출로 바꿨다. `ChatService`가 쓰는 `generate(systemPrompt, userMes
 - okhttp, google-auth-library 등이 추가로 따라와 의존성이 늘어난다.
 - SDK 타임아웃은 전체 요청 20초 하나다(기존처럼 연결 5초·읽기 20초를 따로 줄 수 없다).
 - 키가 비어 있어도 앱이 부팅되도록 SDK `Client`는 첫 호출 때 만든다.
-- SDK로 실제 Gemini를 호출하는 경로(`Client`, `Schema`)는 아직 실제 호출로 검증하지 못했다.

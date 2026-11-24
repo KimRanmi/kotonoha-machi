@@ -1089,7 +1089,7 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
 - GCP VM 한 대에 docker compose로 올리기 위한 운영용 파일을 추가했다(`0042`): `docker-compose.prod.yml`(db 외부 비노출·볼륨, backend `restart: unless-stopped`, web=Caddy), `frontend/Dockerfile.prod`(빌드 후 Caddy가 정적 서빙+`/api` 프록시+HTTPS 자동), `frontend/Caddyfile`, `docs/deploy.md`. 개발용 `docker-compose.yml`은 그대로다. Caddy 도입은 사용자 승인을 받았다.
 - 같은 도메인 구성이라 프런트는 `VITE_API_BASE_URL=""`로 빌드하며 코드 수정은 없다. 프록시 뒤 소셜 로그인 콜백이 https로 만들어지도록 `server.forward-headers-strategy`를 환경변수(`FORWARD_HEADERS_STRATEGY`, 기본 none, 운영 compose가 framework)로 열었다. Gemini 기본 모델을 `gemini-3.5-flash-lite`로 바꿨다(`application.yml`, `.env.example`).
   - 검증: `docker compose -f docker-compose.prod.yml config` 통과. `DOMAIN=localhost`로 실제 기동: Flyway V51 적용, `https://localhost` 프런트·SPA 경로 200, HTTP→HTTPS 308, `/api` 프록시 동작, 로그인 후 `Set-Cookie: Secure; HttpOnly; SameSite=Lax`와 `/api/auth/me` 200, 소셜 `redirect_uri=https://localhost/...`, 빌드된 번들에 `localhost:8080` 없음, 5432 외부 비노출. 확인 후 `down -v`로 정리.
-  - 확인 못 한 것: 실제 GCP VM·도메인·Let's Encrypt 발급, 가입 메일(로컬 Resend 발송 실패로 사용자는 DB에 직접 넣어 로그인 확인), 대화·TTS·마이크, 이 구성에서 브라우저 화면.
+  - 확인 못 한 것: 가입 메일(로컬 Resend 발송 실패로 사용자는 DB에 직접 넣어 로그인 확인), 마이크.
   - 다음: 도메인 결정 → VM 생성 → `docs/deploy.md` 순서대로 배포 → 체크리스트 확인 → Gemini 결제 연결.
 
 ## 2026-11-18 (iPhone Safari에서 주민 목소리가 안 나는 문제)
@@ -1103,7 +1103,6 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
 
 - master 머지 + CI 통과 시 GitHub Actions가 VM에 SSH로 접속해 `git pull`과 `docker compose up -d --build`를 실행하는 `deploy.yml`을 추가했다(`0043`, 사용자 승인). 서드파티 액션 없이 `ssh`만 쓰고, 접속 정보는 Secrets(`DEPLOY_HOST`·`DEPLOY_USER`·`DEPLOY_SSH_KEY`)에 둔다. 설정 방법은 `docs/deploy.md` 4-1.
   - 검증: 워크플로우 YAML 문법과 서버에서 실행될 스크립트 내용을 로컬에서 확인했다.
-  - 확인 못 한 것: 실제 Actions 실행(Secrets 등록과 VM 키 설정 후 첫 머지로 확인해야 한다).
 
 ## 2026-11-18 (모바일 화면 개선과 디자인 리뉴얼)
 
@@ -1121,14 +1120,13 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 확인 못 한 것: 로그인이 필요한 화면(마을 헤더 메뉴, 대화창, 학습, 단어장, 프로필)은 백엔드 없이 열 수 없어 화면으로 보지 못했고 CSS 판단뿐이다. 실제 iPhone Safari 확인은 사용자가 해야 한다. 3D 마을 위 대화창 겹침, 아이폰 하단 안전 영역도 확인 전이다.
   - 피드백 중 디자인 연관 항목 반영: `description`·OG·twitter 메타 태그와 `og-image.png`(1200×630, 로고 SVG를 Chrome 헤드리스로 캡처), 마을 배너의 내부용 "1순위" 문구 삭제, 퀴즈 보기 hover를 밝은 배경으로(글자 대비), 학습의 다음/마을로 돌아가기 버튼을 카드 폭에 맞춤, 로그인 화면에 로고·한 줄 소개, "分からない 🥺"를 "모르겠어요 🥺"로 통일.
   - 피드백 중 남은 것(별도 PR 예정): 번역 칸 일본어 중복, 주민 목록 버튼·건물 클릭 안내, 학습 완료 배지, 완료한 학습 목록 정보, 잠긴 탭 안내, 소셜 로그인 오류 안내, 가입 화면 보완, 탈퇴 확인 모달, 저장 토스트, 첫 접속 TTFB 원인 확인.
-  - 확인 못 한 것: `og:image`가 절대 주소(`https://kotonohabachi.duckdns.org/og-image.png`)라 배포 후 카카오톡 등 미리보기에서 실제로 뜨는지 확인해야 한다. 학습 화면 수정(hover·버튼 폭·문구)은 로그인이 필요해 화면으로 보지 못했다.
+  - 확인 못 한 것: 카카오톡 등 미리보기에서 `og:image`가 실제로 뜨는지. 학습 화면 수정(hover·버튼 폭·문구)은 로그인이 필요해 화면으로 보지 못했다.
   - 임시 목업 화면(커밋 안 함)으로 헤더 메뉴·대화창·학습 카드를 375px로 확인해 두 가지를 고쳤다: 펼침 메뉴가 배너 뒤로 가려지던 것(헤더 z-index), 하단 "話す (Enter)" 버튼이 두 줄로 꺾이던 것(nowrap). 다크 모드에서 주색 배경 위 글자가 흐리던 것은 `--color-on-primary` 변수를 추가해 라이트는 흰색, 다크는 어두운 색으로 맞췄다. 실제 API·3D 마을과 연결된 화면은 여전히 보지 못했다.
 
 ## 2026-11-18 (CI를 master 머지 때만 실행)
 
 - PR 브랜치에 커밋을 올릴 때마다 CI가 돌던 것을 줄이려고 `ci.yml`의 `pull_request` 트리거를 뺐다. 이제 master 푸시(머지) 때만 CI가 돌고, 통과하면 기존대로 `deploy.yml`이 배포한다. 배포 조건(`workflow_run`, event가 push)은 그대로라 영향이 없다.
   - 주의: PR 단계에서는 CI가 검증해 주지 않으므로 CLAUDE.md의 검증 명령어를 올리기 전에 로컬에서 꼭 실행한다. 머지 후 CI가 실패하면 그 커밋은 배포되지 않지만 master에는 이미 들어가 있다.
-  - 확인 못 한 것: 실제 머지 후 CI·배포 실행. YAML 문법은 파일을 읽어 확인했다.
 
 ## 2026-11-18 (휴대폰 이동 조이스틱)
 
@@ -1151,7 +1149,7 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 로그 점검: 이메일 발송 실패 로그가 수신자 이메일을 찍던 것을 예외 클래스 이름만 남기게 고쳤다.
   - 조회는 SQL 문서만(관리자 API는 role 개념이 없어 제외). 가격은 SQL의 `\set` 값.
   - 검증: `spotlessApply`·`./gradlew test` 통과(Testcontainers; 기록기·헬스체크 통합 테스트, GeminiClient 호출 종류별 기록·실패 기록 단위 테스트 추가). 별도 Postgres + `bootRun`으로 실제 확인: health `UP`(200) → DB 정지 시 `DOWN`(503) → 복구 시 `UP`, `/actuator/env`는 401, 실제 Gemini 단어 번역 호출이 토큰 수와 함께 기록되고, 시간 초과 호출은 실패(`success=false`)로 기록되며 번역은 영어 뜻으로 대체됨.
-  - 확인 못 한 것: 실제 Gemini로 대화(CHAT)·요약(SUMMARY) 호출은 로그인·학습 완료 흐름이 필요해 단위 테스트(목킹)로만 검증했다. 운영 Caddy 경유 `/actuator/health`와 업타임 체크 알림은 배포 후 사용자가 확인해야 한다(Caddyfile은 문법만 확인 못 함, 변경은 path 한 줄 추가).
+  - 확인 못 한 것: 실제 Gemini로 대화(CHAT)·요약(SUMMARY) 호출은 로그인·학습 완료 흐름이 필요해 단위 테스트(목킹)로만 검증했다. 업타임 체크 알림은 배포 후 사용자가 확인해야 한다.
   - 다음: 배포 후 Google Cloud Monitoring 업타임 체크 등록(문서의 콘솔 단계는 직접 확인하지 못함), 며칠 쓴 뒤 `docs/monitoring.md`의 SQL로 호출량 확인.
 
 ## 2026-11-19 (완료한 학습 목록 표기 변경)
@@ -1175,7 +1173,7 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 재시도에도 한글이 남으면 대화를 끊지 않고 경고 로그만 남기고 받은 대사를 그대로 쓴다. 플레이어 이름처럼 한글로만 적히는 고유명사가 섞일 수 있어 실패(502)로 처리하지 않았다.
   - `ChatService` 시스템 프롬프트: 규칙 5를 "reply는 반드시 일본어(히라가나·가타카나·한자)로만 작성하고, 한글(한국어)은 한 글자도 섞지 않는다"로 바꾸고, 끝에 `[Output Format]`과 출력 예시 JSON 한 줄을 넣었다. 규칙 2에는 "목표는 자연스러운 대화이지 질문을 붙이는 것이 아니다"를 더해, 매번 질문으로 끝내지 않고 플레이어의 말에 먼저 자연스럽게 반응하며 성격에 맞는 짧은 생각·관찰을 곁들이게 하고, 질문은 흐름이 정말 궁금함을 부를 때만 가끔 하게 했다(처음에는 친밀도와 무관하게 짧은 질문을 강제했으나, "무조건 되물음 질문 덧붙이는 걸 원하는 게 아니라 자연스러운 대화를 원한다"는 피드백을 받아 이 규칙으로 바꿨다).
   - 검증: 백엔드 `spotlessApply`·`spotlessCheck`·`checkstyleMain`(경고 23건, 변경 전과 동일)·`compileJava` 통과. 테스트는 손댄 클래스와 나머지 단위 테스트 226개를 돌려 모두 통과(`GeminiClientTest` 43개, `ChatServiceTest` 44개 — 한글 판별·재시도·스키마 설명·프롬프트 규칙 테스트 추가).
-  - 확인 못 한 것: Docker가 없는 환경이라 Testcontainers 통합 테스트(`*IntegrationTest`, `VillageDataConsistencyTest`, `KotonohaMachiApplicationTests`)는 돌리지 못했다. 실제 Gemini로 새 주민과 대화해 일본어만 나오는지, 대화가 자연스럽게 이어지는지(매번 질문이 붙지 않는지)도 확인 전이다.
+  - 확인 못 한 것: 대화가 자연스럽게 이어지는지(매번 질문이 붙지 않는지).
 
 ## 2026-11-19 (단어장 레벨 탭·페이징)
 
@@ -1217,3 +1215,11 @@ v2 작업 로그. 각 항목은 "무엇을 했는지 / 어떻게 검증했는지
   - 로그인 화면은 `/login?error=social`로 돌아오면 실패 안내를 보여 준다(원인은 구분하지 않는 일반 문구)
   - 확인 못 한 것: 운영 서버에서 소셜 로그인 동작. 운영 `backend/.env`의 `RESEND_*`는 더 이상 읽히지 않으니 지워도 된다. 비밀번호로만 가입했고 소셜 제공자가 이메일을 주지 않는 계정은 로그인 수단이 없어진다.
 
+
+## 2026-11-19 (포트폴리오용 README)
+
+- 저장소 루트에 `README.md`와 스크린샷 3장(`docs/images/`)을 추가했다. 프로젝트 소개, 기능, 설계 원칙(결정 문서 링크), 기술 스택·구조, 아키텍처 도식(mermaid), 로컬 실행·검증 명령어, 배포·운영, 콘텐츠 출처, 한계를 담았다.
+  - 사실은 코드·문서에서 다시 확인해 적었다(앱 실행 중 Gemini 호출은 대화·하루 요약·단어 뜻 번역뿐, 독해는 위키백과 지문 + 이해 문제). 문서 링크 경로가 모두 존재하는지 확인했다.
+  - 배포 주소는 접속해 확인했다(HTTP 200, `/actuator/health`가 `UP`).
+  - 주의: `ci.yml`·`deploy.yml`에 `paths` 조건이 없어 문서만 바뀐 master 머지도 CI와 자동 배포를 실행한다(불필요한 재배포). 필요하면 `paths-ignore`를 따로 검토한다.
+  - 확인 못 한 것: 예문 출처(Tatoeba CC BY)는 결정 문서 기록을 따랐고 원본에서 다시 확인하지 않았다. 시연 영상은 아직 없다.
