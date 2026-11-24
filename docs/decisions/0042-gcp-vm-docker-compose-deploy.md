@@ -1,6 +1,6 @@
 # 0042. 배포 구성: GCP VM 한 대 + docker compose + Caddy
 
-- 상태: 구성 파일 작성·로컬 검증 완료(`DOMAIN=localhost`), 실제 GCP 배포는 아직 안 함. Caddy 도입은 사용자 승인 받음.
+- 상태: 구현·운영 중(GCP VM). Caddy 도입은 사용자 승인 받음.
 
 ## 결정
 
